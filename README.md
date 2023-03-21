@@ -6,7 +6,7 @@ Python wrapper to run Inference of [LLaMA](https://arxiv.org/abs/2302.13971) mod
 
 This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp)
 
-<img src="assets/fast_llama.png" alt="My Image" width="500" height="500">
+<img src="assets/fast_llama.jpg" alt="My Image" width="500" height="500">
 
 ---
 
