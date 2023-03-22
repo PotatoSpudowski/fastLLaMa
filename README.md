@@ -23,6 +23,22 @@ This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp
 
 ---
 
+## Requirements
+1. CMake
+
+    * For Linux: \
+    ```sudo apt-get -y install cmake```
+
+    * For OS X: \
+    ```brew install cmake```
+
+
+   * For Windows \
+Download cmake-*.exe installer from [Download page](https://cmake.org/download/) and run it.
+
+2. Minimum C++ 17
+3. Python 3.x
+
 ## Usage
 
 ### Example
@@ -39,7 +55,7 @@ ls ./models
 65B 30B 13B 7B tokenizer_checklist.chk tokenizer.model
 
 # install Python dependencies
-python3 -m pip install torch numpy sentencepiece pybind11
+pip install -r requirements.txt
 
 # convert the 7B model to ggml FP16 format
 python3 convert-pth-to-ggml.py models/7B/ 1
