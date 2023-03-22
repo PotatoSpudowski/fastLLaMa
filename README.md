@@ -129,6 +129,22 @@ res = model.save_state("./models/fast_llama.bin")
 res = model.load_state("./models/fast_llama.bin")
 ```
 
+### Running Alpaca-LoRA
+
+```sh
+pip install -r requirements.txt
+
+#Before running this command
+#You need to provide the HF model paths as found in the original script 
+python export-alpaca-lora.py
+
+python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1
+
+./quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
+
+python example-alpaca.py
+```
+
 ### Memory/Disk Requirements
 
 As the models are currently fully loaded into memory, you will need adequate disk space to save them
