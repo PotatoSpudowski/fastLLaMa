@@ -45,7 +45,7 @@ python3 -m pip install torch numpy sentencepiece pybind11
 python3 convert-pth-to-ggml.py models/7B/ 1
 
 # quantize the model to 4-bits
-python3 quantize.py 7B
+./quantize ggml-model-f16.bin 7B-quant.bin 2
 
 # run the inference
 python example.py
