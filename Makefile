@@ -132,6 +132,9 @@ ifeq ($(UNAME_M),$(filter $(UNAME_M),x86_64 i686))
 		ifneq (,$(findstring avx512pf,$(AVX512PF_M)))
 			CFLAGS += -mavx512pf
 		endif
+		ifneq (,$(findstring Red Hat,$(CXXV)))
+			CFLAGS += -D_POSIX_C_SOURCE=199309L
+		endif
 	else ifeq ($(UNAME_S),Haiku)
 		AVX1_M := $(shell sysinfo -cpu | grep -w "AVX")
 		ifneq (,$(findstring AVX,$(AVX1_M)))
