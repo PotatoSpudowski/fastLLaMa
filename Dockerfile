@@ -23,8 +23,6 @@ ENV TZ=Etc/UTC
 RUN add-apt-repository -y ppa:deadsnakes/ppa && apt-get update \
     && apt-get install -y python3.9-dev python3.9-distutils python3.9
 
-RUN apt-get install -y python3-dev python3-distutils
-
 WORKDIR /app
 RUN git clone https://github.com/PotatoSpudowski/fastLLaMa.git /app
 RUN chmod +x build.sh && bash ./build.sh
