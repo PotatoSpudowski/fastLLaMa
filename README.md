@@ -198,6 +198,9 @@ This is a Dockerfile to build a minimal working example. Note that it does not d
     CMD ["python3.9", "example.py"]
 
 ### Notes
-* I have only tested this out on an M1 Macbook, Please feel free to test it out on other devices.
-* The whole inspiration behind fast_llama is to let the community test the capabilities of LLaMA by creating custom workflows using Python. 
+* Tested on 
+    * M1 Pro Mac
+    * Intel Mac
+    * Ubuntu:18.04 - Python 3.9
+* The whole inspiration behind fastLLaMa is to let the community test the capabilities of LLaMA by creating custom workflows using Python. 
 * This project was possible because of [llama.cpp](https://github.com/ggerganov/llama.cpp), Do have a look at it as well.
