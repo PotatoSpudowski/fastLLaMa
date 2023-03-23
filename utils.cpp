@@ -390,18 +390,18 @@ gpt_vocab::id llama_sample_top_p(
 
     {
         const double scale = 1.0/temp;
+        auto const inv_penalty = 1. / repeat_penalty;
+
         for (int i = 0; i < n_logits; ++i) {
             // repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
             // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
+            auto const temp = logits[i]*scale;
             if (std::find(last_n_tokens.begin(), last_n_tokens.end(), i) != last_n_tokens.end()) {
                 // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
-                if (logits[i] < 0.0) {
-                    logits_id.push_back(std::make_pair(logits[i]*scale*repeat_penalty, i));
-                } else {
-                    logits_id.push_back(std::make_pair(logits[i]*scale/repeat_penalty, i));
-                }                
+                auto const factor = inv_penalty * static_cast<double>(logits[i] < 0.0) + static_cast<double>(logits[i] >= 0.0) * repeat_penalty;
+                logits_id.push_back(std::make_pair(temp * factor, i));
             } else {
-                logits_id.push_back(std::make_pair(logits[i]*scale, i));
+                logits_id.push_back(std::make_pair(temp, i));
             }
         }
     }

@@ -752,9 +752,10 @@ bool llama_eval(
     return true;
 }
 
-
 template<typename Fn>
 struct FastLlamaBuffer {
+    static constexpr std::size_t str_buffer_size = 512;
+
     FastLlamaBuffer(gpt_vocab const& vocab, std::size_t len, Fn&& fn)
         : m_vocab(vocab)
         , max_len(len)
@@ -768,30 +769,51 @@ struct FastLlamaBuffer {
         m_buffer.push_back(token);
     }
 
+    auto get_token_as_str(gpt_vocab::id id) const -> std::optional<std::string> {
+        auto it = m_vocab.id_to_token.find(id);
+        if (it != m_vocab.id_to_token.end()) return { it->second };
+        return {};
+    }
+
     auto flush_buffer() -> void {
         if (m_buffer.empty()) return;
         auto id = m_buffer.front();
         m_buffer.pop_front();
-        m_fn(m_vocab.id_to_token.at(id));
+        auto temp = get_token_as_str(id);
+        if (temp.has_value()) m_fn(std::move(*temp));
     }
 
-    constexpr auto is_tokens_in_buffer(std::vector<gpt_vocab::id> const& tokens) -> bool {
-        if (tokens.empty()) return false;
+    auto is_tokens_in_buffer(std::string_view tokens) {
+        if (tokens.empty()) return std::make_pair( false, std::string_view{} );
 
-        if (m_buffer.size() < tokens.size()) return false;
-        auto i = 0ul;
-        for (; i < m_buffer.size(); ++i) {
-            if (m_buffer[i] == tokens[i]) break;
-        }
+        auto const token_to_str_view = [this](auto id) -> std::string_view {
+            auto it = m_vocab.id_to_token.find(id);
+            if (it != m_vocab.id_to_token.end()) return it->second;
+            return "";
+        };
 
-        if (m_buffer.size() + i < tokens.size()) return false;
-        return std::equal(m_buffer.begin() + i, m_buffer.begin() + i + tokens.size(), tokens.begin());
+        assert(tokens.size() < str_buffer_size && "Max token is reached");
+
+        std::size_t buff_start = 0;
+
+        std::for_each(m_buffer.begin(), m_buffer.end(), [token_to_str_view, &buff_start, this](auto const e) {
+            assert(buff_start < str_buffer_size && "Max token is reached");
+            auto temp = token_to_str_view(e);
+            std::copy(temp.begin(), temp.end(), m_temp_str_buffer + buff_start);
+            buff_start += temp.size();
+        });
+
+        auto temp_str = std::string_view(m_temp_str_buffer, buff_start);
+        auto substr_pos = temp_str.find(tokens);
+        if (substr_pos == std::string_view::npos) return std::make_pair(false, std::string_view{});
+        return std::make_pair(true, temp_str.substr(0, substr_pos));
     }
 
 private:
     gpt_vocab const& m_vocab;
     std::size_t max_len{1};
     std::deque<gpt_vocab::id> m_buffer;
+    char m_temp_str_buffer[str_buffer_size];
     Fn m_fn;
 };
 
@@ -894,6 +916,11 @@ struct FastLlama {
     bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_p, float temp, float repeat_penalty, std::string stop_word = nullptr) {
 
         auto const stop_token = stop_word.empty() ? std::vector<gpt_vocab::id>() : ::llama_tokenize(m_vocab, stop_word, false);
+        // std::cout<< "Stop Word Size: " << stop_token.size() <<'\n'<<"[ ";
+        // for(auto const t : stop_token) {
+        //     std::cout<<std::quoted(m_vocab.id_to_token[t])<<", ";
+        // }
+        // std::cout<<"]";
 
         auto buffer = FastLlamaBuffer(m_vocab, stop_word.size() + 1, [&fn](std::string const s) {
             fn(s);
@@ -901,7 +928,12 @@ struct FastLlama {
 
         for(auto i = 0ul; i < num_tokens; ++i) {
             const int n_vocab = m_model.hparams.n_vocab;
-            if (buffer.is_tokens_in_buffer(stop_token)) return true;
+            auto const [is_stop_token_present, to_be_flush_substr] = buffer.is_tokens_in_buffer(stop_word);
+            
+            if (is_stop_token_present) {
+                fn(std::string(to_be_flush_substr));
+                return true;
+            }
 
             if (!llama_eval(m_model, m_threads, n_past, m_embd, m_logits, m_mem_per_token)) {
                 return false;
