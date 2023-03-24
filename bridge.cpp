@@ -1024,7 +1024,6 @@ private:
         file.write(reinterpret_cast<char const*>(&m_model.hparams), sizeof(m_model.hparams));
 
         auto const save_tensor = [this, &file](ggml_tensor* t) {
-            transform_tensors_to_relative_ptr(*t);
             save_value(file, get_relative_ptr(t));
             transform_tensors_to_resolved_ptr(*t);
         };
