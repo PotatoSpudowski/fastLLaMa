@@ -11,6 +11,7 @@
 #include <vector>
 #include <deque>
 #include <type_traits>
+#include <optional>
 
 #include <pybind11/embed.h>
 #include <pybind11/functional.h>
