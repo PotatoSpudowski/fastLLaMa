@@ -34,10 +34,14 @@ struct ggml_context {
 
 // determine number of model parts based on the dimension
 static const std::map<int, int> LLAMA_N_PARTS = {
+    // { 4096, 1 },
+    // { 5120, 2 },
+    // { 6656, 4 },
+    // { 8192, 8 },
     { 4096, 1 },
-    { 5120, 2 },
-    { 6656, 4 },
-    { 8192, 8 },
+    { 5120, 1 },
+    { 6656, 1 },
+    { 8192, 1 },
 };
 
 // default hparams (LLaMA 7B)

@@ -4,7 +4,7 @@ sys.path.append("./build/")
 
 import fastLlama
 
-MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
+MODEL_PATH = "./models/ALPACA-LORA-30B/alpaca-lora-q4_0.bin"
 
 def stream_token(x: str) -> None:
     """
@@ -15,15 +15,15 @@ def stream_token(x: str) -> None:
 model = fastLlama.Model(
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
-        n_ctx=10000, #context size of model
+        n_ctx=512, #context size of model
         last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
         seed=0 #seed for random number generator (Optional)
     )
 
-print("Ingesting model with prompt...")
-model.ingest("You are an AI assistant that based the user's Instruction you will give an Explaination.")
+# print("Ingesting model with prompt...")
+# model.ingest("Below is an instruction that describes a task. Write a response that appropriately completes the request. \n\n### Instruction:")
 
-print("Model ingested")
+# print("Model ingested")
 
 # res = model.save_state("./models/fast_llama.bin")
 
@@ -39,15 +39,15 @@ while True:
     if user_input == "exit":
         break
 
-    user_input = "Instruction: " + user_input + "\n Explaination:"
+    user_input = "### Instruction:\n\n" + user_input + "\n\n ### Response:\n\n"
 
     res = model.ingest(user_input)
 
     if res != True:
         break
     
-    print("")
-    
+    print("\n")
+
     res = model.generate(
         num_tokens=300, 
         top_p=0.95, #top p sampling (Optional)
