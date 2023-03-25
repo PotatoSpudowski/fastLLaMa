@@ -97,6 +97,16 @@ gpt_vocab::id llama_sample_top_p(
         double temp,
         std::mt19937 & rng);
 
+gpt_vocab::id llama_sample_top_p_top_k(
+        const gpt_vocab & vocab,
+        const float * logits,
+        std::vector<gpt_vocab::id> & last_n_tokens,
+        double repeat_penalty,
+        int top_k,
+        double top_p,
+        double temp,
+        std::mt19937 & rng);
+
 //
 // Quantization
 //

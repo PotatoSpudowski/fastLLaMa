@@ -883,8 +883,11 @@ struct FastLlama {
         int64_t t_sample_us  = 0;
         int64_t t_predict_us = 0;
 
+        // Add a space in front of the first character to match OG llama tokenizer behavior
+        std::string m_prompt = prompt;
+        m_prompt.insert(0, 1, ' ');
         // tokenize the prompt
-        std::vector<gpt_vocab::id> embd_inp = ::llama_tokenize(m_vocab, prompt, true);
+        std::vector<gpt_vocab::id> embd_inp = ::llama_tokenize(m_vocab, m_prompt, true);
 
         // n_past += m_embd.size();
         // m_embd.clear();
@@ -914,7 +917,7 @@ struct FastLlama {
         return true;
     }
 
-    bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_p, float temp, float repeat_penalty, std::string stop_word = nullptr) {
+    bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_k, float top_p, float temp, float repeat_penalty, std::string stop_word = nullptr) {
 
         auto const stop_token = stop_word.empty() ? std::vector<gpt_vocab::id>() : ::llama_tokenize(m_vocab, stop_word, false);
         // std::cout<< "Stop Word Size: " << stop_token.size() <<'\n'<<"[ ";
@@ -946,7 +949,7 @@ struct FastLlama {
             gpt_vocab::id id = 0;
 
             {
-                id = llama_sample_top_p(m_vocab, m_logits.data() + (m_logits.size() - n_vocab), m_last_n_tokens, repeat_penalty, top_p, temp, m_rng);
+                id = llama_sample_top_p_top_k(m_vocab, m_logits.data() + (m_logits.size() - n_vocab), m_last_n_tokens, repeat_penalty, top_k, top_p, temp, m_rng);
 
                 m_last_n_tokens.erase(m_last_n_tokens.begin());
                 m_last_n_tokens.push_back(id);
@@ -1224,7 +1227,7 @@ PYBIND11_MODULE(fastLlama, m) {
     py::class_<FastLlama>(m, "Model")
         .def(py::init<std::string const&, int, int, std::size_t, int>(), py::arg("path"), py::arg("num_threads"), py::arg("n_ctx"), py::arg("last_n_size") = 200, py::arg("seed") = 0)
         .def("ingest", &FastLlama::ingest, py::arg("prompt"))
-        .def("generate", &FastLlama::generate, py::arg("streaming_fn"), py::arg("num_tokens") = 100, py::arg("top_p") = 0.95f, py::arg("temp") = 0.8f, py::arg("repeat_penalty") = 1.f, py::arg("stop_word") = "")
+        .def("generate", &FastLlama::generate, py::arg("streaming_fn"), py::arg("num_tokens") = 100, py::arg("top_k") = 40, py::arg("top_p") = 0.95f, py::arg("temp") = 0.8f, py::arg("repeat_penalty") = 1.f, py::arg("stop_word") = "")
         .def("save_state", &FastLlama::save_state, py::arg("path"))
         .def("load_state", &FastLlama::load_state, py::arg("path"));
 }
