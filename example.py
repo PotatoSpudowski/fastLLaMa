@@ -29,16 +29,16 @@ User: Please tell me the largest city in Europe.
 Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.
 User: """
 
-# print("\nIngesting model with prompt...")
-# res = model.ingest(prompt) #ingest model with prompt
+print("\nIngesting model with prompt...")
+res = model.ingest(prompt) #ingest model with prompt
 
-# if res != True:
-#     print("\nFailed to ingest model")
-#     exit(1)
+if res != True:
+    print("\nFailed to ingest model")
+    exit(1)
 
-# print("\nModel ingested")
+print("\nModel ingested")
 
-# res = model.save_state("./models/fast_llama.bin") #save model state
+res = model.save_state("./models/fast_llama.bin") #save model state
 
 res = model.load_state("./models/fast_llama.bin") #load model state
 if not res:
