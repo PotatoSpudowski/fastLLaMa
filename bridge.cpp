@@ -6,7 +6,8 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <deque>
@@ -32,12 +33,16 @@ struct ggml_context {
     struct ggml_scratch scratch_save;
 };
 
-// determine number of model parts based on the dimension
-static const std::map<int, int> LLAMA_N_PARTS = {
-    { 4096, 1 },
-    { 5120, 2 },
-    { 6656, 4 },
-    { 8192, 8 },
+// This map allows us to retrieve relevant config for different models
+static const std::unordered_map<std::string_view, int> LLAMA_CONFIG = {
+    { "LLAMA-7B", 1 },
+    { "LLAMA-13B", 2 },
+    { "LLAMA-30B", 4 },
+    { "LLAMA-65B", 8 },
+    { "ALPACA-LORA-7B", 1 },
+    { "ALPACA-LORA-13B", 1 },
+    { "ALPACA-LORA-30B", 1 },
+    { "ALPACA-LORA-65B", 1 }
 };
 
 // default hparams (LLaMA 7B)
@@ -87,11 +92,11 @@ struct llama_model {
 
     //
     struct ggml_context * ctx;
-    std::map<std::string, struct ggml_tensor *> tensors;
+    std::unordered_map<std::string, struct ggml_tensor *> tensors;
 };
 
 // load the model's weights from a file
-bool llama_model_load(const std::string & fname, llama_model & model, gpt_vocab & vocab, int n_ctx) {
+bool llama_model_load(std::string_view model_name, const std::string & fname, llama_model & model, gpt_vocab & vocab, int n_ctx) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -129,7 +134,7 @@ bool llama_model_load(const std::string & fname, llama_model & model, gpt_vocab 
         hparams.n_ctx = n_ctx;
 
         n_ff = ((2*(4*hparams.n_embd)/3 + hparams.n_mult - 1)/hparams.n_mult)*hparams.n_mult;
-        n_parts = LLAMA_N_PARTS.at(hparams.n_embd);
+        n_parts = LLAMA_CONFIG.at(model_name);
 
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
         printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
@@ -820,15 +825,20 @@ private:
 
 struct FastLlama {
 
-    FastLlama(std::string const& path, int num_threads, int n_ctx, std::size_t last_n_size, int seed)
-        : m_threads(num_threads)
+    FastLlama(std::string name, std::string const& path, int num_threads, int n_ctx, std::size_t last_n_size, int seed)
+        : m_model_name(std::move(name))
+        , m_threads(num_threads)
         , m_seed(seed)
         , m_rng(seed)
         , m_last_n_tokens(last_n_size, 0)
     {
+        if (LLAMA_CONFIG.find(m_model_name) == LLAMA_CONFIG.end()) {
+            throw std::runtime_error(std::string("Currently, this model '") + m_model_name + "' is not supported!");
+        }
+
         m_model.hparams.n_ctx = n_ctx;
 
-        if (!llama_model_load(path, m_model, m_vocab, 512)) {
+        if (!llama_model_load(m_model_name, path, m_model, m_vocab, 512)) {
             throw std::runtime_error("Unable to load model");
         }
         if (!llama_eval(m_model, m_threads, 0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)) {
@@ -1210,6 +1220,7 @@ private:
     }
 
 private:
+    std::string m_model_name;
     llama_model m_model;
     gpt_vocab m_vocab;
     int m_threads;
@@ -1225,7 +1236,7 @@ private:
 
 PYBIND11_MODULE(fastLlama, m) {
     py::class_<FastLlama>(m, "Model")
-        .def(py::init<std::string const&, int, int, std::size_t, int>(), py::arg("path"), py::arg("num_threads"), py::arg("n_ctx"), py::arg("last_n_size") = 200, py::arg("seed") = 0)
+        .def(py::init<std::string, std::string const&, int, int, std::size_t, int>(), py::arg("id"), py::arg("path"), py::arg("num_threads"), py::arg("n_ctx"), py::arg("last_n_size") = 200, py::arg("seed") = 0)
         .def("ingest", &FastLlama::ingest, py::arg("prompt"))
         .def("generate", &FastLlama::generate, py::arg("streaming_fn"), py::arg("num_tokens") = 100, py::arg("top_k") = 40, py::arg("top_p") = 0.95f, py::arg("temp") = 0.8f, py::arg("repeat_penalty") = 1.f, py::arg("stop_word") = "")
         .def("save_state", &FastLlama::save_state, py::arg("path"))

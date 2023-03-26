@@ -39,14 +39,36 @@ lora_model.train(False)
 
 lora_model_sd = lora_model.state_dict()
 
+# 7B
+# params = {
+#     "dim": 4096,
+#     "multiple_of": 256,
+#     "n_heads": 32,
+#     "n_layers": 32,
+#     "norm_eps": 1e-06,
+#     "vocab_size": -1,
+# }
+
+# 13B
+# params = {
+#     "dim": 5120,
+#     "multiple_of": 256,
+#     "n_heads": 40,
+#     "n_layers": 40,
+#     "norm_eps": 1e-06,
+#     "vocab_size": -1,
+# }
+
+# # 30B
 params = {
-    "dim": 4096,
+    "dim": 6656,
     "multiple_of": 256,
-    "n_heads": 32,
-    "n_layers": 32,
+    "n_heads": 52,
+    "n_layers": 60,
     "norm_eps": 1e-06,
     "vocab_size": -1,
 }
+
 n_layers = params["n_layers"]
 n_heads = params["n_heads"]
 dim = params["dim"]
@@ -113,9 +135,9 @@ for k, v in lora_model_sd.items():
         else:
             new_state_dict[new_k] = v
 
-os.makedirs("models/ALPACA-LORA-7B", exist_ok=True)
+os.makedirs("models/ALPACA-LORA-30B", exist_ok=True)
 
-torch.save(new_state_dict, "models/ALPACA-LORA-7B/consolidated.00.pth")
+torch.save(new_state_dict, "models/ALPACA-LORA-30B/consolidated.00.pth")
 
-with open("models/ALPACA-LORA-7B/params.json", "w") as f:
+with open("models/ALPACA-LORA-30B/params.json", "w") as f:
     json.dump(params, f)

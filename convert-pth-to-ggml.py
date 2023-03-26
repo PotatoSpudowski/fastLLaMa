@@ -25,10 +25,12 @@ import torch
 
 from sentencepiece import SentencePieceProcessor
 
-if len(sys.argv) < 3:
+if len(sys.argv) < 4:
     print("Usage: convert-ckpt-to-ggml.py dir-model ftype\n")
     print("  ftype == 0 -> float32")
     print("  ftype == 1 -> float16")
+    print("  mode  == 0 -> Split")
+    print("  mode  == 1 -> No split")
     sys.exit(1)
 
 # output in the same directory as the model
@@ -37,7 +39,9 @@ dir_model = sys.argv[1]
 fname_hparams   = sys.argv[1] + "/params.json"
 fname_tokenizer = sys.argv[1] + "/../tokenizer.model"
 
-def get_n_parts(dim):
+def get_n_parts(dim, mode):
+    if mode == 1:
+        return 1
     if dim == 4096:
         return 1
     elif dim == 5120:
@@ -65,6 +69,13 @@ if len(sys.argv) > 2:
         sys.exit(1)
     fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
 
+mode = 0
+if len(sys.argv) > 3:
+    mode = int(sys.argv[3])
+    if mode < 0 or mode > 1:
+        print("Invalid mode: " + str(mode))
+        sys.exit(1)
+
 with open(fname_hparams, "r") as f:
     hparams = json.load(f)
 
@@ -72,7 +83,7 @@ tokenizer = SentencePieceProcessor(fname_tokenizer)
 
 hparams.update({"vocab_size": tokenizer.vocab_size()})
 
-n_parts = get_n_parts(hparams["dim"])
+n_parts = get_n_parts(hparams["dim"], mode)
 
 print(hparams)
 print('n_parts = ', n_parts)

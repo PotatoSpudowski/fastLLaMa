@@ -21,6 +21,18 @@ This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp
 * High performance compared to the original [LLaMA repo](https://github.com/facebookresearch/llama), thanks to the C++ implementation.
 * Ability to save and load the state of the model with system prompts.
 
+### Supported Models
+
+| model | model_id | status |
+|-------|---------------|------------------------|
+| LLaMa 7B    | LLAMA-7B | Done |
+| LLaMa 13B   | LLAMA-13B | Done |
+| LLaMa 30B   | LLAMA-30B | Done |
+| LLaMa 65B   | LLAMA-65B | Done |
+| Alpaca-LoRA 7B   | ALPACA-LORA-7B | Done |
+| Alpaca-LoRA 13B   | ALPACA-LORA-13B | Done |
+| Alpaca-LoRA 30B   | ALPACA-LORA-30B | Done |
+| Alpaca-LoRA 65B   | ALPACA-LORA-65B | Pending |
 ---
 
 ## Requirements
@@ -58,7 +70,8 @@ ls ./models
 pip install -r requirements.txt
 
 # convert the 7B model to ggml FP16 format
-python3 convert-pth-to-ggml.py models/7B/ 1
+# python [PythonFile] [ModelPath] [Floattype] [SplitType]
+python3 convert-pth-to-ggml.py models/7B/ 1 0
 
 # quantize the model to 4-bits
 python3 quantize.py 7B
@@ -81,6 +94,7 @@ import fastLlama
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
 model = fastLlama.Model(
+        id=MODEL_ID
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model
@@ -138,7 +152,9 @@ pip install -r requirements.txt
 #You need to provide the HF model paths as found in the original script 
 python export-alpaca-lora.py
 
-python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1
+# python [PythonFile] [ModelPath] [Floattype] [SplitType]
+# SplitType should be 1 for Alpaca-Lora models exported from HF
+python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 1
 
 ./quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
@@ -150,7 +166,7 @@ python example-alpaca.py
 As the models are currently fully loaded into memory, you will need adequate disk space to save them
 and sufficient RAM to load them. At the moment, memory and disk requirements are the same.
 
-| model | original size | quantized size (4-bit) |
+| model size | original size | quantized size (4-bit) |
 |-------|---------------|------------------------|
 | 7B    | 13 GB         | 3.9 GB                 |
 | 13B   | 24 GB         | 7.8 GB                 |
