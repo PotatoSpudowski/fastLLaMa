@@ -16,6 +16,7 @@
 
 #include <pybind11/embed.h>
 #include <pybind11/functional.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -789,7 +790,7 @@ struct FastLlamaBuffer {
         if (temp.has_value()) m_fn(std::move(*temp));
     }
 
-    auto is_tokens_in_buffer(std::string_view tokens) {
+    auto is_tokens_in_buffer(std::vector<std::string> const& tokens) {
         if (tokens.empty()) return std::make_pair( false, std::string_view{} );
 
         auto const token_to_str_view = [this](auto id) -> std::string_view {
@@ -810,9 +811,12 @@ struct FastLlamaBuffer {
         });
 
         auto temp_str = std::string_view(m_temp_str_buffer, buff_start);
-        auto substr_pos = temp_str.find(tokens);
-        if (substr_pos == std::string_view::npos) return std::make_pair(false, std::string_view{});
-        return std::make_pair(true, temp_str.substr(0, substr_pos));
+        for (auto const& token : tokens) {
+            auto substr_pos = temp_str.find(token);
+            if (substr_pos != std::string_view::npos) return std::make_pair(true, temp_str.substr(0, substr_pos));
+        }
+
+        return std::make_pair( false, std::string_view{} );
     }
 
 private:
@@ -927,16 +931,13 @@ struct FastLlama {
         return true;
     }
 
-    bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_k, float top_p, float temp, float repeat_penalty, std::string stop_word = nullptr) {
+    bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_k, float top_p, float temp, float repeat_penalty, std::vector<std::string> const& stop_word) {
 
-        auto const stop_token = stop_word.empty() ? std::vector<gpt_vocab::id>() : ::llama_tokenize(m_vocab, stop_word, false);
-        // std::cout<< "Stop Word Size: " << stop_token.size() <<'\n'<<"[ ";
-        // for(auto const t : stop_token) {
-        //     std::cout<<std::quoted(m_vocab.id_to_token[t])<<", ";
-        // }
-        // std::cout<<"]";
+        auto const stop_token_len = std::max(std::size_t{1}, std::accumulate(stop_word.begin(), stop_word.end(), std::size_t{1}, [this](auto p, auto const& s) {
+            return std::max(p, ::llama_tokenize(m_vocab, s, false).size());
+        }));
 
-        auto buffer = FastLlamaBuffer(m_vocab, stop_word.size() + 1, [&fn](std::string const s) {
+        auto buffer = FastLlamaBuffer(m_vocab, stop_token_len, [&fn](std::string const s) {
             fn(s);
         });
 
@@ -1238,7 +1239,7 @@ PYBIND11_MODULE(fastLlama, m) {
     py::class_<FastLlama>(m, "Model")
         .def(py::init<std::string, std::string const&, int, int, std::size_t, int>(), py::arg("id"), py::arg("path"), py::arg("num_threads"), py::arg("n_ctx"), py::arg("last_n_size") = 200, py::arg("seed") = 0)
         .def("ingest", &FastLlama::ingest, py::arg("prompt"))
-        .def("generate", &FastLlama::generate, py::arg("streaming_fn"), py::arg("num_tokens") = 100, py::arg("top_k") = 40, py::arg("top_p") = 0.95f, py::arg("temp") = 0.8f, py::arg("repeat_penalty") = 1.f, py::arg("stop_word") = "")
+        .def("generate", &FastLlama::generate, py::arg("streaming_fn"), py::arg("num_tokens") = 100, py::arg("top_k") = 40, py::arg("top_p") = 0.95f, py::arg("temp") = 0.8f, py::arg("repeat_penalty") = 1.f, py::arg("stop_word") = std::vector<std::string>())
         .def("save_state", &FastLlama::save_state, py::arg("path"))
         .def("load_state", &FastLlama::load_state, py::arg("path"));
 }
