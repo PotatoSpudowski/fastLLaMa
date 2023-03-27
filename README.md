@@ -50,100 +50,26 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 
 2. Minimum C++ 17
 3. Python 3.x
+4. Portaudio
+
+    * For Linux: \
+    ```sudo apt-get install libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0```
+    ```sudo apt-get install ffmpeg libav-tools```
+
+    * For OS X: \
+    ```brew install portaudio```
+
+5. Flac
+
+    * For Linux: \
+    ```sudo apt-get install -y flac```
+
+    * For OS X: \
+    ```brew install flac```
 
 ## Usage
 
-### Example
-```sh
-git clone https://github.com/PotatoSpudowski/fastLLaMa
-cd fast_llama
-
-chmod +x build.sh
-
-./build.sh
-
-# obtain the original LLaMA model weights and place them in ./models
-ls ./models
-65B 30B 13B 7B tokenizer_checklist.chk tokenizer.model
-
-# install Python dependencies
-pip install -r requirements.txt
-
-# convert the 7B model to ggml FP16 format
-# python [PythonFile] [ModelPath] [Floattype] [SplitType]
-python3 convert-pth-to-ggml.py models/7B/ 1 0
-
-# quantize the model to 4-bits
-python3 quantize.py 7B
-
-# run the inference
-python example.py
-```
-
-### Importing fastLlama
-```python
-import sys
-
-sys.path.append("./build/")
-
-import fastLlama
-```
-
-### Initializing the Model
-```python
-MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
-
-model = fastLlama.Model(
-        id=MODEL_ID
-        path=MODEL_PATH, #path to model
-        num_threads=8, #number of threads to use
-        n_ctx=512, #context size of model
-        last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
-        seed=0 #seed for random number generator (Optional)
-    )
-```
-
-### Ingesting Prompts
-```python
-prompt = """Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
-
-User: Hello, Bob.
-Bob: Hello. How may I help you today?
-User: Please tell me the largest city in Europe.
-Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.
-User: """
-
-res = model.ingest(prompt) 
-```
-### Generating Output
-```python
-def stream_token(x: str) -> None:
-    """
-    This function is called by the library to stream tokens
-    """
-    print(x, end='', flush=True)
-
-res = model.generate(
-    num_tokens=100, 
-    top_p=0.95, #top p sampling (Optional)
-    temp=0.8, #temperature (Optional)
-    repeat_penalty=1.0, #repetition penalty (Optional)
-    streaming_fn=stream_token, #streaming function
-    stop_word=["User:", "\n"] #stop generation when this word is encountered (Optional)
-    )
-```
-
-### Saving Model State
-```python
-res = model.save_state("./models/fast_llama.bin")
-```
-
-### Loading Model State
-```python
-res = model.load_state("./models/fast_llama.bin")
-```
-
-### Running Alpaca-LoRA
+### Running Alpaca-LoRA Voice Chat
 
 ```sh
 pip install -r requirements.txt
