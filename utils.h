@@ -7,6 +7,7 @@
 #include <vector>
 #include <random>
 #include <thread>
+#include "vocab.hpp"
 
 //
 // CLI argument parsing
@@ -80,8 +81,8 @@ bool gpt_vocab_init(const std::string & fname, gpt_vocab & vocab);
 // TODO: not sure if this implementation is correct
 // TODO: temperature is not implemented
 //
-gpt_vocab::id gpt_sample_top_k_top_p(
-        const gpt_vocab & vocab,
+typename fastllama::vocab::id gpt_sample_top_k_top_p(
+        const fastllama::vocab & vocab,
         const float * logits,
         int    top_k,
         double top_p,
@@ -97,8 +98,8 @@ gpt_vocab::id llama_sample_top_p(
         double temp,
         std::mt19937 & rng);
 
-gpt_vocab::id llama_sample_top_p_top_k(
-        const gpt_vocab & vocab,
+typename fastllama::vocab::id llama_sample_top_p_top_k(
+        const fastllama::vocab & vocab,
         const float * logits,
         std::vector<gpt_vocab::id> & last_n_tokens,
         double repeat_penalty,
