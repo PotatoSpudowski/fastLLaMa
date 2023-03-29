@@ -58,9 +58,7 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 git clone https://github.com/PotatoSpudowski/fastLLaMa
 cd fast_llama
 
-chmod +x build.sh
-
-./build.sh
+python setup.py
 
 # obtain the original LLaMA model weights and place them in ./models
 ls ./models
