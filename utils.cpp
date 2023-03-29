@@ -346,8 +346,8 @@ void sample_top_k(std::vector<std::pair<double, gpt_vocab::id>> & logits_id, int
     logits_id.resize(top_k);
 }
 
-gpt_vocab::id llama_sample_top_p_top_k(
-        const gpt_vocab & vocab,
+typename fastllama::vocab::id llama_sample_top_p_top_k(
+        const fastllama::vocab & vocab,
         const float * logits,
         std::vector<gpt_vocab::id> & last_n_tokens,
         double repeat_penalty,
@@ -355,13 +355,15 @@ gpt_vocab::id llama_sample_top_p_top_k(
         double top_p,
         double temp,
         std::mt19937 & rng) {
+
     int n_logits = vocab.id_to_token.size();
 
-    std::vector<std::pair<double, gpt_vocab::id>> logits_id;
+    std::vector<std::pair<double, typename fastllama::vocab::id>> logits_id;
     logits_id.reserve(n_logits);
 
     {
-        const double scale = 1.0/temp;
+        const double scale = 1.0 / temp;
+        
         for (int i = 0; i < n_logits; ++i) {
             // repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
             // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main

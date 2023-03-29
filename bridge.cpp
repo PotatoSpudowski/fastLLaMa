@@ -12,7 +12,7 @@
 #include <vector>
 #include <deque>
 #include <type_traits>
-#include <optional>
+#include "tokenizer.hpp"
 
 #include <pybind11/embed.h>
 #include <pybind11/functional.h>
@@ -97,7 +97,7 @@ struct llama_model {
 };
 
 // load the model's weights from a file
-bool llama_model_load(std::string_view model_name, const std::string & fname, llama_model & model, gpt_vocab & vocab, int n_ctx) {
+bool llama_model_load(std::string_view model_name, const std::string & fname, llama_model & model, fastllama::vocab & vocab, int n_ctx) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
 
     auto fin = std::ifstream(fname, std::ios::binary);
@@ -151,28 +151,26 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
 
     // load vocab
     {
-        const int32_t n_vocab = model.hparams.n_vocab;
+        auto const n_vocab = static_cast<std::size_t>(model.hparams.n_vocab);
+        vocab.id_to_token.resize(n_vocab);
 
-        if (n_vocab != model.hparams.n_vocab) {
-            fprintf(stderr, "%s: invalid model file '%s' (bad vocab size %d != %d)\n",
-                    __func__, fname.c_str(), n_vocab, model.hparams.n_vocab);
-            return false;
-        }
+        std::string word(' ', 64);
 
-        std::string word;
         for (int i = 0; i < n_vocab; i++) {
             uint32_t len;
-            fin.read((char *) &len, sizeof(len));
+            fin.read(reinterpret_cast<char*>(&len), sizeof(len));
 
             word.resize(len);
-            fin.read((char *) word.data(), len);
+            fin.read(word.data(), len);
+            
+            float score{};
 
             vocab.token_to_id[word] = i;
-            vocab.id_to_token[i] = word;
+            auto& temp = vocab.id_to_token[i];
+            temp.score = score;
+            temp.tok = std::move(word);
 
-            //if (i < 30000) {
-            //    printf("%s: vocab[%d] = '%s'\n", __func__, i, word.c_str());
-            //}
+            word.clear();
         }
     }
 
@@ -540,7 +538,7 @@ bool llama_eval(
         const llama_model & model,
         const int n_threads,
         const int n_past,
-        const std::vector<gpt_vocab::id> & embd_inp,
+        const std::vector<typename fastllama::vocab::id> & embd_inp,
               std::vector<float>         & embd_w,
               size_t                     & mem_per_token) {
     const int N = embd_inp.size();
@@ -762,41 +760,47 @@ bool llama_eval(
 template<typename Fn>
 struct FastLlamaBuffer {
     static constexpr std::size_t str_buffer_size = 512;
+    static constexpr std::size_t unicode_backlog_buffer_size = 8;
 
-    FastLlamaBuffer(gpt_vocab const& vocab, std::size_t len, Fn&& fn)
+    FastLlamaBuffer(fastllama::vocab const& vocab, std::size_t len, Fn&& fn)
         : m_vocab(vocab)
         , max_len(len)
         , m_fn(std::move(fn))
     {}
 
-    auto push(gpt_vocab::id token) -> void {
+    auto push(typename fastllama::vocab::id token) -> void {
         if (max_len <= m_buffer.size()) {
             flush_buffer();
         }
         m_buffer.push_back(token);
     }
 
-    auto get_token_as_str(gpt_vocab::id id) const -> std::optional<std::string> {
-        auto it = m_vocab.id_to_token.find(id);
-        if (it != m_vocab.id_to_token.end()) return { it->second };
-        return {};
+    auto get_token_as_str(typename fastllama::vocab::id id) const -> std::string_view {
+        if (id >= m_vocab.id_to_token.size()) return std::string_view{};
+        auto const& it = m_vocab.id_to_token[id];
+        return it.tok;
     }
 
     auto flush_buffer() -> void {
         if (m_buffer.empty()) return;
         auto id = m_buffer.front();
         m_buffer.pop_front();
-        auto temp = get_token_as_str(id);
-        if (temp.has_value()) m_fn(std::move(*temp));
+        auto temp = std::string(get_token_as_str(id));
+        // Test if the last character is an invalid utf-8 character.
+        // If an invalid Unicode is found, we remove it from the token
+        // and wait for the other part to come, and then we prepend it to the next token.
+        check_and_put_unicode_char_in_buffer_if_invalid(temp);
+        if (temp.empty()) return;
+        m_fn(std::move(temp));
     }
 
     auto is_tokens_in_buffer(std::vector<std::string> const& tokens) {
         if (tokens.empty()) return std::make_pair( false, std::string_view{} );
 
         auto const token_to_str_view = [this](auto id) -> std::string_view {
-            auto it = m_vocab.id_to_token.find(id);
-            if (it != m_vocab.id_to_token.end()) return it->second;
-            return "";
+            if (id >= m_vocab.id_to_token.size()) return "";
+            auto const& it = m_vocab.id_to_token[id];
+            return it.tok;
         };
 
         assert(tokens.size() < str_buffer_size && "Max token is reached");
@@ -820,10 +824,36 @@ struct FastLlamaBuffer {
     }
 
 private:
-    gpt_vocab const& m_vocab;
+
+    void check_and_put_unicode_char_in_buffer_if_invalid(std::string& in_out) {
+        if (in_out.empty()) return;
+        // If backlog exists push it in front of the string
+        if (num_of_chars_in_unicode_buffer != 0) {
+            std::string temp(m_unicode_backlog_buffer, num_of_chars_in_unicode_buffer);
+            in_out = temp + in_out;
+            num_of_chars_in_unicode_buffer = 0;
+        }
+        // Assumption: Invalid unicode can occure at the last part and no other character exists after that
+        for (auto i = 0ul; i < in_out.size();) {
+            auto c = in_out[i];
+            auto len = fastllama::utf8_len(c);
+            if (in_out.size() < i + len) {
+                num_of_chars_in_unicode_buffer = in_out.size() - static_cast<std::size_t>(i);
+                std::copy_n(in_out.begin() + i, num_of_chars_in_unicode_buffer, m_unicode_backlog_buffer);
+                in_out.resize(i);
+                return;
+            }
+            i += len;
+        }
+    }
+
+private:
+    fastllama::vocab const& m_vocab;
     std::size_t max_len{1};
-    std::deque<gpt_vocab::id> m_buffer;
+    std::deque<typename fastllama::vocab::id> m_buffer;
     char m_temp_str_buffer[str_buffer_size];
+    char m_unicode_backlog_buffer[unicode_backlog_buffer_size] = {0};
+    std::size_t num_of_chars_in_unicode_buffer{0};
     Fn m_fn;
 };
 
@@ -901,7 +931,8 @@ struct FastLlama {
         std::string m_prompt = prompt;
         m_prompt.insert(0, 1, ' ');
         // tokenize the prompt
-        std::vector<gpt_vocab::id> embd_inp = ::llama_tokenize(m_vocab, m_prompt, true);
+        auto const embd_inp = fastllama::tokenize(m_vocab, m_prompt, true);
+        // auto const embd_inp = ::llama_tokenize(m_vocab, m_prompt, true);
 
         // n_past += m_embd.size();
         // m_embd.clear();
@@ -934,7 +965,7 @@ struct FastLlama {
     bool generate(std::function<void(std::string const&)> fn, std::size_t num_tokens, float top_k, float top_p, float temp, float repeat_penalty, std::vector<std::string> const& stop_word) {
 
         auto const stop_token_len = std::max(std::size_t{1}, std::accumulate(stop_word.begin(), stop_word.end(), std::size_t{1}, [this](auto p, auto const& s) {
-            return std::max(p, ::llama_tokenize(m_vocab, s, false).size());
+            return std::max(p, fastllama::tokenize(m_vocab, s, false).size());
         }));
 
         auto buffer = FastLlamaBuffer(m_vocab, stop_token_len, [&fn](std::string const s) {
@@ -957,7 +988,7 @@ struct FastLlama {
             n_past += m_embd.size();
             m_embd.clear();
 
-            gpt_vocab::id id = 0;
+            typename fastllama::vocab::id id = 0;
 
             {
                 id = llama_sample_top_p_top_k(m_vocab, m_logits.data() + (m_logits.size() - n_vocab), m_last_n_tokens, repeat_penalty, top_k, top_p, temp, m_rng);
@@ -992,14 +1023,14 @@ private:
         file.write(s.data(), s.size());
     }
 
-    void save_vocab(std::ofstream& file) const {
-        // printf("Save => Vocab size: %zu\n", m_vocab.id_to_token.size());
-        save_value(file, m_vocab.id_to_token.size());
-        for(auto const [k, v] : m_vocab.id_to_token) {
-            save_value(file, k);
-            save_str(file, v);
-        }
-    }
+    // void save_vocab(std::ofstream& file) const {
+    //     // printf("Save => Vocab size: %zu\n", m_vocab.id_to_token.size());
+    //     save_value(file, m_vocab.id_to_token.size());
+    //     for(auto const [k, v] : m_vocab.id_to_token) {
+    //         save_value(file, k);
+    //         save_str(file, v);
+    //     }
+    // }
 
     template<typename T>
     void save_value(std::ofstream& f, T const& v) const {
@@ -1132,18 +1163,18 @@ private:
         return s;
     }
 
-    void load_vocab(std::ifstream& file) {
-        auto len = m_vocab.id_to_token.size();
-        load_value(file, len);
-        // std::cout<<"Vocab size: "<<len<<'\n';
-        for (auto i = 0ul; i < len; ++i) {
-            int k = 0;
-            load_value(file, k);
-            auto v = load_str(file);
-            m_vocab.id_to_token[k] = v;
-            m_vocab.token_to_id[v] = k;
-        }
-    }
+    // void load_vocab(std::ifstream& file) {
+    //     auto len = m_vocab.id_to_token.size();
+    //     load_value(file, len);
+    //     // std::cout<<"Vocab size: "<<len<<'\n';
+    //     for (auto i = 0ul; i < len; ++i) {
+    //         int k = 0;
+    //         load_value(file, k);
+    //         auto v = load_str(file);
+    //         m_vocab.id_to_token[k] = v;
+    //         m_vocab.token_to_id[v] = k;
+    //     }
+    // }
 
     void load_model(std::ifstream& file) {
         auto& ctx = *m_model.ctx;
@@ -1223,14 +1254,14 @@ private:
 private:
     std::string m_model_name;
     llama_model m_model;
-    gpt_vocab m_vocab;
+    fastllama::vocab m_vocab;
     int m_threads;
     int n_past{0};
     int m_seed{0};
     size_t m_mem_per_token = 0;
     std::mt19937 m_rng;
-    std::vector<gpt_vocab::id> m_embd;
-    std::vector<gpt_vocab::id> m_last_n_tokens;
+    std::vector<typename fastllama::vocab::id> m_embd;
+    std::vector<typename fastllama::vocab::id> m_last_n_tokens;
     std::vector<float> m_logits;
 };
 
