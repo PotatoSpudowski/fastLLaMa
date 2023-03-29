@@ -31,6 +31,8 @@ FetchContent_Declare(
 pybind11_add_module(fastLlama bridge.cpp)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 link_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# set(LLAMA_NO_ACCELERATE 1)
+# set_compiler_lib_and_flags(fastLlama)
 target_link_libraries(fastLlama PRIVATE fast_llama_lib)
 set_target_properties(fastLlama PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(fastLlama PROPERTIES SUFFIX ".so")

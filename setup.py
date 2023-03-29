@@ -9,7 +9,7 @@ CMAKE_FEATURE_FILE_PATH = "./cmake/CompilerFlagVariables.cmake"
 def save_cmake_vars(var_map: Mapping[str, List[str]]) -> None:
     with open(CMAKE_FEATURE_FILE_PATH, "w") as f:
         for k, v in var_map.items():
-            s = ' '.join(set(v))
+            s = ';'.join(set(v))
             f.write(f'set({k} "{s}")\n')
 
 def get_gcc_flag(feature: str) -> Optional[str]:
@@ -42,7 +42,7 @@ def get_gcc_flag(feature: str) -> Optional[str]:
     return None
 
 def get_clang_flag(feature: str) -> Optional[str]:
-    return "-march=native"
+    return get_gcc_flag(feature)
 
 def get_msvc_flag(feature: str) -> Optional[str]:
     if 'fma' in feature:
@@ -82,7 +82,7 @@ COMPILER_LOOKUP_TABLE: Mapping[cmake_variable_type, Callable[[str], Optional[str
 def init_cmake_vars(cmake_var: str, arch: str) -> List[str]:
     if 'MSVC' in cmake_var:
         return ['/GL']
-    return []
+    return ['-march=native']
 
 def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str]]:
     return { v : c(feature)  for v, c in COMPILER_LOOKUP_TABLE.items()}
