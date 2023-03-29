@@ -18,7 +18,7 @@ FetchContent_Declare(
 	GIT_SHALLOW    TRUE
 )
 
-FetchContent_MakeAvailable(pybind11)
+# FetchContent_MakeAvailable(pybind11)
 
 pybind11_add_module(fastLlama bridge.cpp)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
