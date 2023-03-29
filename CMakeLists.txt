@@ -14,19 +14,11 @@ include(FetchContent)
 FetchContent_Declare(
 	pybind11
 	GIT_REPOSITORY https://github.com/pybind/pybind11.git
-	GIT_TAG        v2.6.2
+	GIT_TAG        v2.10.4
 	GIT_SHALLOW    TRUE
 )
 
 FetchContent_MakeAvailable(pybind11)
-
-include(FetchContent)
-FetchContent_Declare(
-	pybind11
-	GIT_REPOSITORY https://github.com/pybind/pybind11.git
-	GIT_TAG        v2.10.4
-	GIT_SHALLOW    TRUE
-)
 
 pybind11_add_module(fastLlama bridge.cpp)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
