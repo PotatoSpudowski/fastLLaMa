@@ -760,6 +760,7 @@ bool llama_eval(
 template<typename Fn>
 struct FastLlamaBuffer {
     static constexpr std::size_t str_buffer_size = 512;
+    static constexpr std::size_t unicode_backlog_buffer_size = 8;
 
     FastLlamaBuffer(fastllama::vocab const& vocab, std::size_t len, Fn&& fn)
         : m_vocab(vocab)
@@ -784,8 +785,13 @@ struct FastLlamaBuffer {
         if (m_buffer.empty()) return;
         auto id = m_buffer.front();
         m_buffer.pop_front();
-        auto temp = get_token_as_str(id);
-        if (!temp.empty()) m_fn(std::string(temp));
+        auto temp = std::string(get_token_as_str(id));
+        // Test if the last character is an invalid utf-8 character.
+        // If an invalid Unicode is found, we remove it from the token
+        // and wait for the other part to come, and then we prepend it to the next token.
+        check_and_put_unicode_char_in_buffer_if_invalid(temp);
+        if (temp.empty()) return;
+        m_fn(std::move(temp));
     }
 
     auto is_tokens_in_buffer(std::vector<std::string> const& tokens) {
@@ -818,10 +824,36 @@ struct FastLlamaBuffer {
     }
 
 private:
+
+    void check_and_put_unicode_char_in_buffer_if_invalid(std::string& in_out) {
+        if (in_out.empty()) return;
+        // If backlog exists push it in front of the string
+        if (num_of_chars_in_unicode_buffer != 0) {
+            std::string temp(m_unicode_backlog_buffer, num_of_chars_in_unicode_buffer);
+            in_out = temp + in_out;
+            num_of_chars_in_unicode_buffer = 0;
+        }
+        // Assumption: Invalid unicode can occure at the last part and no other character exists after that
+        for (auto i = 0ul; i < in_out.size();) {
+            auto c = in_out[i];
+            auto len = fastllama::utf8_len(c);
+            if (in_out.size() < i + len) {
+                num_of_chars_in_unicode_buffer = in_out.size() - static_cast<std::size_t>(i);
+                std::copy_n(in_out.begin() + i, num_of_chars_in_unicode_buffer, m_unicode_backlog_buffer);
+                in_out.resize(i);
+                return;
+            }
+            i += len;
+        }
+    }
+
+private:
     fastllama::vocab const& m_vocab;
     std::size_t max_len{1};
     std::deque<typename fastllama::vocab::id> m_buffer;
     char m_temp_str_buffer[str_buffer_size];
+    char m_unicode_backlog_buffer[unicode_backlog_buffer_size] = {0};
+    std::size_t num_of_chars_in_unicode_buffer{0};
     Fn m_fn;
 };
 
