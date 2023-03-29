@@ -89,15 +89,17 @@ def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str
 
 def main() -> None:
     info = get_cpu_info()
-    arch: str = info['arch']
-    flags: List[str] = info['flags']
+    arch: str = info['arch'] if 'arch' in info else ''
     cmake_vars: Mapping[cmake_variable_type, List[str]] = { v : init_cmake_vars(v, arch.upper()) for v in COMPILER_LOOKUP_TABLE.keys() }
+    
+    if 'flags' in info:
+        flags: List[str] = info['flags']
 
-    for f in flags:
-        temp = get_compiler_flag(f.lower())
-        for k, v in temp.items():
-            if v is not None:
-                cmake_vars[k].append(v)
+        for f in flags:
+            temp = get_compiler_flag(f.lower())
+            for k, v in temp.items():
+                if v is not None:
+                    cmake_vars[k].append(v)
     save_cmake_vars(cmake_vars)
 
 if __name__ == "__main__":
