@@ -1,3 +1,5 @@
+import os
+import subprocess
 from enum import Enum
 from typing import Callable, List, Mapping, Optional
 from cpuinfo import get_cpu_info
@@ -11,6 +13,23 @@ def save_cmake_vars(var_map: Mapping[str, List[str]]) -> None:
         for k, v in var_map.items():
             s = ';'.join(set(v))
             f.write(f'set({k} "{s}")\n')
+
+def run_make(build_dir: str = "build") -> None:
+    # Change the current working directory to the build directory
+    if not os.path.exists(build_dir):
+       os.mkdir(build_dir)
+
+    # Run the 'make' command
+    try:
+        result = subprocess.run(["cd ./build && cmake .. && make"], shell=True, check=True, capture_output=True, text=True)
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("An error occurred while running 'make':", e)
+        print("Output:", e.output)
+        return
+    finally:
+        # Change back to the original working directory
+        os.chdir("..")
 
 def get_gcc_flag(feature: str) -> Optional[str]:
     if 'fma' in feature:
@@ -101,6 +120,8 @@ def main() -> None:
                 if v is not None:
                     cmake_vars[k].append(v)
     save_cmake_vars(cmake_vars)
+
+    run_make()
 
 if __name__ == "__main__":
     main()
