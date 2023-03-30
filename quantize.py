@@ -44,7 +44,7 @@ def main():
     )
     parser.add_argument(
         '-q', '--quantize-script-path', dest='quantize_script_path',
-        default=os.path.join(os.getcwd(), quantize_script_binary),
+        default=os.path.join(os.getcwd(), "build", quantize_script_binary),
         help='Specify the path to the "quantize" script.'
     )
 
