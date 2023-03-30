@@ -9,6 +9,7 @@ include(cmake/CompilerFlags.cmake)
 add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp)
 
 set_compiler_lib_and_flags(fast_llama_lib)
+set_target_properties(fast_llama_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 FetchContent_Declare(
