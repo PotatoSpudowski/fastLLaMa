@@ -24,4 +24,4 @@ models/*
 arm_neon.h
 compile_commands.json
 
-CompilerFlagVariables.cmake
+cmake/CompilerFlagVariables.cmake

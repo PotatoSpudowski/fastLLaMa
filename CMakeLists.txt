@@ -11,14 +11,8 @@ add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/ggml.c ${CMAKE_CURRENT_SO
 set_compiler_lib_and_flags(fast_llama_lib)
 set_target_properties(fast_llama_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-include(cmake/OpenBLAS.cmake)
-
 add_executable(quantize ${CMAKE_CURRENT_SOURCE_DIR}/quantize.cpp)
 target_link_libraries(quantize PRIVATE fast_llama_lib)
-
-# if(DEFINED LLAMA_OPENBLAS)
-set_open_blas(quantize)
-# endif(DEFINED LLAMA_OPENBLAS)
 
 include(FetchContent)
 FetchContent_Declare(
