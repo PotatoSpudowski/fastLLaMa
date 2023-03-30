@@ -1,5 +1,6 @@
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BasicUtils.cmake)
+include(cmake/BasicUtils.cmake)
 include(CheckCXXCompilerFlag)
+include(cmake/OpenBLAS.cmake)
 
 set(COMPILER_FLAG_VARS_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerFlagVariables.cmake")
 set(COMPILER_CXX_FLAG "")
@@ -50,13 +51,14 @@ function(set_compiler_lib_and_flags project_name)
         target_link_libraries(${project_name} PRIVATE Threads::Threads)
     endif(Threads_FOUND)
     
-    
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        if(NOT DEFINED LLAMA_NO_ACCELERATE)
-            list(APPEND COMPILER_DEF_FLAGS_LIST "GGML_USE_ACCELERATE")
-            _COMPILER_SWITCH_APPEND(COMPILER_LDFLAGS_LIST "-framework Accelerate" "-framework Accelerate" "")
-        endif(NOT DEFINED LLAMA_NO_ACCELERATE)
-    endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if(DEFINED LLAMA_NO_ACCELERATE OR DEFINED LLAMA_OPENBLAS)
+        set_open_blas(${project_name})
+    else()
+        if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+            target_compile_definitions(${project_name} PRIVATE "GGML_USE_ACCELERATE")
+            target_link_libraries(${project_name} PRIVATE "-framework Accelerate")
+        endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    endif(DEFINED LLAMA_NO_ACCELERATE OR DEFINED LLAMA_OPENBLAS)
     
     if(${CMAKE_SYSTEM_NAME} MATCHES "aarch64")
         _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-mcpu=native" "-mcpu=native" "")
@@ -73,7 +75,7 @@ function(set_compiler_lib_and_flags project_name)
         _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "${_ARM_FLAG}" "${_ARM_FLAG}" "")
         unset(_ARM_FLAG)
     endif()
-    
+
     target_compile_options(${project_name} PRIVATE ${COMPILER_FLAGS_LIST})
     target_link_options(${project_name} PRIVATE ${COMPILER_LDFLAGS_LIST})
     target_compile_definitions(${project_name} PRIVATE ${COMPILER_DEF_FLAGS_LIST})
