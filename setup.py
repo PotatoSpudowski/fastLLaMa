@@ -1,7 +1,6 @@
 import os
 import subprocess
-from enum import Enum
-from typing import Callable, List, Mapping, Optional
+from typing import Callable, List, Mapping, Optional, cast
 from cpuinfo import get_cpu_info
 
 cmake_variable_type = str
@@ -92,19 +91,45 @@ def get_msvc_flag(feature: str) -> Optional[str]:
         return '/arch:AVX512'
     return None
 
+def match_any(sub: List[str], string: str, match_sub = False) -> bool:
+    for s in sub:
+        if (not match_sub and s == string) or (match_sub and s in string):
+            return True 
+    return False
+
+def fix_gcc_flags(flags: List[str]) -> List[str]:
+    return flags
+
+def fix_clang_flags(flags: List[str]) -> List[str]:
+    return flags
+
+def fix_msvc_flag(flags: List[str]) -> List[str]:
+    return flags
+
 COMPILER_LOOKUP_TABLE: Mapping[cmake_variable_type, Callable[[str], Optional[str]]] = {
     'GCC_CXXFLAG': get_gcc_flag,
     'CLANG_CXXFLAG': get_clang_flag,
     'MSVC_CXXFLAG': get_msvc_flag
 }
 
+COMPILER_FLAG_FIX_LOOKUP_TABLE: Mapping[cmake_variable_type, Callable[[List[str]], List[str]]] = {
+    'GCC_CXXFLAG': fix_gcc_flags,
+    'CLANG_CXXFLAG': fix_clang_flags,
+    'MSVC_CXXFLAG': fix_msvc_flag
+}
+
 def init_cmake_vars(cmake_var: str, arch: str) -> List[str]:
     if 'MSVC' in cmake_var:
         return ['/GL']
-    return ['-march=native']
+    return []
 
 def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str]]:
     return { v : c(feature)  for v, c in COMPILER_LOOKUP_TABLE.items()}
+
+def fix_flags(vars: Mapping[cmake_variable_type, List[str]]) -> None:
+    for v, flags in vars.items():
+        if v in COMPILER_FLAG_FIX_LOOKUP_TABLE:
+            vars[v] = COMPILER_FLAG_FIX_LOOKUP_TABLE[v](flags)
 
 def main() -> None:
     info = get_cpu_info()
@@ -119,6 +144,7 @@ def main() -> None:
             for k, v in temp.items():
                 if v is not None:
                     cmake_vars[k].append(v)
+    fix_flags(cmake_vars)
     save_cmake_vars(cmake_vars)
 
     run_make()
