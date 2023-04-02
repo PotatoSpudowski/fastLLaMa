@@ -346,8 +346,8 @@ void sample_top_k(std::vector<std::pair<double, gpt_vocab::id>> & logits_id, int
     logits_id.resize(top_k);
 }
 
-typename fastllama::vocab::id llama_sample_top_p_top_k(
-        const fastllama::vocab & vocab,
+typename fastllama::Vocab::id llama_sample_top_p_top_k(
+        const fastllama::Vocab & vocab,
         const float * logits,
         std::vector<gpt_vocab::id> & last_n_tokens,
         double repeat_penalty,
@@ -358,7 +358,7 @@ typename fastllama::vocab::id llama_sample_top_p_top_k(
 
     int n_logits = vocab.id_to_token.size();
 
-    std::vector<std::pair<double, typename fastllama::vocab::id>> logits_id;
+    std::vector<std::pair<double, typename fastllama::Vocab::id>> logits_id;
     logits_id.reserve(n_logits);
 
     {

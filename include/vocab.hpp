@@ -11,7 +11,7 @@
 
 namespace fastllama {
     
-    struct vocab {
+    struct Vocab {
         using id    = int32_t;
         using token = std::string;
 

@@ -5,14 +5,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_BUILD_TYPE Release)
 
 include(cmake/CompilerFlags.cmake)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp)
+add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/utils.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp)
 
 set_compiler_lib_and_flags(fast_llama_lib)
+# target_compile_options(fast_llama_lib PRIVATE "-g")
 set_target_properties(fast_llama_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-add_executable(quantize ${CMAKE_CURRENT_SOURCE_DIR}/quantize.cpp)
-target_link_libraries(quantize PRIVATE fast_llama_lib)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -24,11 +23,11 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pybind11)
 
-pybind11_add_module(fastLlama bridge.cpp)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-link_directories(${CMAKE_CURRENT_SOURCE_DIR})
-# set(LLAMA_NO_ACCELERATE 1)
-# set_compiler_lib_and_flags(fastLlama)
-target_link_libraries(fastLlama PRIVATE fast_llama_lib)
-set_target_properties(fastLlama PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_target_properties(fastLlama PROPERTIES SUFFIX ".so")
+# pybind11_add_module(fastLlama bridge.cpp)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# link_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# target_link_libraries(fastLlama PRIVATE fast_llama_lib)
+# set_target_properties(fastLlama PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# set_target_properties(fastLlama PROPERTIES SUFFIX ".so")
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
