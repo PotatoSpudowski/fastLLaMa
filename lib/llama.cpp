@@ -2,6 +2,7 @@
 #include "file_reader.hpp"
 #include <cassert>
 #include "macro.hpp"
+#include <thread>
 
 namespace fastllama {
     
@@ -407,7 +408,7 @@ namespace fastllama {
 
         // create the ggml context
         {
-            struct ggml_init_params params = {
+            ggml_init_params params = {
                 .mem_size   = ctx_size,
                 .mem_buffer = NULL,
             };
@@ -466,6 +467,228 @@ namespace fastllama {
         if (!parse_tensor_data(filepath, *this, offset, logger)) return;
 
         this->is_valid = true;
+    }
+
+
+    auto Model::eval(
+            int threads,
+            std::size_t n_past,
+            std::vector<vocab_id> const& embd_inp,
+            std::vector<float>& embd_w,
+            std::size_t& mem_per_token,
+            Logger logger) -> bool
+    {
+        if (!is_valid) {
+            logger.log_err(__func__, "model is not valid\n");
+            return false;
+        }
+        auto const normalized_threads = std::max(1, std::min(static_cast<int>(std::thread::hardware_concurrency()), threads));
+        auto const embd_size = embd_inp.size();
+
+        auto const n_embd  = params.n_embd;
+        auto const n_layer = params.n_layer;
+        auto const n_ctx   = params.n_ctx;
+        auto const n_head  = params.n_head;
+        auto const n_vocab = params.n_vocab;
+        auto const n_rot   = params.n_embd / params.n_head;
+
+        auto const d_key = n_embd / n_head;
+        
+        try {
+            m_buffer.resize(m_buffer_size);
+        } catch([[maybe_unused]] std::exception& e) {
+            logger.log_err(__func__, "failed to allocate ", m_buffer_size, " bytes\n");
+            return false;
+        }
+
+        auto total_mem_for_token = mem_per_token * embd_size;
+        if (mem_per_token > 0 && (total_mem_for_token > m_buffer_size)) {
+            // add 10% to account for ggml object overhead
+            m_buffer_size = 1.1 * total_mem_for_token;
+            try {
+                m_buffer.resize(m_buffer_size);
+            } catch([[maybe_unused]] std::exception& e) {
+                logger.log_err(__func__, "failed to allocate ", m_buffer_size, " bytes\n");
+                return false;
+            }
+        }
+
+        ggml_init_params mem_params;
+        mem_params.mem_size   = m_buffer_size;
+        mem_params.mem_buffer = reinterpret_cast<void*>(m_buffer.data());
+
+        ggml_context * ctx0 = ggml_init(mem_params);
+        ggml_cgraph gf;
+        gf.n_threads = normalized_threads;
+
+        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, embd_size);
+        memcpy(embd->data, embd_inp.data(), embd_size * ggml_element_size(embd));
+
+        ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
+
+        for (int il = 0; il < n_layer; ++il) {
+            ggml_tensor* inpSA = inpL;
+
+            ggml_tensor* cur;
+
+            // norm
+            {
+                cur = ggml_norm(ctx0, inpL);
+
+                // cur = attention_norm*cur
+                cur = ggml_mul(ctx0,
+                            ggml_repeat(ctx0, layers[il].attention_norm, cur),
+                            cur);
+            }
+
+            // self-attention
+            {
+                ggml_tensor * Qcur = ggml_mul_mat(ctx0, layers[il].wq, cur);
+                ggml_tensor * Kcur = ggml_mul_mat(ctx0, layers[il].wk, cur);
+                ggml_tensor * Vcur = ggml_mul_mat(ctx0, layers[il].wv, cur);
+
+                // store key and value to memory
+                if (embd_size >= 1) {
+                    ggml_tensor * k = ggml_view_1d(ctx0, memory_k, embd_size*n_embd, (ggml_element_size(memory_k)*n_embd)*(il*n_ctx + n_past));
+                    ggml_tensor * v = ggml_view_1d(ctx0, memory_v, embd_size*n_embd, (ggml_element_size(memory_v)*n_embd)*(il*n_ctx + n_past));
+
+                    ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
+                    ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
+                }
+
+                // Q = Qcur.contiguous().view(n_embd/n_head, n_head, embd_size).permute(0, 2, 1, 3)
+                ggml_tensor * Q =
+                    ggml_permute(ctx0,
+                            ggml_rope(ctx0,
+                                ggml_cpy(ctx0,
+                                    Qcur,
+                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, embd_size)),
+                                n_past, n_rot, 0),
+                            0, 2, 1, 3);
+
+                // K = Kmem.view(n_embd/n_head, n_head, n_past + embd_size).permute(0, 2, 1, 3)
+                ggml_tensor * K =
+                    ggml_permute(ctx0,
+                            ggml_rope(ctx0,
+                                ggml_reshape_3d(ctx0,
+                                    ggml_view_1d(ctx0, memory_k, (n_past + embd_size)*n_embd, il*n_ctx*ggml_element_size(memory_k)*n_embd),
+                                    n_embd/n_head, n_head, n_past + embd_size),
+                                n_past, n_rot, 1),
+                            0, 2, 1, 3);
+
+                // K * Q
+                ggml_tensor * KQ = ggml_mul_mat(ctx0, K, Q);
+
+                // KQ_scaled = KQ / sqrt(n_embd/n_head)
+                ggml_tensor * KQ_scaled =
+                    ggml_scale(ctx0,
+                            KQ,
+                            ggml_new_f32(ctx0, 1.0f/sqrt(float(n_embd)/n_head))
+                            );
+
+                // KQ_masked = mask_past(KQ_scaled)
+                ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, n_past);
+
+                // KQ = soft_max(KQ_masked)
+                ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
+
+                // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + embd_size).permute(1, 2, 0, 3).contiguous()
+                ggml_tensor * V_trans =
+                    ggml_permute(ctx0,
+                            ggml_reshape_3d(ctx0,
+                                ggml_view_1d(ctx0, memory_v, (n_past + embd_size)*n_embd, il*n_ctx*ggml_element_size(memory_v)*n_embd),
+                                n_embd/n_head, n_head, n_past + embd_size),
+                            1, 2, 0, 3);
+
+                // KQV = transpose(V) * KQ_soft_max
+                ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
+
+                // KQV_merged = KQV.permute(0, 2, 1, 3)
+                ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
+
+                // cur = KQV_merged.contiguous().view(n_embd, embd_size)
+                cur = ggml_cpy(ctx0,
+                        KQV_merged,
+                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, embd_size));
+
+                // projection (no bias)
+                cur = ggml_mul_mat(ctx0,
+                        layers[il].wo,
+                        cur);
+            }
+
+            ggml_tensor * inpFF = ggml_add(ctx0, cur, inpSA);
+
+            // feed-forward network
+            {
+                // norm
+                {
+                    cur = ggml_norm(ctx0, inpFF);
+
+                    // cur = ffn_norm*cur
+                    cur = ggml_mul(ctx0,
+                            ggml_repeat(ctx0, layers[il].ffn_norm, cur),
+                            cur);
+                }
+
+                ggml_tensor * tmp = ggml_mul_mat(ctx0,
+                        layers[il].w3,
+                        cur);
+
+
+                cur = ggml_mul_mat(ctx0,
+                        layers[il].w1,
+                        cur);
+
+                // SILU activation
+                cur = ggml_silu(ctx0, cur);
+
+                cur = ggml_mul(ctx0, cur, tmp);
+
+                cur = ggml_mul_mat(ctx0,
+                        layers[il].w2,
+                        cur);
+            }
+
+            cur  = ggml_add(ctx0, cur, inpFF);
+
+            // input for next layer
+            inpL = cur;
+        }
+
+        // norm
+        {
+            inpL = ggml_norm(ctx0, inpL);
+
+            // inpL = norm*inpL
+            inpL = ggml_mul(ctx0,
+                        ggml_repeat(ctx0, norm, inpL),
+                        inpL);
+        }
+
+        // lm_head
+        {
+            inpL = ggml_mul_mat(ctx0, output, inpL);
+        }
+
+        // logits -> probs
+        //inpL = ggml_soft_max(ctx0, inpL);
+
+        // run the computation
+        ggml_build_forward_expand(&gf, inpL);
+        ggml_graph_compute       (ctx0, &gf);
+
+        // return result for just the last token
+        embd_w.resize(static_cast<std::size_t>(n_vocab));
+        memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(embd_size-1)), sizeof(float)*n_vocab);
+
+        if (mem_per_token == 0) {
+            mem_per_token = ggml_used_mem(ctx0) / embd_size;
+        }
+
+        ggml_free(ctx0);
+
+        return true;
     }
 
 } // namespace fastllama

@@ -44,7 +44,16 @@ namespace fastllama {
     };
 
     struct Model {
+        using vocab_id = typename Vocab::id;
+
         Model(std::string_view model_name, std::string_view filepath, std::size_t context_size = 512, Logger logger = {});
+        auto eval(
+            int threads,
+            std::size_t n_past,
+            std::vector<vocab_id> const& embd_inp,
+            std::vector<float>& embd_w,
+            std::size_t& mem_per_token,
+            Logger logger = {}) -> bool;
 
         ModelId model_id{};
         Vocab vocabulary;
@@ -66,6 +75,10 @@ namespace fastllama {
         std::unordered_map<std::string, ggml_tensor*> tensors;
 
         bool is_valid{false};
+
+    private:
+        std::size_t m_buffer_size{ 512 * 1024 * 1024 };
+        std::vector<unsigned char> m_buffer;
     };
 
 } // namespace fastllama
