@@ -5,11 +5,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_BUILD_TYPE Release)
 
 include(cmake/CompilerFlags.cmake)
+include(cmake/OpenMP.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/utils.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp)
+add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/utils.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/bridge.cpp)
 
 set_compiler_lib_and_flags(fast_llama_lib)
+target_link_libraries(fast_llama_lib PRIVATE ${OPENMP_LIB})
 # target_compile_options(fast_llama_lib PRIVATE "-g")
 set_target_properties(fast_llama_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

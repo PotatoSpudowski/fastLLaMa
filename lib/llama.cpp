@@ -5,7 +5,7 @@
 #include <thread>
 
 namespace fastllama {
-    
+
     FASTLLAMA_ALWAYS_INLINE static constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
         std::uint32_t magic{};
         reader.read(&magic);
@@ -433,19 +433,23 @@ namespace fastllama {
         return { reader.tell() };
     }
 
-    Model::Model(std::string_view model_name, std::string_view filepath, std::size_t context_size, Logger logger)
-    {
+    auto Model::unload() {
+        is_valid = false;
+        if(ctx != nullptr) ggml_free(ctx);
+        ctx = nullptr;
+    }
+
+    bool Model::load(std::string_view model_name, std::string_view filepath) {
         logger.log("Model", "loading model from ", filepath, " - please wait ...\n");
         
         this->is_valid = false;
-        this->params.n_ctx = context_size;
 
         // Get model id
         {
             auto temp_model_id = ModelId::from_str_case_insenstive(model_name);
             if (!temp_model_id) {
                 logger.log_err("Model", "invalid model id'", model_name, "'\n");
-                return;
+                return false;
             }
 
             this->model_id = temp_model_id;
@@ -454,19 +458,20 @@ namespace fastllama {
         auto reader = fastllama::BinaryFileReader(filepath);
         if (!reader) {
             logger.log_err("Model", "failed to open ", filepath, '\n');
-            return;
+            return false;
         }
 
         auto maybe_offset = read_header(filepath, *this, reader, logger);
         
-        if (!maybe_offset.has_value()) return;
+        if (!maybe_offset.has_value()) return false;
         auto offset = maybe_offset.value();
 
         reader.close();
 
-        if (!parse_tensor_data(filepath, *this, offset, logger)) return;
+        if (!parse_tensor_data(filepath, *this, offset, logger)) return false;
 
         this->is_valid = true;
+        return true;
     }
 
 
@@ -475,8 +480,8 @@ namespace fastllama {
             std::size_t n_past,
             std::vector<vocab_id> const& embd_inp,
             std::vector<float>& embd_w,
-            std::size_t& mem_per_token,
-            Logger logger) -> bool
+            std::size_t& mem_per_token
+        ) -> bool
     {
         if (!is_valid) {
             logger.log_err(__func__, "model is not valid\n");

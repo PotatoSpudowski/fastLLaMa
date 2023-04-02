@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <iostream>
 #include "tokenizer.hpp"
+#include "token_buffer.hpp"
 
 #include <pybind11/embed.h>
 #include <pybind11/functional.h>
@@ -766,106 +767,6 @@ bool llama_eval(
     return true;
 }
 
-template<typename Fn>
-struct FastLlamaBuffer {
-    static constexpr std::size_t str_buffer_size = 512;
-    static constexpr std::size_t unicode_backlog_buffer_size = 8;
-
-    FastLlamaBuffer(fastllama::Vocab const& vocab, std::size_t len, Fn&& fn)
-        : m_vocab(vocab)
-        , max_len(len)
-        , m_fn(std::move(fn))
-    {}
-
-    auto push(typename fastllama::Vocab::id token) -> void {
-        if (max_len <= m_buffer.size()) {
-            flush_buffer();
-        }
-        m_buffer.push_back(token);
-    }
-
-    auto get_token_as_str(typename fastllama::Vocab::id id) const -> std::string_view {
-        if (id >= m_vocab.id_to_token.size()) return std::string_view{};
-        auto const& it = m_vocab.id_to_token[id];
-        return it.tok;
-    }
-
-    auto flush_buffer() -> void {
-        if (m_buffer.empty()) return;
-        auto id = m_buffer.front();
-        m_buffer.pop_front();
-        auto temp = std::string(get_token_as_str(id));
-        // Test if the last character is an invalid utf-8 character.
-        // If an invalid Unicode is found, we remove it from the token
-        // and wait for the other part to come, and then we prepend it to the next token.
-        check_and_put_unicode_char_in_buffer_if_invalid(temp);
-        if (temp.empty()) return;
-        m_fn(std::move(temp));
-    }
-
-    auto is_tokens_in_buffer(std::vector<std::string> const& tokens) {
-        if (tokens.empty()) return std::make_pair( false, std::string_view{} );
-
-        auto const token_to_str_view = [this](auto id) -> std::string_view {
-            if (id >= m_vocab.id_to_token.size()) return "";
-            auto const& it = m_vocab.id_to_token[id];
-            return it.tok;
-        };
-
-        assert(tokens.size() < str_buffer_size && "Max token is reached");
-
-        std::size_t buff_start = 0;
-
-        std::for_each(m_buffer.begin(), m_buffer.end(), [token_to_str_view, &buff_start, this](auto const e) {
-            assert(buff_start < str_buffer_size && "Max token is reached");
-            auto temp = token_to_str_view(e);
-            std::copy(temp.begin(), temp.end(), m_temp_str_buffer + buff_start);
-            buff_start += temp.size();
-        });
-
-        auto temp_str = std::string_view(m_temp_str_buffer, buff_start);
-        for (auto const& token : tokens) {
-            auto substr_pos = temp_str.find(token);
-            if (substr_pos != std::string_view::npos) return std::make_pair(true, temp_str.substr(0, substr_pos));
-        }
-
-        return std::make_pair( false, std::string_view{} );
-    }
-
-private:
-
-    void check_and_put_unicode_char_in_buffer_if_invalid(std::string& in_out) {
-        if (in_out.empty()) return;
-        // If backlog exists push it in front of the string
-        if (num_of_chars_in_unicode_buffer != 0) {
-            std::string temp(m_unicode_backlog_buffer, num_of_chars_in_unicode_buffer);
-            in_out = temp + in_out;
-            num_of_chars_in_unicode_buffer = 0;
-        }
-        // Assumption: Invalid unicode can occure at the last part and no other character exists after that
-        for (auto i = 0ul; i < in_out.size();) {
-            auto c = in_out[i];
-            auto len = fastllama::utf8_len(c);
-            if (in_out.size() < i + len) {
-                num_of_chars_in_unicode_buffer = in_out.size() - static_cast<std::size_t>(i);
-                std::copy_n(in_out.begin() + i, num_of_chars_in_unicode_buffer, m_unicode_backlog_buffer);
-                in_out.resize(i);
-                return;
-            }
-            i += len;
-        }
-    }
-
-private:
-    fastllama::Vocab const& m_vocab;
-    std::size_t max_len{1};
-    std::deque<typename fastllama::Vocab::id> m_buffer;
-    char m_temp_str_buffer[str_buffer_size];
-    char m_unicode_backlog_buffer[unicode_backlog_buffer_size] = {0};
-    std::size_t num_of_chars_in_unicode_buffer{0};
-    Fn m_fn;
-};
-
 struct FastLlama {
 
     FastLlama(std::string name, std::string const& path, int num_threads, int n_ctx, std::size_t last_n_size, int seed)
@@ -977,13 +878,13 @@ struct FastLlama {
             return std::max(p, fastllama::tokenize(m_vocab, s, false).size());
         }));
 
-        auto buffer = FastLlamaBuffer(m_vocab, stop_token_len, [&fn](std::string const s) {
+        auto buffer = fastllama::TokenBuffer(m_vocab, stop_token_len, [&fn](std::string const s) {
             fn(s);
         });
 
         for(auto i = 0ul; i < num_tokens; ++i) {
             const int n_vocab = m_model.hparams.n_vocab;
-            auto const [is_stop_token_present, to_be_flush_substr] = buffer.is_tokens_in_buffer(stop_word);
+            auto const [is_stop_token_present, to_be_flush_substr] = buffer.are_tokens_present_in_buffer(stop_word);
             
             if (is_stop_token_present) {
                 fn(std::string(to_be_flush_substr));
@@ -1006,11 +907,11 @@ struct FastLlama {
                 m_last_n_tokens.push_back(id);
             }
 
-            buffer.push(id);
+            buffer.add(id);
             m_embd.push_back(id);
         }
 
-        if (m_embd.back() == 2) fn("[EOS]");
+        // if (m_embd.back() == 2) fn("[EOS]");
         
         buffer.flush_buffer();
 
