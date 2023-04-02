@@ -1,16 +1,17 @@
 #include "llama.hpp"
 #include "file_reader.hpp"
 #include <cassert>
+#include "macro.hpp"
 
 namespace fastllama {
     
-    static constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
+    FASTLLAMA_ALWAYS_INLINE static constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
         std::uint32_t magic{};
         reader.read(&magic);
         return magic == magic_number_v;
     }
 
-    static constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
+    FASTLLAMA_ALWAYS_INLINE static constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
         reader.read(&params.n_vocab);
         reader.read(&params.n_embd);
         reader.read(&params.n_mult);
@@ -20,7 +21,7 @@ namespace fastllama {
         reader.read(&params.f16);
     }
 
-    static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size) {
+    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size) {
         vocab.id_to_token.resize(size);
         std::string word(64, ' ');
 
@@ -41,7 +42,7 @@ namespace fastllama {
         }
     }
 
-    static auto prepare_memory_for_weight(Model& model, ggml_type wtype, ggml_type wtype2, int n_ff) {
+    FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type wtype, ggml_type wtype2, int n_ff) {
         auto const& params = model.params;
         auto const n_embd = params.n_embd;
         auto const n_layer = params.n_layer;
@@ -107,7 +108,7 @@ namespace fastllama {
         }
     }
 
-    static auto prepare_memory_for_key_value_memory(Model& model) -> std::size_t {
+    FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_key_value_memory(Model& model) -> std::size_t {
         auto const& params = model.params;
 
         auto const n_embd  = params.n_embd;
@@ -124,7 +125,7 @@ namespace fastllama {
         return memory_size;
     }
 
-    static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger) -> bool {
+    FASTLLAMA_ALWAYS_INLINE static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger) -> bool {
         std::size_t number_of_tensors{};
         std::size_t total_size {};
         std::string name(64, ' ');
@@ -287,7 +288,7 @@ namespace fastllama {
         return true;
     }
 
-    static auto parse_tensor_data(std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
+    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
         std::size_t n_parts{ model.model_id.number_of_parts };
         auto total_size = filepath.size();
         std::string file_part_path(filepath);
@@ -318,7 +319,7 @@ namespace fastllama {
         return true;
     }
 
-    static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
+    FASTLLAMA_ALWAYS_INLINE static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
         if (!verify_magic_number(reader)) {
             logger.log_err("Model", "invalid model file ", filepath, " (bad magic)\n");
             return std::nullopt;
@@ -462,7 +463,7 @@ namespace fastllama {
 
         reader.close();
 
-        parse_tensor_data(filepath, *this, offset, logger);
+        if (!parse_tensor_data(filepath, *this, offset, logger)) return;
 
         this->is_valid = true;
     }
