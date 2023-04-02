@@ -6,7 +6,44 @@ Python wrapper to run Inference of [LLaMA](https://arxiv.org/abs/2302.13971) mod
 
 This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp)
 
-<img src="assets/fast_llama.jpg" alt="My Image" width="500" height="500">
+
+```
+                ___            __    _    _         __ __      
+                | | '___  ___ _| |_ | |  | |   ___ |  \  \ ___ 
+                | |-<_> |<_-<  | |  | |_ | |_ <_> ||     |<_> |
+                |_| <___|/__/  |_|  |___||___|<___||_|_|_|<___|
+                                                            
+                                                                                        
+                                                                           
+                                                       .+*+-.                
+                                                      -%#--                  
+                                                    :=***%*++=.              
+                                                   :+=+**####%+              
+                                                   ++=+*%#                   
+                                                  .*+++==-                   
+                  ::--:.                           .**++=::                   
+                 #%##*++=......                    =*+==-::                   
+                .@@@*@%*==-==-==---:::::------::==*+==--::                   
+                 %@@@@+--====+===---=---==+=======+++----:                   
+                 .%@@*++*##***+===-=====++++++*++*+====++.                   
+                 :@@%*##%@@%#*%#+==++++++=++***==-=+==+=-                    
+                  %@%%%%%@%#+=*%*##%%%@###**++++==--==++                     
+                  #@%%@%@@##**%@@@%#%%%%**++*++=====-=*-                     
+                  -@@@@@@@%*#%@@@@@@@%%%%#+*%#++++++=*+.                     
+                   +@@@@@%%*-#@@@@@@@@@@@%%@%**#*#+=-.                       
+                    #%%###%:  ..+#%@@@@%%@@@@%#+-                            
+                    :***#*-         ...  *@@@%*+:                            
+                     =***=               -@%##**.                            
+                    :#*++                -@#-:*=.                            
+                     =##-                .%*..##                             
+                      +*-                 *:  +-                             
+                      :+-                :+   =.                             
+                       =-.               *+   =-                             
+                        :-:-              =--  :::                           
+                                                                           
+
+```
+
 
 ---
 
@@ -154,7 +191,7 @@ python export-alpaca-lora.py
 # SplitType should be 1 for Alpaca-Lora models exported from HF
 python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 1
 
-./quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
+./build/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
 python example-alpaca.py
 ```

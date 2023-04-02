@@ -872,7 +872,7 @@ struct FastLlama {
 
         m_model.hparams.n_ctx = n_ctx;
 
-        if (!llama_model_load(m_model_name, path, m_model, m_vocab, 512)) {
+        if (!llama_model_load(m_model_name, path, m_model, m_vocab, n_ctx)) {
             throw std::runtime_error("Unable to load model");
         }
         if (!llama_eval(m_model, m_threads, 0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)) {
