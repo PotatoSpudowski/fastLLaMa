@@ -1,15 +1,16 @@
 #include "llama.hpp"
 #include "file_reader.hpp"
+#include <cassert>
 
 namespace fastllama {
     
-    constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
+    static constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
         std::uint32_t magic{};
         reader.read(&magic);
         return magic == magic_number_v;
     }
 
-    constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
+    static constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
         reader.read(&params.n_vocab);
         reader.read(&params.n_embd);
         reader.read(&params.n_mult);
@@ -19,9 +20,9 @@ namespace fastllama {
         reader.read(&params.f16);
     }
 
-    auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size) {
+    static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size) {
         vocab.id_to_token.resize(size);
-        std::string word(' ', 64);
+        std::string word(64, ' ');
 
         for (auto i = 0ul; i < size; ++i) {
             std::uint32_t len;
@@ -40,7 +41,7 @@ namespace fastllama {
         }
     }
 
-    auto prepare_memory_for_weight(Model& model, ggml_type wtype, ggml_type wtype2, int n_ff) {
+    static auto prepare_memory_for_weight(Model& model, ggml_type wtype, ggml_type wtype2, int n_ff) {
         auto const& params = model.params;
         auto const n_embd = params.n_embd;
         auto const n_layer = params.n_layer;
@@ -78,16 +79,16 @@ namespace fastllama {
             auto str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention_norm.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.attention_norm;
             
-            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wq.weight.weight", i);
+            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wq.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.wq;
             
-            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wk.weight.weight", i);
+            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wk.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.wq;
             
-            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wv.weight.weight", i);
+            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wv.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.wv;
             
-            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wo.weight.weight", i);
+            str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wo.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.wo;
             
             
@@ -106,7 +107,7 @@ namespace fastllama {
         }
     }
 
-    auto prepare_memory_for_key_value_memory(Model& model) -> std::size_t {
+    static auto prepare_memory_for_key_value_memory(Model& model) -> std::size_t {
         auto const& params = model.params;
 
         auto const n_embd  = params.n_embd;
@@ -123,18 +124,201 @@ namespace fastllama {
         return memory_size;
     }
 
-    auto parse_tensor_data(std::string_view filepath, Model& model, Logger& logger) {
-        std::size_t n_part{ model.model_id.number_of_parts };
-        std::string file_part_path('\0', filepath.size() + 20);
-        for(auto i = 0ul; i < n_part + 1; ++i) {
-            auto const part_id = i;
-            auto size = snprintf(file_part_path.data(), file_part_path.size(), "%.*s.%zu", static_cast<int>(filepath.size()), filepath.data(), part_id);
-            file_part_path.resize(static_cast<std::size_t>(size));
-            logger.log("Model", file_part_path, '\n');
+    static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger) -> bool {
+        std::size_t number_of_tensors{};
+        std::size_t total_size {};
+        std::string name(64, ' ');
+
+        printf("Loading Model ");
+
+        while(!reader.eof()) {
+            std::int32_t n_dims;
+            std::int32_t length;
+            std::int32_t ftype;
+
+            reader.read(&n_dims);
+            reader.read(&length);
+            reader.read(&ftype);
+
+            if (reader.eof()) break;
+
+            std::int32_t total_number_of_elements{1};
+            std::int32_t extents[2] = { 1, 1 };
+            assert(n_dims <= 2 && "number of dimensions should be less than 3");
+            for(std::int32_t i {}; i < n_dims; ++i) {
+                reader.read(extents + i);
+                total_number_of_elements *= extents[i];
+            }
+            
+            name.resize(length);
+            reader.read(name.data(), length);
+            if (model.tensors.count(name) == 0) {
+                logger.log_err("Model", "unkown tensor '", name, "' in model file");
+                return false;
+            }
+
+            // split_type = 0: split by columns
+            // split_type = 1: split by rows
+            auto split_type = 0;
+
+            // split_type = 0:
+            // regex:
+            //   - tok_embeddings.*
+            //   - layers.*.attention.wo.weight
+            //   - layers.*.feed_forward.w2.weight
+
+            // split_type = 1:
+            // regex:
+            //   - output.*
+            //   - layers.*.attention.wq.weight
+            //   - layers.*.attention.wk.weight
+            //   - layers.*.attention.wv.weight
+            //   - layers.*.feed_forward.w1.weight
+            //   - layers.*.feed_forward.w3.weight
+
+            if (name.find("tok_embeddings") != std::string::npos) {
+                split_type = 0;
+            } else if (name.find("layers") != std::string::npos) {
+                if (name.find("attention.wo.weight") != std::string::npos) {
+                    split_type = 0;
+                } else if (name.find("feed_forward.w2.weight") != std::string::npos) {
+                    split_type = 0;
+                } else {
+                    split_type = 1;
+                }
+            } else if (name.find("output") != std::string::npos) {
+                split_type = 1;
+            }
+
+            auto tensor = model.tensors[name];
+
+            if (n_dims == 1) {
+                if (ggml_nelements(tensor) != total_number_of_elements) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file\n");
+                    return false;
+                }
+
+                if (tensor->ne[0] != extents[0] || tensor->ne[1] != extents[1]) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got [", tensor->ne[0], ", ", tensor->ne[1], "], but expected [", extents[0], ", ", extents[1],"]\n");
+                    return false;
+                }
+            } else {
+                if ((ggml_nelements(tensor) / n_parts) != total_number_of_elements) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file\n");
+                    return false;
+                }
+
+                std::int32_t temp_ne[] = { tensor->ne[0] / (split_type == 0 ? static_cast<int>(n_parts) : 1 ), tensor->ne[1] / (split_type == 0 ? 1 : static_cast<int>(n_parts) ) };
+                
+                if (temp_ne[0] != extents[0] || temp_ne[1] != extents[1]) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got [", temp_ne[0], ", ", temp_ne[1], "], but expected [", extents[0], ", ", extents[1],"]\n");
+                    return false;
+                }
+            }
+
+            std::size_t bpe{};
+
+            switch (ftype) {
+                case 0: bpe = ggml_type_size(GGML_TYPE_F32);  break;
+                case 1: bpe = ggml_type_size(GGML_TYPE_F16);  break;
+                case 2: bpe = ggml_type_size(GGML_TYPE_Q4_0); assert(extents[0] % 64 == 0); break;
+                case 3: bpe = ggml_type_size(GGML_TYPE_Q4_1); assert(extents[0] % 64 == 0); break;
+                default: {
+                    logger.log_err("Modal", "unknown ftype ", ftype, " in model file\n");
+                    return false;
+                }
+            }
+
+            if (n_dims == 1 || n_parts == 1) {
+                if ((total_number_of_elements * bpe) / ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got ", ggml_nbytes(tensor), ", but expected ", total_number_of_elements * bpe, '\n');
+                    return false;
+                }
+
+                if (part_id == 0) {
+                    reader.read(tensor->data, sizeof(char), ggml_nbytes(tensor));
+                } else {
+                    reader.seek(ggml_nbytes(tensor), fastllama::BinaryFileReader::SeekReference::Current);
+                }
+
+                total_size += ggml_nbytes(tensor);
+            } else {
+                if ((total_number_of_elements * bpe) / ggml_blck_size(tensor->type) != ggml_nbytes(tensor)/n_parts) {
+                    logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got ", ggml_nbytes(tensor), ", but expected ", total_number_of_elements * bpe, '\n');
+                    return false;
+                }
+
+                if (split_type == 0) {
+                    auto const np0 = extents[0];
+
+                    auto const row_size = (tensor->ne[0]/ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
+                    assert(row_size == tensor->nb[1]);
+
+                    for (int i1 = 0; i1 < np0; ++i1) {
+                        auto const offset_row = i1*row_size;
+                        auto const offset = offset_row + ((part_id * np0) / ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
+                        reader.read(static_cast<char*>(tensor->data) + offset, row_size/n_parts);
+                    }
+                } else {
+                    auto const np1 = extents[1];
+
+                    auto const row_size = (tensor->ne[0] / ggml_blck_size(tensor->type)) * ggml_type_size(tensor->type);
+
+                    for (int i1 = 0; i1 < np1; ++i1) {
+                        auto const offset_row = (i1 + part_id * np1)*row_size;
+                        reader.read(static_cast<char*>(tensor->data) + offset_row, row_size);
+                    }
+                }
+
+                total_size += ggml_nbytes(tensor)/n_parts;
+            }
+
+            if (++number_of_tensors % 8 == 0) {
+                printf(".");
+                fflush(stdout);
+            }
         }
+        printf(" done\n");
+
+        char buff[20] = {0};
+        auto len = snprintf(buff, sizeof(buff), "%8.2f", total_size/(1024.0*1024.0));
+        logger.log("Model", "model size = ", std::string(buff, len), " MB / num tensors = ", number_of_tensors, "\n");
+
+        return true;
     }
 
-    auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
+    static auto parse_tensor_data(std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
+        std::size_t n_parts{ model.model_id.number_of_parts };
+        auto total_size = filepath.size();
+        std::string file_part_path(filepath);
+        for(auto i = 0ul; i < n_parts; ++i) {
+            auto const part_id = i;
+            file_part_path.resize(total_size);
+            if (i > 0) {
+                file_part_path.push_back('.');
+                file_part_path.append(std::to_string(part_id));
+            }
+
+            logger.log("Model", "loading model part ", part_id + 1, '/', n_parts, " from ", file_part_path, '\n');
+
+            auto reader = fastllama::BinaryFileReader(file_part_path);
+            if (!reader) {
+                logger.log_err("Model", "failed to open ", file_part_path, '\n');
+                return false;
+            }
+
+            if (!reader.seek(offset)) {
+                logger.log_err("Model", "failed to seek the data in ", file_part_path, " at the offset ", offset, '\n');
+                return false;
+            }
+
+            load_model_weights(reader, model, part_id, n_parts, logger);
+        }
+
+        return true;
+    }
+
+    static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
         if (!verify_magic_number(reader)) {
             logger.log_err("Model", "invalid model file ", filepath, " (bad magic)\n");
             return std::nullopt;
@@ -278,7 +462,7 @@ namespace fastllama {
 
         reader.close();
 
-        parse_tensor_data(filepath, *this, logger);
+        parse_tensor_data(filepath, *this, offset, logger);
 
         this->is_valid = true;
     }
