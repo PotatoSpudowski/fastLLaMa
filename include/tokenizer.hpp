@@ -75,11 +75,11 @@ namespace fastllama {
         using index_t = typename sp_symbol::index_t;
         using queue_t = typename sp_bigram::queue_t;
 
-        tokenizer(vocab const& v)
+        tokenizer(Vocab const& v)
             : m_vocab(v)
         {}
 
-        auto operator()(std::string_view text, std::vector<typename vocab::id>& out) {
+        auto operator()(std::string_view text, std::vector<typename Vocab::id>& out) {
             auto index = 0l;
             auto offset = std::size_t{};
             while(offset < text.size()) {
@@ -128,7 +128,7 @@ namespace fastllama {
                     out.push_back(token->second);
                 } else {
                     for(auto const c : sym.text) {
-                        auto id = (static_cast<typename vocab::id>(c) & 0xff);
+                        auto id = (static_cast<typename Vocab::id>(c) & 0xff);
                         out.push_back(id + 3);
                     }
                 }
@@ -157,14 +157,14 @@ namespace fastllama {
         }
 
     private:
-        vocab const& m_vocab;
+        Vocab const& m_vocab;
         std::vector<sp_symbol> m_symbols;
         queue_t m_queue;
     };
 
-    auto tokenize(vocab const& v, std::string_view text, bool bos) {
+    auto tokenize(Vocab const& v, std::string_view text, bool bos) {
         auto tok = tokenizer(v);
-        std::vector<typename vocab::id> out;
+        std::vector<typename Vocab::id> out;
         
         if (text.size() == 0) return out;
         if (bos) out.push_back(1);

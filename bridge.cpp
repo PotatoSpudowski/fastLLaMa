@@ -12,11 +12,13 @@
 #include <vector>
 #include <deque>
 #include <type_traits>
+#include <iostream>
 #include "tokenizer.hpp"
 
 #include <pybind11/embed.h>
 #include <pybind11/functional.h>
 #include <pybind11/stl.h>
+#include "file_reader.hpp"
 
 namespace py = pybind11;
 
@@ -97,10 +99,11 @@ struct llama_model {
 };
 
 // load the model's weights from a file
-bool llama_model_load(std::string_view model_name, const std::string & fname, llama_model & model, fastllama::vocab & vocab, int n_ctx) {
+bool llama_model_load(std::string_view model_name, const std::string & fname, llama_model & model, fastllama::Vocab & vocab, int n_ctx) {
     printf("%s: loading model from '%s' - please wait ...\n", __func__, fname.c_str());
 
-    auto fin = std::ifstream(fname, std::ios::binary);
+    // auto fin = std::ifstream(fname, std::ios::binary);
+    auto fin = fastllama::BinaryFileReader(fname);
     if (!fin) {
         fprintf(stderr, "%s: failed to open '%s'\n", __func__, fname.c_str());
         return false;
@@ -109,7 +112,7 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
     // verify magic
     {
         uint32_t magic;
-        fin.read((char *) &magic, sizeof(magic));
+        fin.read(&magic);
         if (magic != 0x67676d6c) {
             fprintf(stderr, "%s: invalid model file '%s' (bad magic)\n", __func__, fname.c_str());
             return false;
@@ -123,14 +126,13 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
     {
         auto & hparams = model.hparams;
 
-        fin.read((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
-        //fin.read((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
-        fin.read((char *) &hparams.n_embd,  sizeof(hparams.n_embd));
-        fin.read((char *) &hparams.n_mult,  sizeof(hparams.n_mult));
-        fin.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
-        fin.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
-        fin.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        fin.read((char *) &hparams.f16,     sizeof(hparams.f16));
+        fin.read(&hparams.n_vocab);
+        fin.read(&hparams.n_embd);
+        fin.read(&hparams.n_mult);
+        fin.read(&hparams.n_head);
+        fin.read(&hparams.n_layer);
+        fin.read(&hparams.n_rot);
+        fin.read(&hparams.f16);
 
         hparams.n_ctx = n_ctx;
 
@@ -158,7 +160,7 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
 
         for (int i = 0; i < n_vocab; i++) {
             uint32_t len;
-            fin.read(reinterpret_cast<char*>(&len), sizeof(len));
+            fin.read(&len);
 
             word.resize(len);
             fin.read(word.data(), len);
@@ -318,7 +320,8 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
         printf("%s: memory_size = %8.2f MB, n_mem = %d\n", __func__, memory_size/1024.0/1024.0, n_mem);
     }
 
-    const size_t file_offset = fin.tellg();
+    std::optional<std::size_t> may_be_offset = fin.tell();
+    const size_t file_offset = may_be_offset.value_or(0);
 
     fin.close();
 
@@ -335,8 +338,14 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
 
         printf("%s: loading model part %d/%d from '%s'\n", __func__, i+1, n_parts, fname_part.c_str());
 
-        fin = std::ifstream(fname_part, std::ios::binary);
-        fin.seekg(file_offset);
+        fin = fastllama::BinaryFileReader(fname_part);
+        if (!fin) {
+            fprintf(stderr, "%s: failed to open '%s'\n", __func__, fname.c_str());
+            return false;
+        }
+        
+        fin.seek(file_offset);
+
 
         // load weights
         {
@@ -350,9 +359,9 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
                 int32_t length;
                 int32_t ftype;
 
-                fin.read(reinterpret_cast<char *>(&n_dims), sizeof(n_dims));
-                fin.read(reinterpret_cast<char *>(&length), sizeof(length));
-                fin.read(reinterpret_cast<char *>(&ftype),  sizeof(ftype));
+                fin.read(&n_dims);
+                fin.read(&length);
+                fin.read(&ftype);
 
                 if (fin.eof()) {
                     break;
@@ -361,12 +370,12 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
                 int32_t nelements = 1;
                 int32_t ne[2] = { 1, 1 };
                 for (int i = 0; i < n_dims; ++i) {
-                    fin.read(reinterpret_cast<char *>(&ne[i]), sizeof(ne[i]));
+                    fin.read(&ne[i]);
                     nelements *= ne[i];
                 }
 
                 std::string name(length, 0);
-                fin.read(&name[0], length);
+                fin.read(name.data(), length);
 
                 if (model.tensors.find(name.data()) == model.tensors.end()) {
                     fprintf(stderr, "%s: unknown tensor '%s' in model file\n", __func__, name.data());
@@ -468,9 +477,9 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
                     }
 
                     if (part_id == 0) {
-                        fin.read(reinterpret_cast<char *>(tensor->data), ggml_nbytes(tensor));
+                        fin.read(static_cast<char*>(tensor->data), ggml_nbytes(tensor));
                     } else {
-                        fin.seekg(ggml_nbytes(tensor), std::ios::cur);
+                        fin.seek(ggml_nbytes(tensor), fastllama::BinaryFileReader::SeekReference::Current);
                     }
 
                     total_size += ggml_nbytes(tensor);
@@ -490,7 +499,7 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
                         for (int i1 = 0; i1 < ne[1]; ++i1) {
                             const size_t offset_row = i1*row_size;
                             const size_t offset = offset_row + ((part_id*np0)/ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
-                            fin.read(reinterpret_cast<char *>(tensor->data) + offset, row_size/n_parts);
+                            fin.read(static_cast<char*>(tensor->data) + offset, row_size/n_parts);
                         }
                     } else {
                         const int np1 = ne[1];
@@ -499,7 +508,7 @@ bool llama_model_load(std::string_view model_name, const std::string & fname, ll
 
                         for (int i1 = 0; i1 < ne[1]; ++i1) {
                             const size_t offset_row = (i1 + part_id*np1)*row_size;
-                            fin.read(reinterpret_cast<char *>(tensor->data) + offset_row, row_size);
+                            fin.read(static_cast<char*>(tensor->data) + offset_row, row_size);
                         }
                     }
 
@@ -538,7 +547,7 @@ bool llama_eval(
         const llama_model & model,
         const int n_threads,
         const int n_past,
-        const std::vector<typename fastllama::vocab::id> & embd_inp,
+        const std::vector<typename fastllama::Vocab::id> & embd_inp,
               std::vector<float>         & embd_w,
               size_t                     & mem_per_token) {
     const int N = embd_inp.size();
@@ -762,20 +771,20 @@ struct FastLlamaBuffer {
     static constexpr std::size_t str_buffer_size = 512;
     static constexpr std::size_t unicode_backlog_buffer_size = 8;
 
-    FastLlamaBuffer(fastllama::vocab const& vocab, std::size_t len, Fn&& fn)
+    FastLlamaBuffer(fastllama::Vocab const& vocab, std::size_t len, Fn&& fn)
         : m_vocab(vocab)
         , max_len(len)
         , m_fn(std::move(fn))
     {}
 
-    auto push(typename fastllama::vocab::id token) -> void {
+    auto push(typename fastllama::Vocab::id token) -> void {
         if (max_len <= m_buffer.size()) {
             flush_buffer();
         }
         m_buffer.push_back(token);
     }
 
-    auto get_token_as_str(typename fastllama::vocab::id id) const -> std::string_view {
+    auto get_token_as_str(typename fastllama::Vocab::id id) const -> std::string_view {
         if (id >= m_vocab.id_to_token.size()) return std::string_view{};
         auto const& it = m_vocab.id_to_token[id];
         return it.tok;
@@ -848,9 +857,9 @@ private:
     }
 
 private:
-    fastllama::vocab const& m_vocab;
+    fastllama::Vocab const& m_vocab;
     std::size_t max_len{1};
-    std::deque<typename fastllama::vocab::id> m_buffer;
+    std::deque<typename fastllama::Vocab::id> m_buffer;
     char m_temp_str_buffer[str_buffer_size];
     char m_unicode_backlog_buffer[unicode_backlog_buffer_size] = {0};
     std::size_t num_of_chars_in_unicode_buffer{0};
@@ -988,7 +997,7 @@ struct FastLlama {
             n_past += m_embd.size();
             m_embd.clear();
 
-            typename fastllama::vocab::id id = 0;
+            typename fastllama::Vocab::id id = 0;
 
             {
                 id = llama_sample_top_p_top_k(m_vocab, m_logits.data() + (m_logits.size() - n_vocab), m_last_n_tokens, repeat_penalty, top_k, top_p, temp, m_rng);
@@ -1254,14 +1263,14 @@ private:
 private:
     std::string m_model_name;
     llama_model m_model;
-    fastllama::vocab m_vocab;
+    fastllama::Vocab m_vocab;
     int m_threads;
     int n_past{0};
     int m_seed{0};
     size_t m_mem_per_token = 0;
     std::mt19937 m_rng;
-    std::vector<typename fastllama::vocab::id> m_embd;
-    std::vector<typename fastllama::vocab::id> m_last_n_tokens;
+    std::vector<typename fastllama::Vocab::id> m_embd;
+    std::vector<typename fastllama::Vocab::id> m_last_n_tokens;
     std::vector<float> m_logits;
 };
 
