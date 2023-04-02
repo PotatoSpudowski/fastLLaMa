@@ -12,8 +12,13 @@
 namespace fastllama {
     
     struct Vocab {
-        using id    = int32_t;
+        using id    = std::int32_t;
         using token = std::string;
+
+        constexpr auto get_token_from_id(id token_id) const noexcept -> std::string_view {
+            if (token_id >= id_to_token.size()) return {};
+            return id_to_token[token_id].tok;
+        }
 
         struct token_score {
             token tok;

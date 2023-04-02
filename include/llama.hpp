@@ -46,14 +46,17 @@ namespace fastllama {
     struct Model {
         using vocab_id = typename Vocab::id;
 
-        Model(std::string_view model_name, std::string_view filepath, std::size_t context_size = 512, Logger logger = {});
+        bool load(std::string_view model_name, std::string_view filepath);
+        auto unload();
         auto eval(
             int threads,
             std::size_t n_past,
             std::vector<vocab_id> const& embd_inp,
             std::vector<float>& embd_w,
-            std::size_t& mem_per_token,
-            Logger logger = {}) -> bool;
+            std::size_t& mem_per_token
+        ) -> bool;
+
+        Logger logger{};
 
         ModelId model_id{};
         Vocab vocabulary;
