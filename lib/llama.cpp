@@ -38,18 +38,18 @@ namespace fastllama {
         }
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type wtype, ggml_type wtype2, int n_ff) {
-        auto const& params = model.params;
-        auto const n_embd = params.n_embd;
-        auto const n_layer = params.n_layer;
-        auto const n_ctx = params.n_ctx;
-        auto const n_vocab = params.n_vocab;
-        auto& ctx = model.ctx;
+    FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type vtype, ggml_type wtype, int n_ff) {
+        auto const& params  = model.params;
+        auto const  n_embd  = params.n_embd;
+        auto const  n_layer = params.n_layer;
+        auto const  n_ctx   = params.n_ctx;
+        auto const  n_vocab = params.n_vocab;
+        auto&       ctx     = model.ctx;
 
         model.layers.resize(n_layer);
-        model.tok_embeddings    = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
-        model.norm              = ggml_new_tensor_1d(ctx, wtype2, n_embd);
-        model.output            = ggml_new_tensor_2d(ctx, wtype, n_embd, n_vocab);
+        model.tok_embeddings    = ggml_new_tensor_2d(ctx, vtype, n_embd, n_vocab);
+        model.norm              = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
+        model.output            = ggml_new_tensor_2d(ctx, vtype, n_embd, n_vocab);
 
         model.tensors["tok_embeddings.weight"] = model.tok_embeddings;
 
@@ -60,14 +60,14 @@ namespace fastllama {
 
         for(auto i = 0ul; i < n_layer; ++i) {
             auto& layer = model.layers[i];
-            layer.attention_norm = ggml_new_tensor_1d(ctx, wtype2, n_embd);
+            layer.attention_norm = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
             layer.wq = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
             layer.wk = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
             layer.wv = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
             layer.wo = ggml_new_tensor_2d(ctx, wtype, n_embd, n_embd);
 
-            layer.ffn_norm = ggml_new_tensor_1d(ctx, wtype2, n_embd);
+            layer.ffn_norm = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
             layer.w1 = ggml_new_tensor_2d(ctx, wtype, n_embd,   n_ff);
             layer.w2 = ggml_new_tensor_2d(ctx, wtype,   n_ff, n_embd);
@@ -348,22 +348,21 @@ namespace fastllama {
         }
 
         load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab));        
-
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
-        ggml_type wtype = GGML_TYPE_COUNT;
+        // wtype is for per-layer weights, while vtype is for other weights
+        ggml_type wtype, vtype;
         switch (model.params.f16) {
-            case 0: wtype = GGML_TYPE_F32;  break;
-            case 1: wtype = GGML_TYPE_F16;  break;
-            case 2: wtype = GGML_TYPE_Q4_0; break;
-            case 3: wtype = GGML_TYPE_Q4_1; break;
+            case 0: wtype = vtype = GGML_TYPE_F32;  break;
+            case 1: wtype = vtype = GGML_TYPE_F16;  break;
+            case 2: wtype = vtype = GGML_TYPE_Q4_0; break;
+            case 3: wtype = vtype = GGML_TYPE_Q4_1; break;
+            case 4: wtype = GGML_TYPE_Q4_1; vtype = GGML_TYPE_F16; break;
             default: {
                 logger.log_err("Model", "invalid model file ", filepath, " (bad f16 value ", model.params.f16, ")\n");
                 return std::nullopt;
             }
         }
-
-        const ggml_type wtype2 = GGML_TYPE_F32;
 
         auto & ctx = model.ctx;
 
@@ -378,27 +377,27 @@ namespace fastllama {
             const int n_ctx   = params.n_ctx;
             const int n_vocab = params.n_vocab;
 
-            ctx_size += n_embd*n_vocab * ggml_type_sizef(wtype); // tok_embeddings
+            ctx_size += n_embd*n_vocab * ggml_type_sizef(vtype); // tok_embeddings
 
-            ctx_size += n_embd * ggml_type_sizef(wtype2); // norm
+            ctx_size += n_embd * ggml_type_sizef(GGML_TYPE_F32); // norm
 
-            ctx_size += n_embd * n_vocab * ggml_type_sizef(wtype); // output
+            ctx_size += n_embd * n_vocab * ggml_type_sizef(vtype); // output
 
-            ctx_size += n_layer * (n_embd * ggml_type_sizef(wtype2)); // attention_norm
+            ctx_size += n_layer * (n_embd * ggml_type_sizef(GGML_TYPE_F32)); // attention_norm
 
             ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype)); // wq
             ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype)); // wk
             ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype)); // wv
             ctx_size += n_layer * (n_embd * n_embd * ggml_type_sizef(wtype)); // wo
 
-            ctx_size += n_layer * (n_embd * ggml_type_sizef ( wtype2)); // ffn_norm
+            ctx_size += n_layer * (n_embd * ggml_type_sizef ( GGML_TYPE_F32)); // ffn_norm
 
             ctx_size += n_layer * (n_ff * n_embd * ggml_type_sizef(wtype)); // w1
             ctx_size += n_layer * (n_ff * n_embd * ggml_type_sizef(wtype)); // w2
             ctx_size += n_layer * (n_ff * n_embd * ggml_type_sizef(wtype)); // w3
 
-            ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(wtype2); // memory_k
-            ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(wtype2); // memory_v
+            ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(GGML_TYPE_F32); // memory_k
+            ctx_size += n_ctx * n_layer * n_embd * ggml_type_sizef(GGML_TYPE_F32); // memory_v
 
             ctx_size += (5 + 10 * n_layer) * 256; // object overhead
 
@@ -422,7 +421,7 @@ namespace fastllama {
             }
         }
 
-        prepare_memory_for_weight(model, wtype, wtype2, static_cast<int>(n_ff));
+        prepare_memory_for_weight(model, vtype, wtype, static_cast<int>(n_ff));
 
         auto const memory_size = prepare_memory_for_key_value_memory(model);
 

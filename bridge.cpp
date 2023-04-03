@@ -847,8 +847,14 @@ struct FastLlama {
         // n_past += m_embd.size();
         // m_embd.clear();
         
-        for (auto i = m_embd.size(); i < embd_inp.size(); i++) {
+        // std::cout<<"Embd Size: "<<m_embd.size()<<std::endl;
+        // for(auto const id : m_embd) {
+        //     std::cout<<"<<"<<m_vocab.get_token_from_id(id)<<">> ";
+        // }
+        // std::cout<<std::endl;
+        for (auto i = 0; i < embd_inp.size(); i++) {
             // predict
+            // std::cout<<"Here: "<<i<<' '<<m_embd.size()<<' '<<embd_inp.size()<<std::endl;
             if (m_embd.size() > 0) {
                 if (!llama_eval(m_model, m_threads, n_past, m_embd, m_logits, m_mem_per_token)) {
                     return false;

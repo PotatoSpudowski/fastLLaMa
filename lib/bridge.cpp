@@ -193,6 +193,8 @@ namespace fastllama {
         for(auto i = 0ul; i < embd_input.size(); i += m_batch) {
             auto block = std::min(static_cast<std::size_t>(m_batch), embd_input.size() - i);
 
+            recycle_embed_if_exceeds_context();
+
             if (!m_embd.empty()) {
                 if (!m_model.eval(n_past, m_embd, m_logits, m_mem_per_token)) {
                     return false;
@@ -205,6 +207,8 @@ namespace fastllama {
             std::copy_n(embd_input.begin() + i, block, std::back_inserter(m_embd));
             std::copy_n(embd_input.begin() + i, block, std::back_inserter(m_last_n_tokens));
         }
+
+        m_last_n_tokens.clear();
 
         return true;
     }
