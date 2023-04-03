@@ -7,13 +7,12 @@ using namespace std::chrono_literals;
 int main() {
     auto maybe_bridge = fastllama::FastLlama::Builder()
         .set_number_of_threads(16)
-        .build("LLAMA-7B", "/Users/amit/Desktop/code/fastLLaMa/models/7B/ggml-model-q4_0.bin");
+        .build("LLAMA-7B", "./models/7B/ggml-model-q4_0.bin");
     
     if (!maybe_bridge) {
         return 1;
     }
     auto bridge = maybe_bridge.value();
-    // auto bridge = fastllama::FastLlama("LLAMA-7B", "/Users/amit/Desktop/code/fastLLaMa/models/7B/ggml-model-q4_0.bin", 16);
     // bridge.dump_vocab("./vocab.txt");
     auto& logger = bridge.get_logger();
 

@@ -80,7 +80,7 @@ namespace fastllama {
             model.tensors[std::string(temp_buff, str_size)] = layer.wq;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wk.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.wq;
+            model.tensors[std::string(temp_buff, str_size)] = layer.wk;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wv.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.wv;
@@ -101,6 +101,19 @@ namespace fastllama {
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.feed_forward.w3.weight", i);
             model.tensors[std::string(temp_buff, str_size)] = layer.w3;
+
+            // model.tensors["layers." + std::to_string(i) + ".attention_norm.weight"] = layer.attention_norm;
+
+            // model.tensors["layers." + std::to_string(i) + ".attention.wq.weight"] = layer.wq;
+            // model.tensors["layers." + std::to_string(i) + ".attention.wk.weight"] = layer.wk;
+            // model.tensors["layers." + std::to_string(i) + ".attention.wv.weight"] = layer.wv;
+            // model.tensors["layers." + std::to_string(i) + ".attention.wo.weight"] = layer.wo;
+
+            // model.tensors["layers." + std::to_string(i) + ".ffn_norm.weight"] = layer.ffn_norm;
+
+            // model.tensors["layers." + std::to_string(i) + ".feed_forward.w1.weight"] = layer.w1;
+            // model.tensors["layers." + std::to_string(i) + ".feed_forward.w2.weight"] = layer.w2;
+            // model.tensors["layers." + std::to_string(i) + ".feed_forward.w3.weight"] = layer.w3;
         }
     }
 
