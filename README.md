@@ -90,6 +90,14 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 
 ## Usage
 
+### Getting original LLaMA model weights
+
+Get the model weights from the [LLaMA repo PR](https://github.com/facebookresearch/llama) and place them in the `./models` directory.
+
+Also, as mentioned in [PR](https://github.com/facebookresearch/llama/pull/73), [magnet](magnet:?xt=urn:btih:ZXXDAUWYLRUXXBHUYEMS6Q5CE5WA3LVA&dn=LLaMA) link is available.
+
+>This magnet link provided from the community and not verified by the authors of the paper or Meta Inc. Use it on your own risk.
+
 ### Example
 ```sh
 git clone https://github.com/PotatoSpudowski/fastLLaMa
