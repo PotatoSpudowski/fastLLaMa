@@ -4,7 +4,7 @@ sys.path.append("./build/")
 
 import fastLlama
 
-MODEL_PATH = "./models/ALPACA-LORA-30B/alpaca-lora-q4_0.bin"
+MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
 
 def stream_token(x: str) -> None:
     """
@@ -13,7 +13,7 @@ def stream_token(x: str) -> None:
     print(x, end='', flush=True)
 
 model = fastLlama.Model(
-        id="ALPACA-LORA-30B",
+        id="ALPACA-LORA-7B",
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model

@@ -14,10 +14,10 @@ assert (
 ), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
 from transformers import LlamaTokenizer, LlamaForCausalLM
 
-tokenizer = LlamaTokenizer.from_pretrained("PATH TO THE MODEL HERE")
+tokenizer = LlamaTokenizer.from_pretrained("PATH TO THE MODEL HERE") # E.g. "decapoda-research/llama-7b-hf"
 
 base_model = LlamaForCausalLM.from_pretrained(
-    "PATH TO THE MODEL HERE",
+    "PATH TO THE MODEL HERE",  # E.g. "decapoda-research/llama-7b-hf"
     load_in_8bit=False,
     torch_dtype=torch.float16,
     device_map={"": "cpu"},
@@ -25,7 +25,7 @@ base_model = LlamaForCausalLM.from_pretrained(
 
 lora_model = PeftModel.from_pretrained(
     base_model,
-    "PATH TO THE MODEL HERE",
+    "PATH TO THE MODEL HERE",  # E.g. "tloen/alpaca-lora-7b"
     device_map={"": "cpu"},
     torch_dtype=torch.float16,
 )
@@ -40,14 +40,14 @@ lora_model.train(False)
 lora_model_sd = lora_model.state_dict()
 
 # 7B
-# params = {
-#     "dim": 4096,
-#     "multiple_of": 256,
-#     "n_heads": 32,
-#     "n_layers": 32,
-#     "norm_eps": 1e-06,
-#     "vocab_size": -1,
-# }
+params = {
+    "dim": 4096,
+    "multiple_of": 256,
+    "n_heads": 32,
+    "n_layers": 32,
+    "norm_eps": 1e-06,
+    "vocab_size": -1,
+}
 
 # 13B
 # params = {
@@ -60,14 +60,14 @@ lora_model_sd = lora_model.state_dict()
 # }
 
 # # 30B
-params = {
-    "dim": 6656,
-    "multiple_of": 256,
-    "n_heads": 52,
-    "n_layers": 60,
-    "norm_eps": 1e-06,
-    "vocab_size": -1,
-}
+# params = {
+#     "dim": 6656,
+#     "multiple_of": 256,
+#     "n_heads": 52,
+#     "n_layers": 60,
+#     "norm_eps": 1e-06,
+#     "vocab_size": -1,
+# }
 
 n_layers = params["n_layers"]
 n_heads = params["n_heads"]
@@ -135,9 +135,9 @@ for k, v in lora_model_sd.items():
         else:
             new_state_dict[new_k] = v
 
-os.makedirs("models/ALPACA-LORA-30B", exist_ok=True)
+os.makedirs("models/ALPACA-LORA-7B", exist_ok=True)
 
-torch.save(new_state_dict, "models/ALPACA-LORA-30B/consolidated.00.pth")
+torch.save(new_state_dict, "models/ALPACA-LORA-7B/consolidated.00.pth")
 
-with open("models/ALPACA-LORA-30B/params.json", "w") as f:
+with open("models/ALPACA-LORA-7B/params.json", "w") as f:
     json.dump(params, f)
