@@ -6,6 +6,7 @@
 #include "model_type.hpp"
 #include <cstdint>
 #include <vector>
+#include <thread>
 #include <unordered_map>
 #include "logger.hpp"
 
@@ -49,12 +50,17 @@ namespace fastllama {
         bool load(std::string_view model_name, std::string_view filepath);
         auto unload();
         auto eval(
-            int threads,
             std::size_t n_past,
             std::vector<vocab_id> const& embd_inp,
             std::vector<float>& embd_w,
             std::size_t& mem_per_token
         ) -> bool;
+
+        auto set_threads(int threads) noexcept {
+            this->threads = std::max(1, std::min(static_cast<int>(std::thread::hardware_concurrency()), threads));
+        }
+
+        bool dump_vocab(std::string_view filepath);
 
         Logger logger{};
 
@@ -78,6 +84,7 @@ namespace fastllama {
         std::unordered_map<std::string, ggml_tensor*> tensors;
 
         bool is_valid{false};
+        int threads{ static_cast<int>(std::thread::hardware_concurrency()) };
 
     private:
         std::size_t m_buffer_size{ 512 * 1024 * 1024 };

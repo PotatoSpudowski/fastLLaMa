@@ -9,11 +9,13 @@
 
 namespace fastllama {
     
-    template<typename Fn, typename = std::enable_if_t<std::is_invocable_v<Fn, std::string const&>>>
+    template<typename Fn>
     struct TokenBuffer {
         using id_t = typename Vocab::id;
         static constexpr std::size_t str_buffer_size = 512;
         static constexpr std::size_t unicode_backlog_buffer_size = 8;
+        static constexpr id_t EOS = 2;
+        static constexpr id_t BOS = 1;
 
         TokenBuffer(Vocab const& vocab, std::size_t buffer_size, Fn&& fn)
             : m_vocab(vocab)
@@ -61,7 +63,9 @@ namespace fastllama {
             auto temp_str = std::string_view(m_temp_str_buffer, buffer_start);
             for (auto const& token : tokens) {
                 auto substr_pos = temp_str.find(token);
-                if (substr_pos != std::string_view::npos) return std::make_pair(true, temp_str.substr(0, substr_pos));
+                if (substr_pos != std::string_view::npos) {
+                    return std::make_pair(true, temp_str.substr(0, substr_pos));
+                }
             }
 
             return std::make_pair( false, std::string_view{} );

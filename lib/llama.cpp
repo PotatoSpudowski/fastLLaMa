@@ -2,7 +2,7 @@
 #include "file_reader.hpp"
 #include <cassert>
 #include "macro.hpp"
-#include <thread>
+#include <fstream>
 
 namespace fastllama {
 
@@ -30,15 +30,10 @@ namespace fastllama {
             std::uint32_t len;
             reader.read(&len);
 
-            word.reserve(len);
+            word.resize(len);
             reader.read(word.data(), len);
 
-            float score{};
-
-            vocab.token_to_id[word] = i;
-            auto& temp = vocab.id_to_token[i];
-            temp.score = score;
-            temp.tok = word;
+            vocab.set_word(i, word, 0);
             word.clear();
         }
     }
@@ -146,7 +141,9 @@ namespace fastllama {
 
             std::int32_t total_number_of_elements{1};
             std::int32_t extents[2] = { 1, 1 };
+            
             assert(n_dims <= 2 && "number of dimensions should be less than 3");
+
             for(std::int32_t i {}; i < n_dims; ++i) {
                 reader.read(extents + i);
                 total_number_of_elements *= extents[i];
@@ -210,7 +207,7 @@ namespace fastllama {
                     return false;
                 }
 
-                std::int32_t temp_ne[] = { tensor->ne[0] / (split_type == 0 ? static_cast<int>(n_parts) : 1 ), tensor->ne[1] / (split_type == 0 ? 1 : static_cast<int>(n_parts) ) };
+                std::int64_t temp_ne[] = { tensor->ne[0] / (split_type == 0 ? static_cast<int>(n_parts) : 1 ), tensor->ne[1] / (split_type == 0 ? 1 : static_cast<int>(n_parts) ) };
                 
                 if (temp_ne[0] != extents[0] || temp_ne[1] != extents[1]) {
                     logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got [", temp_ne[0], ", ", temp_ne[1], "], but expected [", extents[0], ", ", extents[1],"]\n");
@@ -289,13 +286,16 @@ namespace fastllama {
         return true;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
+    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::vector<char>& file_buffer, std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
         std::size_t n_parts{ model.model_id.number_of_parts };
+        
         auto total_size = filepath.size();
         std::string file_part_path(filepath);
+        
         for(auto i = 0ul; i < n_parts; ++i) {
             auto const part_id = i;
             file_part_path.resize(total_size);
+
             if (i > 0) {
                 file_part_path.push_back('.');
                 file_part_path.append(std::to_string(part_id));
@@ -308,6 +308,8 @@ namespace fastllama {
                 logger.log_err("Model", "failed to open ", file_part_path, '\n');
                 return false;
             }
+
+            reader.set_buffer(file_buffer.data(), file_buffer.size());
 
             if (!reader.seek(offset)) {
                 logger.log_err("Model", "failed to seek the data in ", file_part_path, " at the offset ", offset, '\n');
@@ -345,7 +347,7 @@ namespace fastllama {
             logger.log("Model", "n_parts = ", model.model_id.number_of_parts, '\n');
         }
 
-        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab));
+        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab));        
 
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
@@ -408,10 +410,10 @@ namespace fastllama {
 
         // create the ggml context
         {
-            ggml_init_params params = {
-                .mem_size   = ctx_size,
-                .mem_buffer = NULL,
-            };
+            ggml_init_params params {};
+            params.mem_size = ctx_size;
+            params.mem_buffer = nullptr;
+            params.no_alloc = false;
 
             model.ctx = ggml_init(params);
             if (!model.ctx) {
@@ -439,6 +441,17 @@ namespace fastllama {
         ctx = nullptr;
     }
 
+    bool Model::dump_vocab(std::string_view filepath) {
+        std::ofstream f(filepath);
+        if (!f) return false;
+
+        for(auto i = 0ul; i < vocabulary.id_to_token.size(); ++i) {
+            f << i << " : " << vocabulary.id_to_token[i].tok<<'\n';
+        }
+        f.close();
+        return true;
+    }
+
     bool Model::load(std::string_view model_name, std::string_view filepath) {
         logger.log("Model", "loading model from ", filepath, " - please wait ...\n");
         
@@ -461,6 +474,9 @@ namespace fastllama {
             return false;
         }
 
+        std::vector<char> file_buffer((1 << 20));
+        reader.set_buffer(file_buffer.data(), file_buffer.size());
+
         auto maybe_offset = read_header(filepath, *this, reader, logger);
         
         if (!maybe_offset.has_value()) return false;
@@ -468,7 +484,7 @@ namespace fastllama {
 
         reader.close();
 
-        if (!parse_tensor_data(filepath, *this, offset, logger)) return false;
+        if (!parse_tensor_data(file_buffer, filepath, *this, offset, logger)) return false;
 
         this->is_valid = true;
         return true;
@@ -476,7 +492,6 @@ namespace fastllama {
 
 
     auto Model::eval(
-            int threads,
             std::size_t n_past,
             std::vector<vocab_id> const& embd_inp,
             std::vector<float>& embd_w,
@@ -486,9 +501,8 @@ namespace fastllama {
         if (!is_valid) {
             logger.log_err(__func__, "model is not valid\n");
             return false;
-        }
-        auto const normalized_threads = std::max(1, std::min(static_cast<int>(std::thread::hardware_concurrency()), threads));
-        auto const embd_size = embd_inp.size();
+        };
+        auto const N = embd_inp.size();
 
         auto const n_embd  = params.n_embd;
         auto const n_layer = params.n_layer;
@@ -506,7 +520,7 @@ namespace fastllama {
             return false;
         }
 
-        auto total_mem_for_token = mem_per_token * embd_size;
+        auto total_mem_for_token = mem_per_token * N;
         if (mem_per_token > 0 && (total_mem_for_token > m_buffer_size)) {
             // add 10% to account for ggml object overhead
             m_buffer_size = 1.1 * total_mem_for_token;
@@ -518,27 +532,29 @@ namespace fastllama {
             }
         }
 
-        ggml_init_params mem_params;
+        ggml_init_params mem_params {};
         mem_params.mem_size   = m_buffer_size;
         mem_params.mem_buffer = reinterpret_cast<void*>(m_buffer.data());
 
         ggml_context * ctx0 = ggml_init(mem_params);
-        ggml_cgraph gf;
-        gf.n_threads = normalized_threads;
+        ggml_cgraph gf{};
+        gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
 
-        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, embd_size);
-        memcpy(embd->data, embd_inp.data(), embd_size * ggml_element_size(embd));
+        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
+        memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
 
         ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
 
         for (int il = 0; il < n_layer; ++il) {
-            ggml_tensor* inpSA = inpL;
+            ggml_tensor * inpSA = inpL;
 
-            ggml_tensor* cur;
+            ggml_tensor * cur;
+
+            // lctx.use_buf(ctx0, 0);
 
             // norm
             {
-                cur = ggml_norm(ctx0, inpL);
+                cur = ggml_rms_norm(ctx0, inpL);
 
                 // cur = attention_norm*cur
                 cur = ggml_mul(ctx0,
@@ -553,31 +569,31 @@ namespace fastllama {
                 ggml_tensor * Vcur = ggml_mul_mat(ctx0, layers[il].wv, cur);
 
                 // store key and value to memory
-                if (embd_size >= 1) {
-                    ggml_tensor * k = ggml_view_1d(ctx0, memory_k, embd_size*n_embd, (ggml_element_size(memory_k)*n_embd)*(il*n_ctx + n_past));
-                    ggml_tensor * v = ggml_view_1d(ctx0, memory_v, embd_size*n_embd, (ggml_element_size(memory_v)*n_embd)*(il*n_ctx + n_past));
+                if (N >= 1) {
+                    ggml_tensor * k = ggml_view_1d(ctx0, memory_k, N*n_embd, (ggml_element_size(memory_k)*n_embd)*(il*n_ctx + n_past));
+                    ggml_tensor * v = ggml_view_1d(ctx0, memory_v, N*n_embd, (ggml_element_size(memory_v)*n_embd)*(il*n_ctx + n_past));
 
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
                 }
 
-                // Q = Qcur.contiguous().view(n_embd/n_head, n_head, embd_size).permute(0, 2, 1, 3)
+                // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0, 2, 1, 3)
                 ggml_tensor * Q =
                     ggml_permute(ctx0,
                             ggml_rope(ctx0,
                                 ggml_cpy(ctx0,
                                     Qcur,
-                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, embd_size)),
+                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, N)),
                                 n_past, n_rot, 0),
                             0, 2, 1, 3);
 
-                // K = Kmem.view(n_embd/n_head, n_head, n_past + embd_size).permute(0, 2, 1, 3)
+                // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
                 ggml_tensor * K =
                     ggml_permute(ctx0,
                             ggml_rope(ctx0,
                                 ggml_reshape_3d(ctx0,
-                                    ggml_view_1d(ctx0, memory_k, (n_past + embd_size)*n_embd, il*n_ctx*ggml_element_size(memory_k)*n_embd),
-                                    n_embd/n_head, n_head, n_past + embd_size),
+                                    ggml_view_1d(ctx0, memory_k, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(memory_k)*n_embd),
+                                    n_embd/n_head, n_head, n_past + N),
                                 n_past, n_rot, 1),
                             0, 2, 1, 3);
 
@@ -588,8 +604,7 @@ namespace fastllama {
                 ggml_tensor * KQ_scaled =
                     ggml_scale(ctx0,
                             KQ,
-                            ggml_new_f32(ctx0, 1.0f/sqrt(float(n_embd)/n_head))
-                            );
+                            ggml_new_f32(ctx0, 1.0f/sqrtf(float(n_embd)/n_head)));
 
                 // KQ_masked = mask_past(KQ_scaled)
                 ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, n_past);
@@ -597,13 +612,15 @@ namespace fastllama {
                 // KQ = soft_max(KQ_masked)
                 ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
 
-                // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + embd_size).permute(1, 2, 0, 3).contiguous()
+                // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
                 ggml_tensor * V_trans =
-                    ggml_permute(ctx0,
-                            ggml_reshape_3d(ctx0,
-                                ggml_view_1d(ctx0, memory_v, (n_past + embd_size)*n_embd, il*n_ctx*ggml_element_size(memory_v)*n_embd),
-                                n_embd/n_head, n_head, n_past + embd_size),
-                            1, 2, 0, 3);
+                    ggml_cpy(ctx0,
+                        ggml_permute(ctx0,
+                                ggml_reshape_3d(ctx0,
+                                    ggml_view_1d(ctx0, memory_v, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(memory_v)*n_embd),
+                                    n_embd/n_head, n_head, n_past + N),
+                                1, 2, 0, 3),
+                        ggml_new_tensor_3d(ctx0, memory_v->type, n_past + N, n_embd/n_head, n_head));
 
                 // KQV = transpose(V) * KQ_soft_max
                 ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
@@ -611,10 +628,10 @@ namespace fastllama {
                 // KQV_merged = KQV.permute(0, 2, 1, 3)
                 ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
 
-                // cur = KQV_merged.contiguous().view(n_embd, embd_size)
+                // cur = KQV_merged.contiguous().view(n_embd, N)
                 cur = ggml_cpy(ctx0,
                         KQV_merged,
-                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, embd_size));
+                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, N));
 
                 // projection (no bias)
                 cur = ggml_mul_mat(ctx0,
@@ -622,13 +639,15 @@ namespace fastllama {
                         cur);
             }
 
+            // lctx.use_buf(ctx0, 1);
+
             ggml_tensor * inpFF = ggml_add(ctx0, cur, inpSA);
 
             // feed-forward network
             {
                 // norm
                 {
-                    cur = ggml_norm(ctx0, inpFF);
+                    cur = ggml_rms_norm(ctx0, inpFF);
 
                     // cur = ffn_norm*cur
                     cur = ggml_mul(ctx0,
@@ -639,7 +658,6 @@ namespace fastllama {
                 ggml_tensor * tmp = ggml_mul_mat(ctx0,
                         layers[il].w3,
                         cur);
-
 
                 cur = ggml_mul_mat(ctx0,
                         layers[il].w1,
@@ -655,26 +673,32 @@ namespace fastllama {
                         cur);
             }
 
-            cur  = ggml_add(ctx0, cur, inpFF);
+            cur = ggml_add(ctx0, cur, inpFF);
 
             // input for next layer
             inpL = cur;
         }
 
+        // used at the end to optionally extract the embeddings
+        ggml_tensor * embeddings = NULL;
+
         // norm
         {
-            inpL = ggml_norm(ctx0, inpL);
+
+            inpL = ggml_rms_norm(ctx0, inpL);
 
             // inpL = norm*inpL
             inpL = ggml_mul(ctx0,
                         ggml_repeat(ctx0, norm, inpL),
                         inpL);
+
+            embeddings = inpL;
         }
 
         // lm_head
-        {
-            inpL = ggml_mul_mat(ctx0, output, inpL);
-        }
+        inpL = ggml_mul_mat(ctx0, output, inpL);
+
+        // lctx.use_buf(ctx0, -1);
 
         // logits -> probs
         //inpL = ggml_soft_max(ctx0, inpL);
@@ -685,10 +709,10 @@ namespace fastllama {
 
         // return result for just the last token
         embd_w.resize(static_cast<std::size_t>(n_vocab));
-        memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(embd_size-1)), sizeof(float)*n_vocab);
+        memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(N-1)), sizeof(float)*n_vocab);
 
         if (mem_per_token == 0) {
-            mem_per_token = ggml_used_mem(ctx0) / embd_size;
+            mem_per_token = ggml_used_mem(ctx0) / N;
         }
 
         ggml_free(ctx0);

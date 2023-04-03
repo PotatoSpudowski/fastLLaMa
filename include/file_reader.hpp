@@ -80,6 +80,10 @@ namespace fastllama{
             m_file_ptr = nullptr;
         }
 
+        constexpr auto set_buffer(char* buffer, std::size_t size) noexcept {
+            setvbuf(m_file_ptr, buffer, _IOFBF, size);
+        }
+
         friend void swap(BinaryFileReader& lhs, BinaryFileReader& rhs) noexcept {
             std::swap(lhs.m_file_ptr, rhs.m_file_ptr);
         }

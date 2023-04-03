@@ -34,7 +34,7 @@ namespace fastllama {
         RingBuffer& operator=(RingBuffer &&) = default;
         ~RingBuffer() = default;
 
-        auto push(value_type const& val) -> void {
+        auto push_back(value_type const& val) -> void {
             if (m_data.size() >= m_capacity) m_data.pop_front();
             m_data.push_back(val);
         }
@@ -60,6 +60,11 @@ namespace fastllama {
         
         const_iterator begin() const noexcept { return m_data.begin(); }
         const_iterator end() const noexcept { return m_data.end(); }
+
+        void resize(std::size_t size) {
+            m_data.resize(size);
+            m_capacity = size;
+        }
 
         void clear() {
             m_data.clear();
