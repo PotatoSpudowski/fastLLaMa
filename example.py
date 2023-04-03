@@ -37,32 +37,23 @@ if res != True:
     exit(1)
 
 print("\nModel ingested")
+
+res = model.save_state("./models/fast_llama.bin") #save model state
+
+res = model.load_state("./models/fast_llama.bin") #load model state
+if not res:
+    print("\nFailed to load the model")
+    exit(1)
+print("\nLoaded the model successfully!")
+
+print("\nGenerating from model...")
 print("")
-print("Start of chat (type 'exit' to exit)")
-print("")
 
-while True:
-    user_input = input("User: ")
-
-    if user_input == "exit":
-        break
-
-    user_input = "### Instruction:\n\n" + user_input + "\n\n ### Response:\n\n"
-
-    res = model.ingest(user_input)
-
-    if res != True:
-        break
-    
-    print("\n")
-
-    res = model.generate(
-        num_tokens=30, 
-        top_p=0.95, #top p sampling (Optional)
-        temp=0.8, #temperature (Optional)
-        repeat_penalty=1.0, #repetition penalty (Optional)
-        streaming_fn=stream_token, #streaming function
-        stop_word=[".\n", "# "] #stop generation when this word is encountered (Optional)
-        )
-
-    print("\n")
+res = model.generate(
+    num_tokens=100, 
+    top_p=0.95, #top p sampling (Optional)
+    temp=0.8, #temperature (Optional)
+    repeat_penalty=1.0, #repetition penalty (Optional)
+    streaming_fn=stream_token, #streaming function
+    stop_word=["User:"] #stop generation when this word is encountered (Optional)
+    )
