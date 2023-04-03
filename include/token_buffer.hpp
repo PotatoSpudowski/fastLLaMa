@@ -65,10 +65,6 @@ namespace fastllama {
                 auto substr_pos = temp_str.find(token);
                 if (substr_pos != std::string_view::npos) {
                     return std::make_pair(true, temp_str.substr(0, substr_pos));
-                }
-            }
-
-            return std::make_pair( false, std::string_view{} );
         }
 
     private:

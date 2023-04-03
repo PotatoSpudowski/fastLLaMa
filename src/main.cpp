@@ -4,6 +4,7 @@
 
 using namespace std::chrono_literals;
 
+<<<<<<< HEAD
 int main() {
     auto maybe_bridge = fastllama::FastLlama::Builder()
         .set_number_of_threads(16)
@@ -34,6 +35,19 @@ int main() {
         std::cout.flush();
     }, 300, 40, 0.95, 0.8, 1.0);
 
+=======
+template<typename T>
+void print(fastllama::RingBuffer<T> const& r) {
+    std::cout<<"[ ";
+    for(auto i : r) {
+        std::cout<<i<<", ";
+    }
+    std::cout<<"]"<<std::endl;
+}
+
+int main() {
+    // auto bridge = fastllama::FastLlama("LLAMA-7B", "/Users/amit/Desktop/code/fastLLaMa/models/7B/ggml-model-q4_0.bin", 16, 512, 64, 0);
+>>>>>>> 411b2fe3005bd12b4d974594b5d40573f7625a22
     // auto model = fastllama::Model("LLAMA-7B", "/Users/amit/Desktop/code/fastLLaMa/models/7B/ggml-model-q4_0.bin");
     // // llama_eval(m_model, m_threads, 0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)
     // std::vector<float> m_logits;
