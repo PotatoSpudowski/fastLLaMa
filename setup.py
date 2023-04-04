@@ -1,9 +1,14 @@
 import os
+import sys
 import subprocess
 from typing import Callable, List, Mapping, Optional, cast
 from cpuinfo import get_cpu_info
 
 cmake_variable_type = str
+
+# Get the Python version
+python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+print(f"Detected Python version: {python_version}")
 
 CMAKE_FEATURE_FILE_PATH = "./cmake/CompilerFlagVariables.cmake"
 
@@ -20,7 +25,7 @@ def run_make(build_dir: str = "build") -> None:
 
     # Run the 'make' command
     try:
-        cmd = ["cd ./build && cmake .. && make"]
+        cmd = [f"cd ./build && cmake -DPYTHON_VERSION={python_version} .. && make"]
         result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         while True:
             output = result.stdout.readline()

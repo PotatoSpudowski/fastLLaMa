@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
+message(STATUS "Python version built for: ${PYTHON_VERSION}")
 include(cmake/CompilerFlags.cmake)
 include(cmake/OpenMP.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
