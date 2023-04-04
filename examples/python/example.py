@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("./build/")
+sys.path.append("./build/interfaces/python")
 
 import fastLlama
 
@@ -18,7 +18,8 @@ model = fastLlama.Model(
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model
         last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
-        seed=0 #seed for random number generator (Optional)
+        seed=0, #seed for random number generator (Optional)
+        # log_info=lambda x,y: print(x, y)
     )
 
 prompt = """Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
@@ -38,9 +39,9 @@ if res != True:
 
 print("\nModel ingested")
 
-res = model.save_state("./models/fast_llama.bin") #save model state
+# res = model.save_state("./models/fast_llama.bin") #save model state
 
-res = model.load_state("./models/fast_llama.bin") #load model state
+# res = model.load_state("./models/fast_llama.bin") #load model state
 if not res:
     print("\nFailed to load the model")
     exit(1)
@@ -55,5 +56,5 @@ res = model.generate(
     temp=0.8, #temperature (Optional)
     repeat_penalty=1.0, #repetition penalty (Optional)
     streaming_fn=stream_token, #streaming function
-    stop_word=["User:"] #stop generation when this word is encountered (Optional)
+    stop_words=["User:"] #stop generation when this word is encountered (Optional)
     )
