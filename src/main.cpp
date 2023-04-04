@@ -7,6 +7,8 @@ using namespace std::chrono_literals;
 int main() {
     auto maybe_bridge = fastllama::FastLlama::Builder()
         .set_number_of_threads(16)
+        .set_number_of_batches(64)
+        .set_number_of_tokens_to_keep(48)
         .build("LLAMA-7B", "./models/7B/ggml-model-q4_0.bin");
     
     if (!maybe_bridge) {
@@ -23,23 +25,25 @@ int main() {
         "Bob: Hello. How may I help you today?\n"
         "User: Please tell me the largest city in Europe.\n"
         "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n"
-        "User:\n"
     );
-
     logger.log_warn("main", "Ingestion complete!\n");
 
-    bridge.generate([](std::string const& s) {
-        std::cout<<s;
-        std::cout.flush();
-    }, 300, 40, 0.95, 0.8, 1.0);
+    std::string prompt;
 
-    // auto model = fastllama::Model("LLAMA-7B", "/Users/amit/Desktop/code/fastLLaMa/models/7B/ggml-model-q4_0.bin");
-    // // llama_eval(m_model, m_threads, 0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)
-    // std::vector<float> m_logits;
-    // std::size_t mem_per_token{};
-    // if (model.eval(8, 0, { 0, 1, 2, 3 }, m_logits, mem_per_token )) {
-    //     return 1;
-    // }
+    std::cout<<"User: ";
+
+    while(std::getline(std::cin, prompt)) {
+        prompt = "User: " + prompt;
+        
+        bridge.ingest(prompt);
+
+        bridge.generate([](std::string const& s) {
+            std::cout<<s;
+            std::cout.flush();
+        }, 300, 40, 0.95, 0.8, 1.0, { "User: " });
+        
+        std::cout<<"User: ";
+    }
     
     return 0;
 }
