@@ -141,6 +141,7 @@ namespace fastllama {
 
         bool is_valid{false};
         int threads{ static_cast<int>(std::thread::hardware_concurrency()) };
+        int n_batch{64};
     };
 
 } // namespace fastllama

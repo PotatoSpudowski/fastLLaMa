@@ -14,8 +14,6 @@ namespace fastllama {
         using id_t = typename Vocab::id;
         static constexpr std::size_t str_buffer_size = 512;
         static constexpr std::size_t unicode_backlog_buffer_size = 8;
-        static constexpr id_t EOS = 2;
-        static constexpr id_t BOS = 1;
 
         TokenBuffer(Vocab const& vocab, std::size_t buffer_size, Fn&& fn)
             : m_vocab(vocab)
