@@ -117,6 +117,7 @@ namespace fastllama {
         temp.m_model.set_threads(n_threads);
         temp.m_keep = n_keep;
         temp.m_model.n_batch = n_batch;
+        temp.m_model.logger = std::move(logger);
 
         if (!temp.m_model.load(model_id, filepath)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -180,6 +181,7 @@ namespace fastllama {
     }
 
     bool FastLlama::ingest(std::string prompt) {
+        m_model.logger.reset();
         prompt.insert(0, 1, ' ');
 
         auto embd_input = tokenize(m_model.vocabulary, prompt, true);
@@ -213,7 +215,6 @@ namespace fastllama {
         }
 
         m_last_n_tokens.clear();
-
         return true;
     }
 
@@ -226,6 +227,7 @@ namespace fastllama {
         float repeat_penalty,
         std::vector<std::string> const& stop_words
     ) {
+        m_model.logger.reset();
         auto const max_token_buffer_size = std::accumulate(
             stop_words.begin(),
             stop_words.end(),
