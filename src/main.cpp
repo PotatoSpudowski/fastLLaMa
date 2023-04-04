@@ -5,7 +5,7 @@
 using namespace std::chrono_literals;
 
 int main() {
-    auto maybe_bridge = fastllama::FastLlama::Builder()
+    auto maybe_bridge = fastllama::FastLlama::builder()
         .set_number_of_threads(16)
         .set_number_of_batches(64)
         .set_number_of_tokens_to_keep(48)
