@@ -1,7 +1,5 @@
 #include "ggml.h"
 
-#include "utils.h"
-
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -11,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <regex>
+#include "vocab.hpp"
 
 // TODO: move somewhere else
 #define QK 32
@@ -43,7 +42,7 @@ bool llama_model_quantize(const std::string & fname_inp, const std::string & fna
         return false;
     }
 
-    gpt_vocab vocab;
+    fastllama::Vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
 
@@ -122,8 +121,7 @@ bool llama_model_quantize(const std::string & fname_inp, const std::string & fna
             finp.read ((char *) word.data(), len);
             fout.write((char *) word.data(), len);
 
-            vocab.token_to_id[word] = i;
-            vocab.id_to_token[i] = word;
+            vocab.set_word(i, word, 0);
         }
     }
 
@@ -228,11 +226,11 @@ bool llama_model_quantize(const std::string & fname_inp, const std::string & fna
                 switch (type) {
                     case GGML_TYPE_Q4_0:
                         {
-                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
+                            cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                         } break;
                     case GGML_TYPE_Q4_1:
                         {
-                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0], QK, hist_cur.data());
+                            cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), nelements, ne[0], hist_cur.data());
                         } break;
                     default:
                         {
