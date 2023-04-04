@@ -8,7 +8,7 @@ include(cmake/CompilerFlags.cmake)
 include(cmake/OpenMP.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/utils.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/bridge.cpp)
+add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/bridge.cpp)
 
 set_compiler_lib_and_flags(fast_llama_lib)
 target_link_libraries(fast_llama_lib PRIVATE ${OPENMP_LIB})
