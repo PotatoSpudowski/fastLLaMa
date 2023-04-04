@@ -113,10 +113,10 @@ namespace fastllama {
     std::optional<FastLlama> FastLlama::Params::build(std::string_view model_id, std::string_view const& filepath) {
         auto temp = FastLlama();
         temp.m_model.params.n_ctx = n_ctx;
-        temp.m_batch = n_batch;
         temp.m_last_n_tokens = last_n_tokens;
         temp.m_model.set_threads(n_threads);
         temp.m_keep = n_keep;
+        temp.m_model.n_batch = n_batch;
 
         if (!temp.m_model.load(model_id, filepath)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -190,10 +190,14 @@ namespace fastllama {
             return false;
         }
 
-        for(auto i = 0ul; i < embd_input.size(); i += m_batch) {
-            auto block = std::min(static_cast<std::size_t>(m_batch), embd_input.size() - i);
+        auto const n_batch = m_model.n_batch;
+
+        for(auto i = 0ul; i < embd_input.size(); i += n_batch) {
+            auto block = std::min(static_cast<std::size_t>(n_batch), embd_input.size() - i);
 
             recycle_embed_if_exceeds_context();
+
+            // std::cout<<"E Size: " << m_embd.size()<<", Past: "<<n_past<<", Mem: "<<m_mem_per_token<<std::endl;
 
             if (!m_embd.empty()) {
                 if (!m_model.eval(n_past, m_embd, m_logits, m_mem_per_token)) {
@@ -267,6 +271,7 @@ namespace fastllama {
                 temp,
                 m_rng
             );
+            if (token_id == FastLlama::EOS) break;
             m_last_n_tokens.push_back(token_id);
             token_buffer.add(token_id);
             m_embd.push_back(token_id);

@@ -12,6 +12,9 @@ namespace fastllama {
     struct FastLlama {
         using token_id_t = typename Vocab::id;
 
+        static constexpr token_id_t EOS = 2;
+        static constexpr token_id_t BOS = 1;
+
         struct Params {
             int seed{};
             int n_keep{64};
@@ -65,7 +68,6 @@ namespace fastllama {
         int n_past{};
         int m_seed{};
         int m_keep{};
-        int m_batch{64};
         size_t m_mem_per_token{};
         std::string m_model_name;
         std::mt19937 m_rng;
