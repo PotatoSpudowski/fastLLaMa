@@ -5,24 +5,115 @@
 #include <string>
 #include <limits>
 #include <utility>
+#include "utils.hpp"
 
 namespace fastllama {
 
-    inline static constexpr std::pair<std::string_view const, std::size_t> g_models[] = {
-        std::pair( "LLAMA-7B", 1 ),
-        std::pair( "LLAMA-13B", 2 ),
-        std::pair( "LLAMA-30B", 4 ),
-        std::pair( "LLAMA-65B", 8 ),
-        std::pair( "ALPACA-LORA-7B", 1 ),
-        std::pair( "ALPACA-LORA-13B", 1 ),
-        std::pair( "ALPACA-LORA-30B", 1 ),
-        std::pair( "ALPACA-LORA-65B", 1 ),
+    struct ModelIdConfig {
+        using size_type = std::size_t;
+
+        size_type number_of_parts{};
+        size_type mem_required_for_scratch_buff_0{};
+        size_type mem_required_for_scratch_buff_1{};
+        size_type mem_required_for_kv_self_buff{};
+        size_type mem_required_for_eval{};
     };
+
+    namespace detail {
+        using namespace ::fastllama::literals;
+        
+        using model_lookup_table_t = std::pair<std::string_view, ModelIdConfig>;
+        
+        inline static constexpr model_lookup_table_t g_models[] = {
+            model_lookup_table_t(
+                "LLAMA-7B",
+                ModelIdConfig {
+                    .number_of_parts = 1,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 1026_MiB,
+                    .mem_required_for_eval = 768_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "LLAMA-13B",
+                ModelIdConfig {
+                    .number_of_parts = 2,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 1608_MiB,
+                    .mem_required_for_eval = 1024_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "LLAMA-30B",
+                ModelIdConfig {
+                    .number_of_parts = 4,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 3124_MiB,
+                    .mem_required_for_eval = 1280_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "LLAMA-65B",
+                ModelIdConfig {
+                    .number_of_parts = 8,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 5120_MiB,
+                    .mem_required_for_eval = 1536_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "ALPACA-LORA-7B",
+                ModelIdConfig {
+                    .number_of_parts = 1,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 1026_MiB,
+                    .mem_required_for_eval = 768_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "ALPACA-LORA-13B",
+                ModelIdConfig {
+                    .number_of_parts = 1,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 1608_MiB,
+                    .mem_required_for_eval = 1024_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "ALPACA-LORA-30B",
+                ModelIdConfig {
+                    .number_of_parts = 1,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 3124_MiB,
+                    .mem_required_for_eval = 1280_MiB
+                }
+            ),
+            model_lookup_table_t(
+                "ALPACA-LORA-65B",
+                ModelIdConfig {
+                    .number_of_parts = 1,
+                    .mem_required_for_scratch_buff_0 = 512_MiB,
+                    .mem_required_for_scratch_buff_1 = 512_MiB,
+                    .mem_required_for_kv_self_buff = 5120_MiB,
+                    .mem_required_for_eval = 1536_MiB
+                }
+            ),
+        };
+    } // namespace detail
+    
+
 
     struct ModelId;
 
     namespace detail {
-        constexpr auto match_case_insenstive_str(std::string_view lhs, std::string_view rhs) noexcept -> bool {
+        constexpr auto match_case_insensitive_str(std::string_view lhs, std::string_view rhs) noexcept -> bool {
             if (lhs.size() != rhs.size()) return false;
             for(auto i = 0ul; i < rhs.size(); ++i) {
                 auto const lc = std::toupper(lhs[i]);
@@ -35,10 +126,10 @@ namespace fastllama {
 
     struct ModelId {
         using id_t = std::string_view;
-        using part_t = std::size_t;
 
         id_t id{};
-        part_t number_of_parts{0};
+        ModelIdConfig config{};
+        
 
         // Assumption 1: ModelId is a singleton
         // Assumption 2: It cannot be constructed outside this translation unit
@@ -61,18 +152,18 @@ namespace fastllama {
             return id.data() !=  nullptr && id.size() != 0;
         }
 
-        constexpr static auto from_str_case_senstive(std::string_view model_id) noexcept -> ModelId {
-            for (auto const& model : g_models) {
+        constexpr static auto from_str_case_sensitive(std::string_view model_id) noexcept -> ModelId {
+            for (auto const& model : detail::g_models) {
                 auto const el = model.first;
                 if (el == model_id) return ModelId{ model.first, model.second };
             }
             return ModelId{};
         }
         
-        constexpr static auto from_str_case_insenstive(std::string_view model_id) noexcept -> ModelId {
-            for (auto const& model : g_models) {
+        constexpr static auto from_str_case_insensitive(std::string_view model_id) noexcept -> ModelId {
+            for (auto const& model : detail::g_models) {
                 auto const el = model.first;
-                if (detail::match_case_insenstive_str(el, model_id)) return ModelId{ model.first, model.second };
+                if (detail::match_case_insensitive_str(el, model_id)) return ModelId{ model.first, model.second };
             }
             return ModelId{};
         }
