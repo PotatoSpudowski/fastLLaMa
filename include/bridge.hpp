@@ -35,7 +35,7 @@ namespace fastllama {
         FastLlama(FastLlama &&) noexcept = default;
         FastLlama& operator=(FastLlama const&) = default;
         FastLlama& operator=(FastLlama &&) noexcept = default;
-        ~FastLlama() = default;
+        ~FastLlama() { m_model.unload(); }
 
         bool ingest(std::string prompt);
         bool generate(
