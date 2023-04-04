@@ -1,8 +1,4 @@
-import sys
-
-sys.path.append("./build/interfaces/python")
-
-import fastLlama
+import fastllama
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
@@ -12,14 +8,13 @@ def stream_token(x: str) -> None:
     """
     print(x, end='', flush=True)
 
-model = fastLlama.Model(
+model = fastllama.Model(
         id="LLAMA-7B",
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model
         last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
         seed=0, #seed for random number generator (Optional)
-        # log_info=lambda x,y: print(x, y)
     )
 
 prompt = """Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
