@@ -20,8 +20,15 @@ def run_make(build_dir: str = "build") -> None:
 
     # Run the 'make' command
     try:
-        result = subprocess.run(["cd ./build && cmake .. && make"], shell=True, check=True, capture_output=True, text=True)
-        print(result.stdout)
+        cmd = ["cd ./build && cmake .. && make"]
+        result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        while True:
+            output = result.stdout.readline()
+            if output:
+                print(output, end='', flush=True)
+            else:
+                break
+        # print(result.stdout)
     except subprocess.CalledProcessError as e:
         print("An error occurred while running 'make':", e)
         print("Output:", e.output)
