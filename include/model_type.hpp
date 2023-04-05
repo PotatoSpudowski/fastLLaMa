@@ -17,6 +17,7 @@ namespace fastllama {
         size_type mem_required_for_scratch_buff_1{};
         size_type mem_required_for_kv_self_buff{};
         size_type mem_required_for_eval{};
+        bool      has_vocab_padding{false};
     };
 
     namespace detail {
@@ -32,7 +33,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1026_MiB,
-                    /* mem_required_for_eval =              */ 768_MiB
+                    /* mem_required_for_eval =              */ 768_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -42,7 +44,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1608_MiB,
-                    /* mem_required_for_eval =              */ 1024_MiB
+                    /* mem_required_for_eval =              */ 1024_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -52,7 +55,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 3124_MiB,
-                    /* mem_required_for_eval =              */ 1280_MiB
+                    /* mem_required_for_eval =              */ 1280_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -62,7 +66,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 5120_MiB,
-                    /* mem_required_for_eval =              */ 1536_MiB
+                    /* mem_required_for_eval =              */ 1536_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -72,7 +77,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1026_MiB,
-                    /* mem_required_for_eval =              */ 768_MiB
+                    /* mem_required_for_eval =              */ 768_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -82,7 +88,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1608_MiB,
-                    /* mem_required_for_eval =              */ 1024_MiB
+                    /* mem_required_for_eval =              */ 1024_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -92,7 +99,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 3124_MiB,
-                    /* mem_required_for_eval =              */ 1280_MiB
+                    /* mem_required_for_eval =              */ 1280_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
@@ -102,7 +110,8 @@ namespace fastllama {
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 5120_MiB,
-                    /* mem_required_for_eval =              */ 1536_MiB
+                    /* mem_required_for_eval =              */ 1536_MiB,
+                    /* has_vocab_padding =                  */ false
                 }
             ),
         };

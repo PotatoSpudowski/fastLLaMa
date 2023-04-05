@@ -30,11 +30,12 @@ namespace fastllama {
         reader.read(&params.f16);
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size) {
+    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size, bool has_padding = false) {
         vocab.id_to_token.resize(size);
         std::string word(64, ' ');
 
-        for (auto i = 0ul; i < size; ++i) {
+        auto new_size = size - static_cast<std::size_t>(has_padding);
+        for (auto i = 0ul; i < new_size; ++i) {
             std::uint32_t len;
             reader.read(&len);
 
@@ -45,6 +46,11 @@ namespace fastllama {
             reader.read(&score);
             vocab.set_word(i, word, score);
         }
+
+        if (!has_padding) return;
+
+        std::string pad_token = "<pad>";
+        vocab.set_word(new_size, std::move(pad_token), 0);
     }
 
     FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type vtype, ggml_type wtype, int n_ff) {
@@ -354,7 +360,7 @@ namespace fastllama {
             logger.log("Model", "n_parts = ", model.model_id.config.number_of_parts, '\n');
         }
 
-        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab));        
+        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab), model.model_id.config.has_vocab_padding);
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
         // wtype is for per-layer weights, while vtype is for other weights
