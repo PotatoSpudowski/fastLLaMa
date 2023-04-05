@@ -3,6 +3,7 @@ import sys
 import subprocess
 from typing import Callable, List, Mapping, Optional, cast
 from cpuinfo import get_cpu_info
+from scripts.utils.shell import run_shell
 
 cmake_variable_type = str
 
@@ -22,22 +23,17 @@ def run_make(build_dir: str = "build") -> None:
     # Change the current working directory to the build directory
     if not os.path.exists(build_dir):
        os.mkdir(build_dir)
-
+       
     # Run the 'make' command
+    os.chdir('./build')
     try:
-        cmd = [f"cd ./build && cmake -DPYTHON_VERSION={python_version} .. && make"]
-        result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        while True:
-            output = result.stdout.readline()
-            if output:
-                print(output, end='', flush=True)
-            else:
-                break
-        # print(result.stdout)
+        run_shell([
+            'cmake ..',
+            'make'
+        ])
     except subprocess.CalledProcessError as e:
         print("An error occurred while running 'make':", e)
         print("Output:", e.output)
-        return
     finally:
         # Change back to the original working directory
         os.chdir("..")
