@@ -105,8 +105,8 @@ ls ./models
 pip install -r requirements.txt
 
 # convert the 7B model to ggml FP16 format
-# python [PythonFile] [ModelPath] [Floattype] [SplitType]
-python3 convert-pth-to-ggml.py models/7B/ 1 0
+# python [PythonFile] [ModelPath] [Floattype] [Vocab Only] [SplitType]
+python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0 1
 
 # quantize the model to 4-bits
 python3 quantize.py 7B
@@ -189,7 +189,7 @@ python export-alpaca-lora.py
 
 # python [PythonFile] [ModelPath] [Floattype] [SplitType]
 # SplitType should be 1 for Alpaca-Lora models exported from HF
-python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 1
+python3 scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0 0
 
 ./build/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
