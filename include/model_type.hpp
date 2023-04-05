@@ -28,81 +28,81 @@ namespace fastllama {
             model_lookup_table_t(
                 "LLAMA-7B",
                 ModelIdConfig {
-                    .number_of_parts = 1,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 1026_MiB,
-                    .mem_required_for_eval = 768_MiB
+                    /* number_of_parts =                    */ 1,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 1026_MiB,
+                    /* mem_required_for_eval =              */ 768_MiB
                 }
             ),
             model_lookup_table_t(
                 "LLAMA-13B",
                 ModelIdConfig {
-                    .number_of_parts = 2,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 1608_MiB,
-                    .mem_required_for_eval = 1024_MiB
+                    /* number_of_parts =                    */ 2,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 1608_MiB,
+                    /* mem_required_for_eval =              */ 1024_MiB
                 }
             ),
             model_lookup_table_t(
                 "LLAMA-30B",
                 ModelIdConfig {
-                    .number_of_parts = 4,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 3124_MiB,
-                    .mem_required_for_eval = 1280_MiB
+                    /* number_of_parts =                    */ 4,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 3124_MiB,
+                    /* mem_required_for_eval =              */ 1280_MiB
                 }
             ),
             model_lookup_table_t(
                 "LLAMA-65B",
                 ModelIdConfig {
-                    .number_of_parts = 8,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 5120_MiB,
-                    .mem_required_for_eval = 1536_MiB
+                    /* number_of_parts =                    */ 8,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 5120_MiB,
+                    /* mem_required_for_eval =              */ 1536_MiB
                 }
             ),
             model_lookup_table_t(
                 "ALPACA-LORA-7B",
                 ModelIdConfig {
-                    .number_of_parts = 1,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 1026_MiB,
-                    .mem_required_for_eval = 768_MiB
+                    /* number_of_parts =                    */ 1,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 1026_MiB,
+                    /* mem_required_for_eval =              */ 768_MiB
                 }
             ),
             model_lookup_table_t(
                 "ALPACA-LORA-13B",
                 ModelIdConfig {
-                    .number_of_parts = 1,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 1608_MiB,
-                    .mem_required_for_eval = 1024_MiB
+                    /* number_of_parts =                    */ 1,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 1608_MiB,
+                    /* mem_required_for_eval =              */ 1024_MiB
                 }
             ),
             model_lookup_table_t(
                 "ALPACA-LORA-30B",
                 ModelIdConfig {
-                    .number_of_parts = 1,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 3124_MiB,
-                    .mem_required_for_eval = 1280_MiB
+                    /* number_of_parts =                    */ 1,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 3124_MiB,
+                    /* mem_required_for_eval =              */ 1280_MiB
                 }
             ),
             model_lookup_table_t(
                 "ALPACA-LORA-65B",
                 ModelIdConfig {
-                    .number_of_parts = 1,
-                    .mem_required_for_scratch_buff_0 = 512_MiB,
-                    .mem_required_for_scratch_buff_1 = 512_MiB,
-                    .mem_required_for_kv_self_buff = 5120_MiB,
-                    .mem_required_for_eval = 1536_MiB
+                    /* number_of_parts =                    */ 1,
+                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
+                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
+                    /* mem_required_for_kv_self_buff =      */ 5120_MiB,
+                    /* mem_required_for_eval =              */ 1536_MiB
                 }
             ),
         };
