@@ -1,32 +1,47 @@
 import os
 import sys
 import subprocess
-from typing import Callable, List, Mapping, Optional, cast
+from typing import Callable, List, Mapping, MutableMapping, Optional, cast
 from cpuinfo import get_cpu_info
-from scripts.utils.shell import run_shell
+from scripts.utils.shell import get_python_info, run_shell
 
 cmake_variable_type = str
 
-# Get the Python version
-python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-print(f"Detected Python version: {python_version}")
-
 CMAKE_FEATURE_FILE_PATH = "./cmake/CompilerFlagVariables.cmake"
 
-def save_cmake_vars(var_map: Mapping[str, List[str]]) -> None:
-    with open(CMAKE_FEATURE_FILE_PATH, "w") as f:
+def save_cmake_vars_helper(filepath: str, var_map: Mapping[str, List[str]]) -> None:
+    with open(filepath, "w") as f:
         for k, v in var_map.items():
             s = ';'.join(set(v))
             f.write(f'set({k} "{s}")\n')
+
+def save_cmake_vars(var_map: Mapping[str, List[str]]) -> None:
+    save_cmake_vars_helper(CMAKE_FEATURE_FILE_PATH, var_map)
+
+def set_global_cmake_variables() -> None:
+    python_info = get_python_info('./scripts/utils/python_info.py')
+    cmake_global_vars: MutableMapping[str, List[str]] = {}
+
+    if python_info is not None:
+        cmake_global_vars['Python_EXECUTABLE'] = [python_info.binary_path]
+        cmake_global_vars['Python_INCLUDE_DIRS'] = [python_info.include_path]
+        cmake_global_vars['Python_LIBRARIES'] = [python_info.library_path]
+        print(f"Set python to '{python_info.binary_path}'")
+    else:
+        print("Auto detecting python version")
+
+    save_cmake_vars_helper('./cmake/GlobalVars.cmake', cmake_global_vars)
 
 def run_make(build_dir: str = "build") -> None:
     # Change the current working directory to the build directory
     if not os.path.exists(build_dir):
        os.mkdir(build_dir)
-       
-    # Run the 'make' command
+
+    # set_global_cmake_variables()
+
     os.chdir('./build')
     try:
+        # Run the 'make' command
         run_shell([
             'cmake ..',
             'make'
@@ -134,7 +149,7 @@ def init_cmake_vars(cmake_var: str, arch: str) -> List[str]:
 def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str]]:
     return { v : c(feature)  for v, c in COMPILER_LOOKUP_TABLE.items()}
 
-def fix_flags(vars: Mapping[cmake_variable_type, List[str]]) -> None:
+def fix_flags(vars: MutableMapping[cmake_variable_type, List[str]]) -> None:
     for v, flags in vars.items():
         if v in COMPILER_FLAG_FIX_LOOKUP_TABLE:
             vars[v] = COMPILER_FLAG_FIX_LOOKUP_TABLE[v](flags)
@@ -142,7 +157,7 @@ def fix_flags(vars: Mapping[cmake_variable_type, List[str]]) -> None:
 def main() -> None:
     info = get_cpu_info()
     arch: str = info['arch'] if 'arch' in info else ''
-    cmake_vars: Mapping[cmake_variable_type, List[str]] = { v : init_cmake_vars(v, arch.upper()) for v in COMPILER_LOOKUP_TABLE.keys() }
+    cmake_vars: MutableMapping[cmake_variable_type, List[str]] = { v : init_cmake_vars(v, arch.upper()) for v in COMPILER_LOOKUP_TABLE.keys() }
     
     if 'flags' in info:
         flags: List[str] = info['flags']

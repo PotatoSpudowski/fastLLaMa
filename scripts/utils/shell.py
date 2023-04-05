@@ -1,10 +1,14 @@
+from dataclasses import dataclass
 import subprocess
-from typing import List, Union
+import sys
+from typing import List, Optional, Tuple, Union
+import inquirer
+from scripts.utils.python_version import get_python_exec_paths
 
 def run_shell(commands: List[Union[List[str], str]]) -> None:
     for cmd in commands:
         normalized_command = [cmd] if type(cmd) == str else cmd
-        print(f"Setup executing command: '{subprocess.list2cmdline(normalized_command)}'")
+        print(f"Setup executing command: {subprocess.list2cmdline(normalized_command)}")
         result = subprocess.Popen(normalized_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         while True:
             if result.stdout is None:
@@ -14,3 +18,38 @@ def run_shell(commands: List[Union[List[str], str]]) -> None:
                 print(output, end='', flush=True)
             else:
                 break
+
+def choose_option(name: str, message: str, options: List[str]) -> Optional[str]:
+    questions = [
+        inquirer.List(name, message=message, choices=options)
+    ]
+    answers = inquirer.prompt(questions)
+    return answers[name]
+
+@dataclass
+class PythonInfo:
+    binary_path: str
+    include_path: str
+    library_path: str
+
+def get_python_info(info_script_path: str) -> Optional[PythonInfo]:
+    python_paths = get_python_exec_paths()
+
+    python_version = choose_option('python_version', 'Select a python version', python_paths)
+    if python_version is None:
+        return None
+
+    print(f"Selected python version: '{python_version}'")
+
+    print("Getting python information, please wait...")
+
+    result = subprocess.run([f'{python_version} {info_script_path}'], shell=True, text=True, capture_output=True)
+    if result.returncode == 0:
+        output = list(filter(lambda x: len(x.strip()) != 0, result.stdout.split(';')))
+        if len(output) != 2:
+            print(f"Error occurred while getting python information. Needed both include and library path, but got one of it", file=sys.stderr)
+            return None
+        return PythonInfo(binary_path=python_version, library_path=output[0], include_path=output[1])
+    else:
+        print(f"Error occurred while getting python information: code(='{result.returncode}'), ", result.stderr, file=sys.stderr)
+        return None

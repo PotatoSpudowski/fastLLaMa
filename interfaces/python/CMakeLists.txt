@@ -1,4 +1,5 @@
-find_package(Python ${PYTHON_VERSION} COMPONENTS Interpreter Development)
+set(PYBIND11_FINDPYTHON ON)
+find_package(Python COMPONENTS Interpreter Development)
 
 include(FetchContent)
 FetchContent_Declare(

@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
 project(fastLlama)
+
+set(GLOBAL_VARS_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GlobalVars.cmake")
+
+if(EXISTS ${GLOBAL_VARS_FILE_PATH})
+  message(STATUS "Found '${GLOBAL_VARS_FILE_PATH}'")
+  include(${GLOBAL_VARS_FILE_PATH})
+
+  include_directories(${PYTHON_INCLUDE_DIRS})
+  link_libraries(${PYTHON_LIBRARIES})
+else()
+  message(STATUS "Unable to find '${GLOBAL_VARS_FILE_PATH}'")
+endif(EXISTS ${GLOBAL_VARS_FILE_PATH})
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 if(NOT CMAKE_BUILD_TYPE)
