@@ -12,6 +12,13 @@ namespace fastllama {
         reader.read(&magic);
         return magic == magic_number_v;
     }
+    
+    FASTLLAMA_ALWAYS_INLINE static constexpr auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
+        std::uint32_t version{};
+        reader.read(&version);
+        if (format_version != nullptr) *format_version = version;
+        return version == file_version_v;
+    }
 
     FASTLLAMA_ALWAYS_INLINE static constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
         reader.read(&params.n_vocab);
@@ -34,7 +41,9 @@ namespace fastllama {
             word.resize(len);
             reader.read(word.data(), len);
 
-            vocab.set_word(i, word, 0);
+            float score{};
+            reader.read(&score);
+            vocab.set_word(i, word, score);
         }
     }
 
@@ -137,6 +146,15 @@ namespace fastllama {
             if (model.tensors.count(name) == 0) {
                 logger.log_err("Model", "unkown tensor '", name, "' in model file\n");
                 return false;
+            }
+
+            {
+                // ensure tensor data is aligned
+                auto maybe_offset = reader.tell();
+                if (!maybe_offset) return false;
+                auto offset = *maybe_offset;
+                offset = (offset + 31) & -32;
+                reader.seek(offset);
             }
 
             // split_type = 0: split by columns
@@ -308,6 +326,12 @@ namespace fastllama {
     FASTLLAMA_ALWAYS_INLINE static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
         if (!verify_magic_number(reader)) {
             logger.log_err("Model", "invalid model file ", filepath, " (bad magic)\n");
+            return std::nullopt;
+        }
+
+        std::uint32_t format_version{};
+        if (!verify_file_version(reader, &format_version)) {
+            logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ", file_version_v, "\n");
             return std::nullopt;
         }
 
@@ -801,6 +825,15 @@ namespace fastllama {
         }
 
         pipe.get_writer().write(&magic_number_v);
+        
+        std::uint32_t format_version{};
+        if (!verify_file_version(pipe.get_reader(), &format_version)) {
+            fprintf(stderr, "%s: invalid model file '%.*s' (unsupported format version %zu, expected %d)\n",
+                    __func__, static_cast<int>(in_filepath.size()), in_filepath.data(), static_cast<std::size_t>(format_version), file_version_v);
+            return false;
+        }
+
+        pipe.get_writer().write(&format_version);
 
         std::string_view parent_fn_name = __func__;
 
@@ -835,6 +868,9 @@ namespace fastllama {
                 pipe.read_and_write(&len);
                 word.resize(len);
                 pipe.read_and_write(word.data(), len);
+
+                float score{};
+                pipe.read_and_write(&score);
             }
         }
 
@@ -877,14 +913,14 @@ namespace fastllama {
                 name.resize(length);
                 pipe.get_reader().read(name.data(), length);
 
-                // {
-                //     // ensure tensor data is aligned
-                //     auto maybe_offset = pipe.get_reader().tell();
-                //     if (!maybe_offset) return false;
-                //     auto offset = *maybe_offset;
-                //     offset = (offset + 31) & -32;
-                //     pipe.get_reader().seek(offset);
-                // }
+                {
+                    // ensure tensor data is aligned
+                    auto maybe_offset = pipe.get_reader().tell();
+                    if (!maybe_offset) return false;
+                    auto offset = *maybe_offset;
+                    offset = (offset + 31) & -32;
+                    pipe.get_reader().seek(offset);
+                }
 
                 {
                     static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", };
@@ -934,15 +970,14 @@ namespace fastllama {
 
                 pipe.get_writer().write(name.data(), length);
 
-
-                // {
-                //     // ensure tensor data is aligned
-                //     auto maybe_offset = pipe.get_writer().tell();
-                //     if (!maybe_offset) return false;
-                //     auto offset = *maybe_offset;
-                //     offset = (offset + 31) & -32;
-                //     pipe.get_writer().seek(offset);
-                // }
+                {
+                    // ensure tensor data is aligned
+                    auto maybe_offset = pipe.get_writer().tell();
+                    if (!maybe_offset) return false;
+                    auto offset = *maybe_offset;
+                    offset = (offset + 31) & -32;
+                    pipe.get_writer().seek(offset);
+                }
 
                 if (quantize) {
                     printf("quantizing .. ");
