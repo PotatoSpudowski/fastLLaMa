@@ -2,7 +2,7 @@
 #include "tokenizer.hpp"
 #include "token_buffer.hpp"
 #include <unordered_set>
-#include <numbers>
+#include <numeric>
 
 namespace fastllama {
 
