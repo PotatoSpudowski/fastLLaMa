@@ -18,6 +18,18 @@ namespace fastllama {
         constexpr auto operator""_KiB (unsigned long long int  size) noexcept {
             return size * 1024;
         }
+        
+        constexpr auto operator""_GiB (long double  size) noexcept {
+            return size * (1024.0 * 1024.0 * 1024.0);
+        }
+
+        constexpr auto operator""_MiB (long double  size) noexcept {
+            return size * (1024.0 * 1024.0);
+        }
+        
+        constexpr auto operator""_KiB (long double  size) noexcept {
+            return size * 1024.0;
+        }
 
     } // namespace literals
     

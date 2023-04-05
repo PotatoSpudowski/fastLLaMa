@@ -15,14 +15,14 @@ def main():
     """
 
     if "linux" in sys.platform or "darwin" in sys.platform:
-        quantize_script_binary = "quantize"
+        quantize_script_binary = os.path.join(*['.', 'src', 'quantize'])
 
     elif "win32" in sys.platform or "cygwin" in sys.platform:
-        quantize_script_binary = "quantize.exe"
+        quantize_script_binary = os.path.join(*['.', 'src', 'quantize.exe'])
 
     else:
         print("WARNING: Unknown platform. Assuming a UNIX-like OS.\n")
-        quantize_script_binary = "quantize"
+        quantize_script_binary = os.path.join(*['.', 'src', 'quantize'])
 
     parser = argparse.ArgumentParser(
         prog='python3 quantize.py',

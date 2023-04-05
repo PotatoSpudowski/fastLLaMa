@@ -1,5 +1,6 @@
 #include "llama.hpp"
 #include "file_reader.hpp"
+#include "file_pipe.hpp"
 #include <cassert>
 #include "macro.hpp"
 #include <fstream>
@@ -34,7 +35,6 @@ namespace fastllama {
             reader.read(word.data(), len);
 
             vocab.set_word(i, word, 0);
-            word.clear();
         }
     }
 
@@ -135,7 +135,7 @@ namespace fastllama {
             name.resize(length);
             reader.read(name.data(), length);
             if (model.tensors.count(name) == 0) {
-                logger.log_err("Model", "unkown tensor '", name, "' in model file");
+                logger.log_err("Model", "unkown tensor '", name, "' in model file\n");
                 return false;
             }
 
@@ -334,6 +334,7 @@ namespace fastllama {
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
         // wtype is for per-layer weights, while vtype is for other weights
+
         ggml_type wtype, vtype;
         switch (model.params.f16) {
             case 0: wtype = vtype = GGML_TYPE_F32;  break;
@@ -761,6 +762,254 @@ namespace fastllama {
         }
 
         ggml_free(ctx0);
+
+        return true;
+    }
+
+    bool quantize(std::string_view in_filepath, std::string_view out_filepath, int itype) {
+        using namespace ::fastllama::literals;
+
+        ggml_type type = GGML_TYPE_Q4_1;
+
+        switch (itype) {
+            case 2: type = GGML_TYPE_Q4_0; break;
+            case 3: type = GGML_TYPE_Q4_1; break;
+            default: fprintf(stderr, "%s: invalid quantization type %d\n", __func__, itype); return false;
+        };
+
+        if (type != GGML_TYPE_Q4_0 && type != GGML_TYPE_Q4_1) {
+            fprintf(stderr, "%s: invalid quantization type %d\n", __func__, type);
+            return false;
+        }
+
+        printf("%s: loading model from '%.*s'\n", __func__, static_cast<int>(in_filepath.size()), in_filepath.data());
+
+        BinaryFilePipe pipe(in_filepath, out_filepath);
+        if (!pipe.get_reader()) {
+            fprintf(stderr, "%s: failed to open '%.*s' for reading\n", __func__, static_cast<int>(in_filepath.size()), in_filepath.data());
+            return false;
+        }
+        
+        if (!pipe.get_writer()) {
+            fprintf(stderr, "%s: failed to open '%.*s' for writing\n", __func__, static_cast<int>(out_filepath.size()), out_filepath.data());
+            return false;
+        }
+
+        if (!verify_magic_number(pipe.get_reader())) {
+            fprintf(stderr, "%s: invalid model file '%.*s' (bad magic)\n", __func__, static_cast<int>(in_filepath.size()), in_filepath.data());
+            return false;
+        }
+
+        pipe.get_writer().write(&magic_number_v);
+
+        std::string_view parent_fn_name = __func__;
+
+        auto param_print_fn = [parent_fn_name](std::string_view s) {
+            return [s, parent_fn_name](auto* val) {
+                printf("%.*s: %.*s = %d\n", static_cast<int>(parent_fn_name.size()), parent_fn_name.data(), static_cast<int>(s.size()), s.data(), *val);
+                return val;
+            };
+        };
+
+        auto params = HyperParams{};
+        pipe.read_and_write(&params.n_vocab, 1, param_print_fn("n_vocab"));
+        pipe.read_and_write(&params.n_embd, 1, param_print_fn("n_embd"));
+        pipe.read_and_write(&params.n_mult, 1, param_print_fn("n_mult"));
+        pipe.read_and_write(&params.n_head, 1, param_print_fn("n_head"));
+        pipe.read_and_write(&params.n_layer, 1, param_print_fn("n_layer"));
+        pipe.read_and_write(&params.n_rot, 1, param_print_fn("n_rot"));
+        pipe.read_and_write(&params.f16, 1, [parent_fn_name, itype](auto* v) {
+            *v = itype;
+            printf("%.*s: %s = %d\n", static_cast<int>(parent_fn_name.size()), parent_fn_name.data(), "f16", *v);
+            return v;
+        });
+
+        printf("%s: vocabulary processing started\n", __func__);
+        // load and save vocab
+        {
+            std::string word(64, ' ');
+
+            for(auto i = 0l; i < params.n_vocab; ++i) {
+                std::uint32_t len;
+
+                pipe.read_and_write(&len);
+                word.resize(len);
+                pipe.read_and_write(word.data(), len);
+            }
+        }
+
+        printf("%s: vocabulary processing completed\n", __func__);
+
+        // load -> transform -> save weights
+        {
+            std::size_t total_size_org = 0;
+            std::size_t total_size_new = 0;
+
+            std::vector<float> work;
+
+            std::vector<std::uint8_t>   data_u8;
+            std::vector<ggml_fp16_t>    data_f16;
+            std::vector<float>          data_f32;
+
+            std::vector<std::int64_t> hist_all(1 << 4, 0);
+
+            std::string name(64, ' ');
+
+            while(!pipe.get_reader().eof()) {
+                std::int32_t n_dims;
+                std::int32_t length;
+                std::int32_t ftype;
+
+                pipe.read_and_write(&n_dims);
+                pipe.read_and_write(&length);
+                pipe.get_reader().read(&ftype);
+
+                if (pipe.get_reader().eof()) break;
+
+                std::int32_t total_number_of_elements{1};
+                std::int32_t extents[2] = { 1, 1 };
+
+                for(std::int32_t i {}; i < n_dims; ++i) {
+                    pipe.get_reader().read(extents + i);
+                    total_number_of_elements *= extents[i];
+                }
+                
+                name.resize(length);
+                pipe.get_reader().read(name.data(), length);
+
+                // {
+                //     // ensure tensor data is aligned
+                //     auto maybe_offset = pipe.get_reader().tell();
+                //     if (!maybe_offset) return false;
+                //     auto offset = *maybe_offset;
+                //     offset = (offset + 31) & -32;
+                //     pipe.get_reader().seek(offset);
+                // }
+
+                {
+                    static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", };
+                    printf("%48s - [%5d, %5d], type = %6s ", name.data(), extents[0], extents[1], ftype_str[ftype]);
+                }
+
+                std::string_view temp_w_str = "weight";
+                auto pos = (name.size() > temp_w_str.size() ? name.size() - temp_w_str.size() : 0);
+                auto find_pos = name.find(temp_w_str, pos);
+                bool quantize = (n_dims == 2) && (find_pos != std::string::npos);
+                
+                // printf("Quantize? %s, Size: %zu - %zu == %zu\n", quantize ? "Yes" : "No", name.size(), find_pos, temp_w_str.size());
+
+                if (quantize) {
+                    if (ftype != 0 && ftype != 1) {
+                        fprintf(stderr, "%s: unsupported ftype %d for integer quantization\n", __func__, ftype);
+                        return false;
+                    }
+
+                    if (ftype == 1) {
+                        data_f16.resize(total_number_of_elements);
+                        pipe.get_reader().read(data_f16.data(), total_number_of_elements);
+
+                        data_f32.resize(total_number_of_elements);
+                        #pragma omp parallel for if (total_number_of_elements > 512)
+                        for (int i = 0; i < total_number_of_elements; ++i) {
+                            data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
+                        }
+                    } else {
+                        data_f32.resize(total_number_of_elements);
+                        pipe.get_reader().read(data_f32.data(), total_number_of_elements);
+                    }
+
+                    ftype = itype;
+                } else {
+                    auto const bpe = (ftype == 0) ? sizeof(float) : sizeof(uint16_t);
+
+                    data_u8.resize(total_number_of_elements * bpe);
+                    pipe.get_reader().read(reinterpret_cast<void*>(data_u8.data()), bpe, total_number_of_elements);
+                }
+
+                pipe.get_writer().write(&ftype);
+
+                for(auto i = 0ul; i < n_dims; ++i) {
+                    pipe.get_writer().write(extents + i);
+                }
+
+                pipe.get_writer().write(name.data(), length);
+
+
+                // {
+                //     // ensure tensor data is aligned
+                //     auto maybe_offset = pipe.get_writer().tell();
+                //     if (!maybe_offset) return false;
+                //     auto offset = *maybe_offset;
+                //     offset = (offset + 31) & -32;
+                //     pipe.get_writer().seek(offset);
+                // }
+
+                if (quantize) {
+                    printf("quantizing .. ");
+                    work.resize(total_number_of_elements); // for quantization
+
+                    size_t cur_size = 0;
+                    std::vector<int64_t> hist_cur(1 << 4, 0);
+
+                    switch (type) {
+                        case GGML_TYPE_Q4_0:
+                            {
+                                cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), total_number_of_elements, extents[0], hist_cur.data());
+                            } break;
+                        case GGML_TYPE_Q4_1:
+                            {
+                                cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), total_number_of_elements, extents[0], hist_cur.data());
+                            } break;
+                        default:
+                            {
+                                fprintf(stderr, "%s: unsupported quantization type %d\n", __func__, type);
+                                return false;
+                            }
+                    }
+
+                    pipe.get_writer().write(reinterpret_cast<char*>(work.data()), cur_size);
+
+                    total_size_new += cur_size;
+
+                    printf("size = %8.2Lf MB -> %8.2Lf MB | hist: ", total_number_of_elements * sizeof(float)/1.0_MiB, cur_size/1.0_MiB);
+                    for (int i = 0; i < (int) hist_cur.size(); ++i) {
+                        hist_all[i] += hist_cur[i];
+                    }
+
+                    for (int i = 0; i < (int) hist_cur.size(); ++i) {
+                        printf("%5.3f ", hist_cur[i] / float(total_number_of_elements));
+                    }
+                    printf("\n");
+
+                } else {
+                    printf("size = %8.3Lf MB\n", data_u8.size()/1.0_MiB);
+                    pipe.get_writer().write(data_u8.data(), data_u8.size());
+
+                    total_size_new += data_u8.size();
+                }
+
+                total_size_org += total_number_of_elements * sizeof(float);
+            }
+
+            printf("%s: model size  = %8.2Lf MB\n", __func__, total_size_org / 1.0_MiB);
+            printf("%s: quant size  = %8.2Lf MB\n", __func__, total_size_new / 1.0_MiB);
+
+            {
+                int64_t sum_all = 0;
+                for (int i = 0; i < (int) hist_all.size(); ++i) {
+                    sum_all += hist_all[i];
+                }
+
+                printf("%s: hist: ", __func__);
+                for (int i = 0; i < (int) hist_all.size(); ++i) {
+                    printf("%5.3f ", hist_all[i] / float(sum_all));
+                }
+                printf("\n");
+            }
+
+        }
+
+        pipe.close();
 
         return true;
     }

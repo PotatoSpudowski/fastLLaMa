@@ -144,6 +144,8 @@ namespace fastllama {
         int n_batch{64};
     };
 
+    bool quantize(std::string_view in_filepath, std::string_view out_filepath, int itype);
+
 } // namespace fastllama
 
 
