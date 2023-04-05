@@ -81,8 +81,8 @@ namespace fastllama {
             std::size_t& mem_per_token
         ) -> bool;
 
-        auto set_threads(int threads) noexcept {
-            this->threads = std::max(1, std::min(static_cast<int>(std::thread::hardware_concurrency()), threads));
+        auto set_threads(int in_threads) noexcept {
+            this->threads = std::max(1, std::min(static_cast<int>(std::thread::hardware_concurrency()), in_threads));
         }
 
         bool dump_vocab(std::string_view filepath);

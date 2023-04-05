@@ -40,7 +40,7 @@ int main() {
         bridge.generate([](std::string const& s) {
             std::cout<<s;
             std::cout.flush();
-        }, 300, 40, 0.95, 0.8, 1.0, { "User: " });
+        }, 300, 40, 0.95f, 0.8f, 1.0f, { "User: " });
         
         std::cout<<"User: ";
     }

@@ -81,6 +81,7 @@ PYBIND11_MODULE(fastLlama, m) {
             model_builder.n_threads = num_threads;
             model_builder.n_ctx = n_ctx;
             model_builder.n_batch = n_batch;
+            model_builder.last_n_tokens = static_cast<std::size_t>(max_tokens_in_memory);
             
             auto loggerInner = fl::DefaultLogger{
                 /*log       = */ make_py_logger_func(std::move(log_info)),

@@ -25,12 +25,12 @@ namespace fastllama {
             std::size_t last_n_tokens{64};
             Logger logger{};
 
-            constexpr Params& set_seed(int seed) noexcept { this->seed = seed; return *this; }
+            constexpr Params& set_seed(int in_seed) noexcept { this->seed = in_seed; return *this; }
             constexpr Params& set_number_of_tokens_to_keep(int keep) noexcept { this->n_keep = keep; return *this; }
             constexpr Params& set_number_of_contexts(int ctx) noexcept { this->n_ctx = ctx; return *this; }
             constexpr Params& set_number_of_threads(int threads) noexcept { this->n_threads = threads; return *this; }
             constexpr Params& set_number_of_batches(int batches) noexcept { this->n_batch = batches; return *this; }
-            Params& set_logger(Logger logger) noexcept { this->logger = std::move(logger); return *this; }
+            Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view model_id, std::string_view const& filepath);
         };

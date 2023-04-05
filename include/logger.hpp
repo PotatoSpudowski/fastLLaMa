@@ -53,7 +53,7 @@ namespace fastllama {
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
-            m_sink.log(func_name.data(), func_name.size(), message.data(), message.size());
+            m_sink.log(func_name.data(), static_cast<int>(func_name.size()), message.data(), static_cast<int>(message.size()));
         }
         
         template<typename... Args>
@@ -61,7 +61,7 @@ namespace fastllama {
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
-            m_sink.log_err(func_name.data(), func_name.size(), message.data(), message.size());
+            m_sink.log_err(func_name.data(), static_cast<int>(func_name.size()), message.data(), static_cast<int>(message.size()));
         }
         
         template<typename... Args>
@@ -69,7 +69,7 @@ namespace fastllama {
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
-            m_sink.log_warn(func_name.data(), func_name.size(), message.data(), message.size());
+            m_sink.log_warn(func_name.data(), static_cast<int>(func_name.size()), message.data(), static_cast<int>(message.size()));
         }
     private:
         DefaultLogger m_sink{};

@@ -16,14 +16,15 @@ namespace fastllama {
         using token = std::string;
         
         constexpr auto get_token_from_id(id token_id) const noexcept -> std::string_view {
-            if (token_id >= id_to_token.size()) return {};
-            return id_to_token[token_id].tok;
+            auto temp_id = static_cast<std::size_t>(token_id);
+            if (temp_id >= id_to_token.size()) return {};
+            return id_to_token[temp_id].tok;
         }
 
         auto set_word(id token_id, std::string_view s, float score) {
             auto const temp = std::string(s);
             token_to_id[temp] = token_id;
-            id_to_token[token_id] = {
+            id_to_token[static_cast<std::size_t>(token_id)] = {
                 std::move(temp),
                 score
             };
