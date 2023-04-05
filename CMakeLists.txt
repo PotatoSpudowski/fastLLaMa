@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(fastLlama)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 include(cmake/CompilerWarnings.cmake)
 include(cmake/CompilerFlags.cmake)
