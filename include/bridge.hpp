@@ -35,6 +35,7 @@ namespace fastllama {
             Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view model_id, std::string_view const& filepath);
+            std::optional<FastLlama> build(ModelKind model_id, std::string_view const& filepath);
         };
 
         // FastLlama(std::string_view model_id, std::string_view const& filepath, int n_threads = 8, int n_ctx = 512, std::size_t last_n_size = 64, int seed = 0, int keep = 64);

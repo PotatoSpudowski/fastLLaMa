@@ -10,7 +10,7 @@ int main() {
         .set_number_of_batches(64)
         .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
-        .build("LLAMA-7B", "./models/7B/ggml-model-q4_0.bin");
+        .build(fastllama::ModelKind::LLAMA_7B, "./models/7B/ggml-model-q4_0.bin");
     
     if (!maybe_bridge) {
         return 1;

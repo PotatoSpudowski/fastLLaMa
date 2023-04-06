@@ -541,7 +541,7 @@ namespace fastllama {
     bool Model::load(std::string_view model_name, std::string_view filepath, bool is_old_model) {
         using namespace ::fastllama::literals;
 
-        logger.log("Model", "loading model from ", filepath, " - please wait ...\n");
+        logger.log("Model", "loading model(='", model_name,"') from ", filepath, " - please wait ...\n");
         
         this->is_valid = false;
 

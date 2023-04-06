@@ -133,6 +133,10 @@ namespace fastllama {
         return { std::move(temp) };
     }
 
+    std::optional<FastLlama> FastLlama::Params::build(ModelKind model_id, std::string_view const& filepath) {
+        return build(detail::g_models[static_cast<std::size_t>(model_id)].first, filepath);
+    }
+
     auto FastLlama::recycle_embed_if_exceeds_context() -> bool {
         auto const len = static_cast<int>(m_embd.size());
         if (len <= 0) return false;

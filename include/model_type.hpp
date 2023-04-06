@@ -115,9 +115,8 @@ namespace fastllama {
                 }
             ),
         };
+        inline static constexpr auto g_models_size_v = sizeof(detail::g_models) / sizeof(detail::g_models[0]);
     } // namespace detail
-    
-
 
     struct ModelId;
 
@@ -131,15 +130,42 @@ namespace fastllama {
             }
             return true;
         }
+
+        template<std::size_t N>
+        constexpr auto get_model_index(char const name[N]) noexcept -> std::size_t {
+            std::size_t i = 0ul;
+            auto temp_name = std::string_view(name);
+            for(auto const& m : g_models) {
+                if (m.first == temp_name) return i;
+                ++i;
+            }
+            return i;
+        }
+
     } // namespace detail
+
+    #define GET_MODE_IDX(STR) ([]() { constexpr auto index = detail::get_model_index<sizeof(STR)>(STR);  static_assert(index < detail::g_models_size_v, "Model(='" STR "') does not exist."); return index; })()
+
+    enum class ModelKind : std::size_t {
+        LLAMA_7B = GET_MODE_IDX("LLAMA-7B"),
+        LLAMA_13B = GET_MODE_IDX("LLAMA-13B"),
+        LLAMA_30B = GET_MODE_IDX("LLAMA-30B"),
+        LLAMA_65B = GET_MODE_IDX("LLAMA-65B"),
+        ALPACA_LORA_7B = GET_MODE_IDX("ALPACA-LORA-7B"),
+        ALPACA_LORA_13B = GET_MODE_IDX("ALPACA-LORA-13B"),
+        ALPACA_LORA_30B = GET_MODE_IDX("ALPACA-LORA-30B"),
+        ALPACA_LORA_65B = GET_MODE_IDX("ALPACA-LORA-65B"),
+    };
+
+    #undef GET_MODE_IDX
 
     struct ModelId {
         using id_t = std::string_view;
 
+
         id_t id{};
         ModelIdConfig config{};
         
-
         // Assumption 1: ModelId is a singleton
         // Assumption 2: It cannot be constructed outside this translation unit
         constexpr auto operator==(ModelId const& other) noexcept {
