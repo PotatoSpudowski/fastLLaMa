@@ -23,9 +23,9 @@ def set_global_cmake_variables() -> None:
     cmake_global_vars: MutableMapping[str, List[str]] = {}
 
     if python_info is not None:
-        cmake_global_vars['Python_EXECUTABLE'] = [python_info.binary_path]
-        cmake_global_vars['Python_INCLUDE_DIRS'] = [python_info.include_path]
-        cmake_global_vars['Python_LIBRARIES'] = [python_info.library_path]
+        cmake_global_vars['PYTHON_EXECUTABLE'] = [python_info.binary_path]
+        cmake_global_vars['PYTHON_INCLUDE_DIR'] = [python_info.include_path]
+        cmake_global_vars['PYTHON_LIBRARY'] = [python_info.library_path]
         print(f"Set python to '{python_info.binary_path}'")
     else:
         print("Auto detecting python version")
