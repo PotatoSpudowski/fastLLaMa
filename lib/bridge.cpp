@@ -71,7 +71,7 @@ namespace fastllama {
         probs.reserve(logits_id.size());
 
         double sum = 0.0;
-        auto const logits_id_size = logits_id.size();
+        [[maybe_unused]] auto const logits_id_size = logits_id.size();
         #pragma omp parallel for if(logits_id_size > 256)
         for (const auto & kv : logits_id) {
             auto p = static_cast<double>(expf(static_cast<float>(kv.first - maxl)));
@@ -80,7 +80,7 @@ namespace fastllama {
         }
 
         // normalize the probs
-        auto probs_size = probs.size();
+        [[maybe_unused]] auto probs_size = probs.size();
         #pragma omp parallel for if(probs_size > 256)
         for (auto i = 0ul; i < probs.size(); ++i) {
             probs[i] /= sum;
