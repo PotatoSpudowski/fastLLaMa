@@ -11,11 +11,9 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pybind11)
 
-pybind11_add_module(fastLlama main.cpp)
+pybind11_add_module(pyfastllama main.cpp)
 
 message(STATUS "Python version built for: ${Python_VERSION}")
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-link_directories(${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(fastLlama PRIVATE fast_llama_lib)
-set_target_properties(fastLlama PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_target_properties(fastLlama PROPERTIES SUFFIX ".so")
+target_link_libraries(pyfastllama PRIVATE fast_llama_lib)
+set_target_properties(pyfastllama PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(pyfastllama PROPERTIES SUFFIX ".so")

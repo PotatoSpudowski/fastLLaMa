@@ -1,2 +1,2 @@
-# add_executable(main main.c)
-# target_link_libraries(main PRIVATE fast_llama_lib)
+add_library(cfastllama main.cpp)
+target_link_libraries(cfastllama PRIVATE fast_llama_lib)

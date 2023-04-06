@@ -1,0 +1,10 @@
+_SUBDIRLIST(EXAMPLE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
+
+# set(EXAMPLES_c TRUE)
+
+foreach(EXAMPLE_DIR ${EXAMPLE_DIRS})
+    if(DEFINED EXAMPLES_${EXAMPLE_DIR})
+        message(STATUS "Building examples for '${EXAMPLE_DIR}'")
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR})
+    endif(DEFINED EXAMPLES_${EXAMPLE_DIR})
+endforeach(EXAMPLE_DIR ${EXAMPLE_DIRS})

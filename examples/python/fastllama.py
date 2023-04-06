@@ -5,7 +5,7 @@ from typing import Callable, List, Optional, Union
 
 sys.path.append("./build/interfaces/python")
 
-import fastLlama
+import pyfastllama
 
 class Logger:
     def log_info(self, func_name: str, message: str) -> None:
@@ -45,7 +45,7 @@ class Model:
         ):
         normalized_id = id if type(id) == str else id.value
         if logger is None:
-            self.inner = fastLlama.Model(
+            self.inner = pyfastllama.Model(
                 normalized_id,
                 path,
                 num_threads,
@@ -56,7 +56,7 @@ class Model:
                 n_batch,
             )
         else:
-            self.inner = fastLlama.Model(
+            self.inner = pyfastllama.Model(
                 normalized_id,
                 path,
                 num_threads,

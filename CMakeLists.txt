@@ -39,3 +39,4 @@ set_target_properties(fast_llama_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/interfaces)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)

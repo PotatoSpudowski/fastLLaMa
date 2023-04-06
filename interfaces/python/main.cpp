@@ -59,7 +59,7 @@ inline static LoggerResetFunction make_def_reset_logger_func() {
 }
 
 
-PYBIND11_MODULE(fastLlama, m) {
+PYBIND11_MODULE(pyfastllama, m) {
     py::class_<PyFastLlama>(m, "Model")
         .def(py::init([](
             std::string const& model_id,
@@ -73,7 +73,8 @@ PYBIND11_MODULE(fastLlama, m) {
             PyLogFunction log_info,
             PyLogFunction log_err,
             PyLogFunction log_warn,
-            LoggerResetFunction log_reset
+            LoggerResetFunction log_reset,
+            bool is_old_model
         ) {
             auto model_builder = fl::FastLlama::builder();
             model_builder.seed = std::max(0, seed);
@@ -81,6 +82,7 @@ PYBIND11_MODULE(fastLlama, m) {
             model_builder.n_threads = num_threads;
             model_builder.n_ctx = n_ctx;
             model_builder.n_batch = n_batch;
+            model_builder.is_old_model = is_old_model;
             model_builder.last_n_tokens = static_cast<std::size_t>(max_tokens_in_memory);
             
             auto loggerInner = fl::DefaultLogger{
@@ -105,7 +107,8 @@ PYBIND11_MODULE(fastLlama, m) {
             py::arg("log_info") = make_def_info_logger_func(),
             py::arg("log_err") = make_def_err_logger_func(),
             py::arg("log_warn") = make_def_warn_logger_func(),
-            py::arg("log_reset") = make_def_reset_logger_func()
+            py::arg("log_reset") = make_def_reset_logger_func(),
+            py::arg("is_old_model") = false
         ).def("ingest", [](PyFastLlama& self, std::string prompt, bool is_system_prompt = false) {
             return self.inner.ingest(std::move(prompt), is_system_prompt);
         }, py::arg("prompt"), py::arg("is_system_prompt") = false)
