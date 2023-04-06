@@ -1,6 +1,7 @@
+from enum import Enum
 import sys
 import multiprocessing
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 sys.path.append("./build/interfaces/python")
 
@@ -19,10 +20,20 @@ class Logger:
     def reset(self) -> None:
         return None
 
+class ModelKind(Enum):
+    LLAMA_7B = "LLAMA-7B"
+    LLAMA_13B = "LLAMA-13B"
+    LLAMA_30B = "LLAMA-30B"
+    LLAMA_65B = "LLAMA-65B"
+    ALPACA_LORA_7B = "ALPACA-LORA-7B"
+    ALPACA_LORA_13B = "ALPACA-LORA-13B"
+    ALPACA_LORA_30B = "ALPACA-LORA-30B"
+    ALPACA_LORA_65B = "ALPACA-LORA-65B"
+
 class Model:
     def __init__(
         self,
-        id: str, # Model Id. See the readme for support models and get the id
+        id: Union[str, ModelKind], # Model Id. See the readme for support models and get the id
         path: str, # File path to the model
         num_threads: int = multiprocessing.cpu_count(), # Number of threads to use during evaluation of model
         n_ctx: int = 512, # Size of the memory context to use
@@ -32,9 +43,10 @@ class Model:
         n_batch: int = 16, # Size of the token batch that will be processed at a given time
         logger: Optional[Logger] = None, # Logger to be used for reporting messages
         ):
+        normalized_id = id if type(id) == str else id.value
         if logger is None:
             self.inner = fastLlama.Model(
-                id,
+                normalized_id,
                 path,
                 num_threads,
                 n_ctx,
@@ -45,7 +57,7 @@ class Model:
             )
         else:
             self.inner = fastLlama.Model(
-                id,
+                normalized_id,
                 path,
                 num_threads,
                 n_ctx,

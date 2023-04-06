@@ -9,7 +9,7 @@ def stream_token(x: str) -> None:
     print(x, end='', flush=True)
 
 model = fastllama.Model(
-        id="ALPACA-LORA-30B",
+        id=fastllama.ModelKind.ALPACA_LORA_30B,
         path=MODEL_PATH, #path to model
         num_threads=16, #number of threads to use
         n_ctx=512, #context size of model
