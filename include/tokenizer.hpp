@@ -80,7 +80,7 @@ namespace fastllama {
         {}
 
         auto operator()(std::string_view text, std::vector<typename Vocab::id>& out) {
-            auto index = 0l;
+            int index = 0l;
             auto offset = std::size_t{};
             while(offset < text.size()) {
                 auto sym = sp_symbol{};
@@ -101,8 +101,8 @@ namespace fastllama {
                 auto const bigram = m_queue.top();
                 m_queue.pop();
 
-                auto& left_sym = m_symbols[bigram.left];
-                auto& right_sym = m_symbols[bigram.right];
+                auto& left_sym = m_symbols[static_cast<std::size_t>(bigram.left)];
+                auto& right_sym = m_symbols[static_cast<std::size_t>(bigram.right)];
 
                 auto const sym_size = left_sym.text.size() + right_sym.text.size();
                 if (left_sym.text.empty() || right_sym.text.empty() || sym_size != bigram.size) {
@@ -112,7 +112,7 @@ namespace fastllama {
                 left_sym.merge_symbol(right_sym);
 
                 if (right_sym.next >= 0) {
-                    m_symbols[right_sym.next].prev = bigram.left;
+                    m_symbols[static_cast<std::size_t>(right_sym.next)].prev = bigram.left;
                 }
 
                 right_sym.clear();
@@ -121,8 +121,8 @@ namespace fastllama {
                 try_add_bigram(bigram.left, left_sym.next);
             }
 
-            for(index_t i = 0; i != -1; i = m_symbols[i].next) {
-                auto& sym = m_symbols[i];
+            for(index_t i = 0; i != -1; i = m_symbols[static_cast<std::size_t>(i)].next) {
+                auto& sym = m_symbols[static_cast<std::size_t>(i)];
 
                 if (auto const& token = m_vocab.token_to_id.find(std::string(sym.text)); token != m_vocab.token_to_id.end()) {
                     out.push_back(token->second);
@@ -139,7 +139,10 @@ namespace fastllama {
         auto try_add_bigram(index_t left, index_t right) -> void {
             if (left == -1 || right == -1) return;
 
-            auto const text = std::string(m_symbols[left].text.data(), m_symbols[left].text.size() + m_symbols[right].text.size());
+            auto const text = std::string(
+                m_symbols[static_cast<std::size_t>(left)].text.data(),
+                m_symbols[static_cast<std::size_t>(left)].text.size() + m_symbols[static_cast<std::size_t>(right)].text.size()
+            );
             auto const token = m_vocab.token_to_id.find(text);
             if (token == m_vocab.token_to_id.end()) return;
 

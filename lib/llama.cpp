@@ -4,6 +4,8 @@
 #include <cassert>
 #include "macro.hpp"
 #include <fstream>
+#include <numeric>
+#include <functional>
 
 namespace fastllama {
 
@@ -44,24 +46,24 @@ namespace fastllama {
 
             float score{};
             reader.read(&score);
-            vocab.set_word(i, word, score);
+            vocab.set_word(static_cast<typename Vocab::id>(i), word, score);
         }
 
         if (!has_padding) return;
 
         std::string pad_token = "<pad>";
-        vocab.set_word(new_size, std::move(pad_token), 0);
+        vocab.set_word(static_cast<typename Vocab::id>(new_size), std::move(pad_token), 0);
     }
 
     FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type vtype, ggml_type wtype, int n_ff) {
         auto const& params  = model.params;
         auto const  n_embd  = params.n_embd;
         auto const  n_layer = params.n_layer;
-        auto const  n_ctx   = params.n_ctx;
+        // auto const  n_ctx   = params.n_ctx;
         auto const  n_vocab = params.n_vocab;
         auto&       ctx     = model.ctx;
 
-        model.layers.resize(n_layer);
+        model.layers.resize(static_cast<std::size_t>(n_layer));
         model.tok_embeddings    = ggml_new_tensor_2d(ctx, vtype, n_embd, n_vocab);
         model.norm              = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
         model.output            = ggml_new_tensor_2d(ctx, vtype, n_embd, n_vocab);
@@ -73,7 +75,7 @@ namespace fastllama {
 
         char temp_buff[128] = {0};
 
-        for(auto i = 0ul; i < n_layer; ++i) {
+        for(auto i = 0ul; i < static_cast<std::size_t>(n_layer); ++i) {
             auto& layer = model.layers[i];
             layer.attention_norm = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embd);
 
@@ -89,33 +91,33 @@ namespace fastllama {
             layer.w3 = ggml_new_tensor_2d(ctx, wtype, n_embd,   n_ff);
 
             auto str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention_norm.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.attention_norm;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.attention_norm;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wq.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.wq;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.wq;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wk.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.wk;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.wk;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wv.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.wv;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.wv;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.attention.wo.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.wo;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.wo;
             
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.ffn_norm.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.ffn_norm;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.ffn_norm;
             
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.feed_forward.w1.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.w1;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.w1;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.feed_forward.w2.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.w2;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.w2;
             
             str_size = snprintf(temp_buff, sizeof(temp_buff), "layers.%zu.feed_forward.w3.weight", i);
-            model.tensors[std::string(temp_buff, str_size)] = layer.w3;
+            model.tensors[std::string(temp_buff, static_cast<std::size_t>(str_size))] = layer.w3;
         }
     }
 
@@ -137,18 +139,19 @@ namespace fastllama {
 
             if (reader.eof()) break;
 
-            std::int32_t total_number_of_elements{1};
+            std::size_t total_number_of_elements{1};
             std::int32_t extents[2] = { 1, 1 };
             
             assert(n_dims <= 2 && "number of dimensions should be less than 3");
 
             for(std::int32_t i {}; i < n_dims; ++i) {
                 reader.read(extents + i);
-                total_number_of_elements *= extents[i];
+                total_number_of_elements *= static_cast<std::size_t>(extents[i]);
             }
             
-            name.resize(length);
-            reader.read(name.data(), length);
+            auto str_len = static_cast<std::size_t>(length);
+            name.resize(str_len);
+            reader.read(name.data(), str_len);
             if (model.tensors.count(name) == 0) {
                 logger.log_err("Model", "unkown tensor '", name, "' in model file\n");
                 return false;
@@ -159,7 +162,7 @@ namespace fastllama {
                 auto maybe_offset = reader.tell();
                 if (!maybe_offset) return false;
                 auto offset = *maybe_offset;
-                offset = (offset + 31) & -32;
+                offset = (offset + 31ul) & static_cast<std::size_t>(-32);
                 reader.seek(offset);
             }
 
@@ -199,7 +202,7 @@ namespace fastllama {
             auto tensor = model.tensors[name];
 
             if (n_dims == 1) {
-                if (ggml_nelements(tensor) != total_number_of_elements) {
+                if (static_cast<std::size_t>(ggml_nelements(tensor)) != total_number_of_elements) {
                     logger.log_err("Model", "tensor '", name, "' has wrong size in model file\n");
                     return false;
                 }
@@ -209,7 +212,7 @@ namespace fastllama {
                     return false;
                 }
             } else {
-                if ((ggml_nelements(tensor) / n_parts) != total_number_of_elements) {
+                if ((static_cast<std::size_t>(ggml_nelements(tensor)) / n_parts) != total_number_of_elements) {
                     logger.log_err("Model", "tensor '", name, "' has wrong size in model file\n");
                     return false;
                 }
@@ -236,7 +239,7 @@ namespace fastllama {
             }
 
             if (n_dims == 1 || n_parts == 1) {
-                if ((total_number_of_elements * bpe) / ggml_blck_size(tensor->type) != ggml_nbytes(tensor)) {
+                if ((total_number_of_elements * bpe) / static_cast<std::size_t>(ggml_blck_size(tensor->type)) != ggml_nbytes(tensor)) {
                     logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got ", ggml_nbytes(tensor), ", but expected ", total_number_of_elements * bpe, '\n');
                     return false;
                 }
@@ -249,28 +252,28 @@ namespace fastllama {
 
                 total_size += ggml_nbytes(tensor);
             } else {
-                if ((total_number_of_elements * bpe) / ggml_blck_size(tensor->type) != ggml_nbytes(tensor)/n_parts) {
+                if ((total_number_of_elements * bpe) / static_cast<std::size_t>(ggml_blck_size(tensor->type)) != ggml_nbytes(tensor)/n_parts) {
                     logger.log_err("Model", "tensor '", name, "' has wrong size in model file: got ", ggml_nbytes(tensor), ", but expected ", total_number_of_elements * bpe, '\n');
                     return false;
                 }
 
                 if (split_type == 0) {
-                    auto const np0 = extents[0];
+                    auto const np0 = static_cast<std::size_t>(extents[0]);
 
-                    auto const row_size = (tensor->ne[0]/ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
+                    auto const row_size = static_cast<std::size_t>(tensor->ne[0]/ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
                     assert(row_size == tensor->nb[1]);
 
-                    for (int i1 = 0; i1 < np0; ++i1) {
+                    for (auto i1 = 0ul; i1 < np0; ++i1) {
                         auto const offset_row = i1*row_size;
-                        auto const offset = offset_row + ((part_id * np0) / ggml_blck_size(tensor->type))*ggml_type_size(tensor->type);
+                        auto const offset = offset_row + ((part_id * np0) / static_cast<std::size_t>(ggml_blck_size(tensor->type)))*ggml_type_size(tensor->type);
                         reader.read(static_cast<char*>(tensor->data) + offset, row_size/n_parts);
                     }
                 } else {
-                    auto const np1 = extents[1];
+                    auto const np1 = static_cast<std::size_t>(extents[1]);
 
-                    auto const row_size = (tensor->ne[0] / ggml_blck_size(tensor->type)) * ggml_type_size(tensor->type);
+                    auto const row_size = static_cast<std::size_t>(tensor->ne[0] / ggml_blck_size(tensor->type)) * ggml_type_size(tensor->type);
 
-                    for (int i1 = 0; i1 < np1; ++i1) {
+                    for (auto i1 = 0ul; i1 < np1; ++i1) {
                         auto const offset_row = (i1 + part_id * np1)*row_size;
                         reader.read(static_cast<char*>(tensor->data) + offset_row, row_size);
                     }
@@ -288,7 +291,7 @@ namespace fastllama {
 
         char buff[20] = {0};
         auto len = snprintf(buff, sizeof(buff), "%8.2f", total_size/(1024.0*1024.0));
-        logger.log("Model", "model size = ", std::string(buff, len), " MB / num tensors = ", number_of_tensors, "\n");
+        logger.log("Model", "model size = ", std::string(buff, static_cast<std::size_t>(len)), " MB / num tensors = ", number_of_tensors, "\n");
 
         return true;
     }
@@ -330,6 +333,8 @@ namespace fastllama {
     }
 
     FASTLLAMA_ALWAYS_INLINE static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
+        using namespace ::fastllama::literals;
+
         if (!verify_magic_number(reader)) {
             logger.log_err("Model", "invalid model file ", filepath, " (bad magic)\n");
             return std::nullopt;
@@ -378,9 +383,7 @@ namespace fastllama {
             }
         }
 
-        auto & ctx = model.ctx;
-
-        size_t ctx_size = 0;
+        float ctx_size = 0;
         
         // Get total context size
         {
@@ -416,14 +419,14 @@ namespace fastllama {
             ctx_size += (5 + 10 * n_layer) * 256; // object overhead
 
             char buff[20] = {0};
-            snprintf(buff, 20, "%6.2f", ctx_size/(1024.0*1024.0));
+            snprintf(buff, 20, "%6.2Lf", static_cast<long double>(ctx_size)/1.0_MiB);
             logger.log("Model", "ggml ctx size = ", std::string(buff), " MB\n");
         }
 
 
         // create the ggml context
         {
-            model.buffer.resize(ctx_size);
+            model.buffer.resize(static_cast<std::size_t>(std::ceil(ctx_size)));
             ggml_init_params params {};
             params.mem_size = model.buffer.size();
             params.mem_buffer = model.buffer.data();
@@ -454,11 +457,11 @@ namespace fastllama {
             char buff[20] = {0};
             std::string mem_req_str, mem_req_state_str;
             {
-                auto const len = snprintf(buff, sizeof(buff), "%7.2f", mem_required / (1024.0 * 1024.0));
+                auto const len = snprintf(buff, sizeof(buff), "%7.2Lf", static_cast<long double>(mem_required) / 1.0_MiB);
                 mem_req_str = std::string(buff, static_cast<std::size_t>(len));
             }
             {
-                auto const len = snprintf(buff, sizeof(buff), "%7.2f", mem_required_state / (1024.0 * 1024.0));
+                auto const len = snprintf(buff, sizeof(buff), "%7.2Lf", static_cast<long double>(mem_required_state) / 1.0_MiB);
                 mem_req_state_str = std::string(buff, static_cast<std::size_t>(len));
             }
 
@@ -482,7 +485,7 @@ namespace fastllama {
         auto const n_embd  = params.n_embd;
         auto const n_layer = params.n_layer;
 
-        std::size_t mem_size = static_cast<std::size_t>(n_layer) * n_ctx;
+        std::size_t mem_size = static_cast<std::size_t>(n_layer * n_ctx);
         std::size_t number_of_elements = static_cast<std::size_t>(n_embd) * mem_size;
         auto const buffer_size = 2 * number_of_elements * static_cast<std::size_t>(ggml_type_size(memory_type)) + 2_MiB;
         buffer.resize( buffer_size );
@@ -499,8 +502,8 @@ namespace fastllama {
             return false;
         }
 
-        this->k = ggml_new_tensor_1d(this->ctx, memory_type, number_of_elements);
-        this->v = ggml_new_tensor_1d(this->ctx, memory_type, number_of_elements);
+        this->k = ggml_new_tensor_1d(this->ctx, memory_type, static_cast<std::int64_t>(number_of_elements));
+        this->v = ggml_new_tensor_1d(this->ctx, memory_type, static_cast<std::int64_t>(number_of_elements));
 
         auto const total_kv_size = ggml_nbytes(this->k) + ggml_nbytes(this->v);
 
@@ -512,7 +515,7 @@ namespace fastllama {
         return true;
     }
 
-    void KVCacheBuffer::deinit(Logger const& logger) {
+    void KVCacheBuffer::deinit([[maybe_unused]] Logger const& logger) {
         if (!ctx) return;
         ggml_free(ctx);
         ctx = nullptr;
@@ -552,7 +555,7 @@ namespace fastllama {
 
         // Initialize compute buffers
         {
-            model_id.config.mem_required_for_eval += n_batch * 20_MiB; // extra space large batch
+            model_id.config.mem_required_for_eval += static_cast<std::size_t>(n_batch) * 20_MiB; // extra space large batch
             buf_compute.resize(model_id.config.mem_required_for_eval);
             buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
             buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
@@ -608,18 +611,12 @@ namespace fastllama {
         ggml_cgraph gf{};
         gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
 
-        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
+        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, static_cast<std::int64_t>(N));
         memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
-
-        // std::cout<<"Address: "<<tok_embeddings<<", [ ";
-        // for(auto const el: tok_embeddings->ne) {
-        //     std::cout<<el<<", ";
-        // }
-        // std::cout<<"]"<<std::endl;
 
         ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
         
-        for (int il = 0; il < n_layer; ++il) {
+        for (auto il = 0ul; il < static_cast<std::size_t>(n_layer); ++il) {
             ggml_tensor * inpSA = inpL;
 
             ggml_tensor * cur;
@@ -644,8 +641,9 @@ namespace fastllama {
 
                 // store key and value to memory
                 if (N >= 1) {
-                    ggml_tensor * k = ggml_view_1d(ctx0, kv_self.k, N*n_embd, (ggml_element_size(kv_self.k)*n_embd)*(il*n_ctx + n_past));
-                    ggml_tensor * v = ggml_view_1d(ctx0, kv_self.v, N*n_embd, (ggml_element_size(kv_self.v)*n_embd)*(il*n_ctx + n_past));
+                    auto const ne0 = static_cast<std::int64_t>(N * static_cast<std::size_t>(n_embd));
+                    ggml_tensor * k = ggml_view_1d(ctx0, kv_self.k, ne0, (ggml_element_size(kv_self.k)*static_cast<std::size_t>(n_embd))*(il*static_cast<std::size_t>(n_ctx) + n_past));
+                    ggml_tensor * v = ggml_view_1d(ctx0, kv_self.v, ne0, (ggml_element_size(kv_self.v)*static_cast<std::size_t>(n_embd))*(il*static_cast<std::size_t>(n_ctx) + n_past));
 
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
@@ -657,8 +655,8 @@ namespace fastllama {
                             ggml_rope(ctx0,
                                 ggml_cpy(ctx0,
                                     Qcur,
-                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, N)),
-                                n_past, n_rot, 0),
+                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, static_cast<std::int64_t>(N))),
+                                static_cast<int>(n_past), n_rot, 0),
                             0, 2, 1, 3);
 
                 // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
@@ -666,9 +664,9 @@ namespace fastllama {
                     ggml_permute(ctx0,
                             ggml_rope(ctx0,
                                 ggml_reshape_3d(ctx0,
-                                    ggml_view_1d(ctx0, kv_self.k, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(kv_self.k)*n_embd),
-                                    n_embd/n_head, n_head, n_past + N),
-                                n_past, n_rot, 1),
+                                    ggml_view_1d(ctx0, kv_self.k, static_cast<std::int64_t>((n_past + N)*static_cast<std::size_t>(n_embd)), il*static_cast<std::size_t>(n_ctx)*ggml_element_size(kv_self.k)*static_cast<std::size_t>(n_embd)),
+                                    n_embd/n_head, n_head, static_cast<std::int64_t>(n_past + N)),
+                                static_cast<int>(n_past), n_rot, 1),
                             0, 2, 1, 3);
 
                 // K * Q
@@ -681,7 +679,7 @@ namespace fastllama {
                             ggml_new_f32(ctx0, 1.0f/sqrtf(float(n_embd)/n_head)));
 
                 // KQ_masked = mask_past(KQ_scaled)
-                ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, n_past);
+                ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, static_cast<int>(n_past));
 
                 // KQ = soft_max(KQ_masked)
                 ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
@@ -691,10 +689,10 @@ namespace fastllama {
                     ggml_cpy(ctx0,
                         ggml_permute(ctx0,
                                 ggml_reshape_3d(ctx0,
-                                    ggml_view_1d(ctx0, kv_self.v, (n_past + N)*n_embd, il*n_ctx*ggml_element_size(kv_self.v)*n_embd),
-                                    n_embd/n_head, n_head, n_past + N),
+                                    ggml_view_1d(ctx0, kv_self.v, static_cast<std::int64_t>((n_past + N)*static_cast<std::size_t>(n_embd)), il*static_cast<std::size_t>(n_ctx)*ggml_element_size(kv_self.v)*static_cast<std::size_t>(n_embd)),
+                                    n_embd/n_head, n_head, static_cast<std::int64_t>(n_past + N)),
                                 1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx0, kv_self.v->type, n_past + N, n_embd/n_head, n_head));
+                        ggml_new_tensor_3d(ctx0, kv_self.v->type, static_cast<std::int64_t>(n_past + N), n_embd/n_head, n_head));
 
                 // KQV = transpose(V) * KQ_soft_max
                 ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
@@ -705,7 +703,7 @@ namespace fastllama {
                 // cur = KQV_merged.contiguous().view(n_embd, N)
                 cur = ggml_cpy(ctx0,
                         KQV_merged,
-                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, N));
+                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, static_cast<std::int64_t>(N)));
 
                 // projection (no bias)
                 cur = ggml_mul_mat(ctx0,
@@ -756,7 +754,7 @@ namespace fastllama {
         use_buf(ctx0, 0);
 
         // used at the end to optionally extract the embeddings
-        ggml_tensor * embeddings = NULL;
+        [[maybe_unused]] ggml_tensor * embeddings = nullptr;
 
         // norm
         {
@@ -785,7 +783,7 @@ namespace fastllama {
 
         // return result for just the last token
         embd_w.resize(static_cast<std::size_t>(n_vocab));
-        memcpy(embd_w.data(), (float *) ggml_get_data(inpL) + (n_vocab*(N-1)), sizeof(float)*n_vocab);
+        memcpy(embd_w.data(), static_cast<float*>(ggml_get_data(inpL)) + (static_cast<std::size_t>(n_vocab)*(N-1)), sizeof(float)*static_cast<std::size_t>(n_vocab));
 
         if (mem_per_token == 0) {
             mem_per_token = ggml_used_mem(ctx0) / N;
@@ -908,23 +906,24 @@ namespace fastllama {
 
                 if (pipe.get_reader().eof()) break;
 
-                std::int32_t total_number_of_elements{1};
+                std::size_t total_number_of_elements{1};
                 std::int32_t extents[2] = { 1, 1 };
 
                 for(std::int32_t i {}; i < n_dims; ++i) {
                     pipe.get_reader().read(extents + i);
-                    total_number_of_elements *= extents[i];
+                    total_number_of_elements *= static_cast<std::size_t>(extents[i]);
                 }
                 
-                name.resize(length);
-                pipe.get_reader().read(name.data(), length);
+                auto const str_len = static_cast<std::size_t>(length);
+                name.resize(str_len);
+                pipe.get_reader().read(name.data(), str_len);
 
                 {
                     // ensure tensor data is aligned
                     auto maybe_offset = pipe.get_reader().tell();
                     if (!maybe_offset) return false;
                     auto offset = *maybe_offset;
-                    offset = (offset + 31) & -32;
+                    offset = (offset + static_cast<std::size_t>(31)) & static_cast<std::size_t>(-32);
                     pipe.get_reader().seek(offset);
                 }
 
@@ -952,7 +951,7 @@ namespace fastllama {
 
                         data_f32.resize(total_number_of_elements);
                         #pragma omp parallel for if (total_number_of_elements > 512)
-                        for (int i = 0; i < total_number_of_elements; ++i) {
+                        for (auto i = 0ul; i < total_number_of_elements; ++i) {
                             data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
                         }
                     } else {
@@ -970,18 +969,18 @@ namespace fastllama {
 
                 pipe.get_writer().write(&ftype);
 
-                for(auto i = 0ul; i < n_dims; ++i) {
+                for(auto i = 0ul; i < static_cast<std::size_t>(n_dims); ++i) {
                     pipe.get_writer().write(extents + i);
                 }
 
-                pipe.get_writer().write(name.data(), length);
+                pipe.get_writer().write(name.data(), str_len);
 
                 {
                     // ensure tensor data is aligned
                     auto maybe_offset = pipe.get_writer().tell();
                     if (!maybe_offset) return false;
                     auto offset = *maybe_offset;
-                    offset = (offset + 31) & -32;
+                    offset = (offset + static_cast<std::size_t>(31)) & static_cast<std::size_t>(-32);
                     pipe.get_writer().seek(offset);
                 }
 
@@ -995,11 +994,11 @@ namespace fastllama {
                     switch (type) {
                         case GGML_TYPE_Q4_0:
                             {
-                                cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), total_number_of_elements, extents[0], hist_cur.data());
+                                cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), static_cast<int>(total_number_of_elements), extents[0], hist_cur.data());
                             } break;
                         case GGML_TYPE_Q4_1:
                             {
-                                cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), total_number_of_elements, extents[0], hist_cur.data());
+                                cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), static_cast<int>(total_number_of_elements), extents[0], hist_cur.data());
                             } break;
                         default:
                             {
@@ -1013,12 +1012,10 @@ namespace fastllama {
                     total_size_new += cur_size;
 
                     printf("size = %8.2Lf MB -> %8.2Lf MB | hist: ", total_number_of_elements * sizeof(float)/1.0_MiB, cur_size/1.0_MiB);
-                    for (int i = 0; i < (int) hist_cur.size(); ++i) {
-                        hist_all[i] += hist_cur[i];
-                    }
+                    std::copy(hist_cur.begin(), hist_cur.end(), hist_all.begin());
 
-                    for (int i = 0; i < (int) hist_cur.size(); ++i) {
-                        printf("%5.3f ", hist_cur[i] / float(total_number_of_elements));
+                    for (auto i = 0ul; i < hist_cur.size(); ++i) {
+                        printf("%5.3f ", static_cast<double>(hist_cur[i]) / static_cast<double>(total_number_of_elements));
                     }
                     printf("\n");
 
@@ -1036,14 +1033,11 @@ namespace fastllama {
             printf("%s: quant size  = %8.2Lf MB\n", __func__, total_size_new / 1.0_MiB);
 
             {
-                int64_t sum_all = 0;
-                for (int i = 0; i < (int) hist_all.size(); ++i) {
-                    sum_all += hist_all[i];
-                }
+                double sum_all = std::accumulate(hist_all.begin(), hist_all.end(), double{}, std::plus<>{});
 
                 printf("%s: hist: ", __func__);
-                for (int i = 0; i < (int) hist_all.size(); ++i) {
-                    printf("%5.3f ", hist_all[i] / float(sum_all));
+                for (auto i = 0ul; i < hist_all.size(); ++i) {
+                    printf("%5.3f ", static_cast<double>(hist_all[i]) / sum_all);
                 }
                 printf("\n");
             }

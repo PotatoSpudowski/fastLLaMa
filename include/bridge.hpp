@@ -67,6 +67,8 @@ namespace fastllama {
 
         FastLlama() = default;
 
+        void set_seed(int seed) { m_rng = std::mt19937(static_cast<std::uint32_t>(seed)); m_seed = seed; }
+
     private:
         int n_past{};
         int m_seed{};

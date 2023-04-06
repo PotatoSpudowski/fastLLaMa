@@ -16,7 +16,7 @@ namespace fastllama {
                 }
         );
 
-        logits_id.resize(top_k);
+        logits_id.resize(static_cast<std::size_t>(top_k));
     }
 
     auto sample_top_p_top_k(
@@ -31,8 +31,8 @@ namespace fastllama {
     ) -> typename Vocab::id {
 
 
-        std::size_t n_logits = model.params.n_vocab;
-        auto const plogits = logits.end() - n_logits;
+        std::size_t n_logits = static_cast<std::size_t>(model.params.n_vocab);
+        auto const plogits = logits.end() - static_cast<std::ptrdiff_t>(n_logits);
 
         if (temp <= 0.) {
             auto max_el  = std::max_element(plogits, logits.end());
@@ -51,11 +51,11 @@ namespace fastllama {
             for (auto i = 0ul; i < n_logits; ++i) {
                 // repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
                 // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
-                auto const scaled_logits = plogits[i] * scale;
-                if (temp_toks.count(i) != 0) {
+                auto const scaled_logits = static_cast<double>(plogits[static_cast<std::ptrdiff_t>(i)]) * scale;
+                if (temp_toks.count(static_cast<int>(i)) != 0) {
                     // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
-                    auto const temp = scaled_logits * (plogits[i] < 0.0 ? repeat_penalty : inv_repeat_penalty);
-                    logits_id[i] = { temp, i }; 
+                    auto const temp_scaled_logits = scaled_logits * (plogits[static_cast<std::ptrdiff_t>(i)] < 0.0f ? repeat_penalty : inv_repeat_penalty);
+                    logits_id[i] = { temp_scaled_logits, i }; 
                 } else {
                     logits_id[i] = { scaled_logits, i };
                 }
@@ -74,20 +74,20 @@ namespace fastllama {
         auto const logits_id_size = logits_id.size();
         #pragma omp parallel for if(logits_id_size > 256)
         for (const auto & kv : logits_id) {
-            auto p = expf(kv.first - maxl);
+            auto p = static_cast<double>(expf(static_cast<float>(kv.first - maxl)));
             probs.push_back(p);
             sum += p;
         }
 
         // normalize the probs
-        auto const probs_size = probs.size();
+        auto probs_size = probs.size();
         #pragma omp parallel for if(probs_size > 256)
         for (auto i = 0ul; i < probs.size(); ++i) {
             probs[i] /= sum;
         }
 
-        if (top_p < 1.0f) {
-            double cumsum = 0.0f;
+        if (top_p < 1.0) {
+            double cumsum = 0.0;
             for (auto i = 0ul; i < probs.size(); i++) {
                 cumsum += probs[i];
                 if (cumsum >= top_p) {
@@ -98,9 +98,9 @@ namespace fastllama {
             }
 
             cumsum = 1.0 / cumsum;
-            auto const probs_size = probs.size();
+            probs_size = probs.size();
             #pragma omp parallel for if(probs_size > 256)
-            for (int i = 0ul; i < probs.size(); i++) {
+            for (auto i = 0ul; i < probs.size(); i++) {
                 probs[i] *= cumsum;
             }
         }
@@ -108,7 +108,7 @@ namespace fastllama {
         std::discrete_distribution<> dist(probs.begin(), probs.end());
         int idx = dist(rng);
 
-        return logits_id[idx].second;
+        return logits_id[static_cast<std::size_t>(idx)].second;
     }
 
     std::optional<FastLlama> FastLlama::Params::build(std::string_view model_id, std::string_view const& filepath) {
@@ -119,6 +119,7 @@ namespace fastllama {
         temp.m_keep = n_keep;
         temp.m_model.n_batch = n_batch;
         temp.m_model.logger = std::move(logger);
+        temp.set_seed(seed);
 
         if (!temp.m_model.load(model_id, filepath)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -173,7 +174,7 @@ namespace fastllama {
         n_past = m_keep;
         
         auto last_tokens_begin = m_last_n_tokens.begin() + m_model.params.n_ctx + (remaining >> 1) - len;
-        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.end() - m_embd.size());
+        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.end() - static_cast<std::ptrdiff_t>(m_embd.size()));
         return true;
     }
 
@@ -188,14 +189,14 @@ namespace fastllama {
         auto embd_input = tokenize(m_model.vocabulary, prompt, true);
         
         auto max_input_size = m_model.params.n_ctx - 4;
-        if (embd_input.size() > max_input_size) {
+        if (embd_input.size() > static_cast<std::size_t>(max_input_size)) {
             m_model.logger.log_err("ingest", "prompt size(='", embd_input.size(), "') exceeds maximum allowed size('", max_input_size, "')");
             return false;
         }
 
         auto const n_batch = m_model.n_batch;
 
-        for(auto i = 0ul; i < embd_input.size(); i += n_batch) {
+        for(auto i = 0ul; i < embd_input.size(); i += static_cast<std::size_t>(n_batch)) {
             auto block = std::min(static_cast<std::size_t>(n_batch), embd_input.size() - i);
 
             recycle_embed_if_exceeds_context();
@@ -203,7 +204,7 @@ namespace fastllama {
             // std::cout<<"E Size: " << m_embd.size()<<", Past: "<<n_past<<", Mem: "<<m_mem_per_token<<std::endl;
 
             if (!m_embd.empty()) {
-                if (!m_model.eval(n_past, m_embd, m_logits, m_mem_per_token)) {
+                if (!m_model.eval(static_cast<std::size_t>(n_past), m_embd, m_logits, m_mem_per_token)) {
                     return false;
                 }
             }
@@ -211,8 +212,8 @@ namespace fastllama {
             n_past += m_embd.size();
             m_embd.clear();
 
-            std::copy_n(embd_input.begin() + i, block, std::back_inserter(m_embd));
-            std::copy_n(embd_input.begin() + i, block, std::back_inserter(m_last_n_tokens));
+            std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_embd));
+            std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_last_n_tokens));
         }
 
         m_last_n_tokens.clear();
@@ -242,8 +243,8 @@ namespace fastllama {
             fn(std::forward<decltype(s)>(s));
         });
 
-        auto new_line_token = tokenize(m_model.vocabulary, "\n", false);
-        auto new_line_token_id = new_line_token.front();
+        // auto new_line_token = tokenize(m_model.vocabulary, "\n", false);
+        // auto new_line_token_id = new_line_token.front();
 
         for (auto i = 0ul; i < num_tokens; ++i) {
             auto const [is_stop_token_present, to_be_flush_substr] = token_buffer.are_tokens_present_in_buffer(stop_words);
@@ -256,7 +257,7 @@ namespace fastllama {
             recycle_embed_if_exceeds_context();
 
             if (!m_embd.empty()) {
-                if (!m_model.eval(n_past, m_embd, m_logits, m_mem_per_token)) {
+                if (!m_model.eval(static_cast<std::size_t>(n_past), m_embd, m_logits, m_mem_per_token)) {
                     return false;
                 }
             }
@@ -268,10 +269,10 @@ namespace fastllama {
                 m_model,
                 m_logits,
                 m_last_n_tokens,
-                repeat_penalty,
-                top_k,
-                top_p,
-                temp,
+                static_cast<double>(repeat_penalty),
+                static_cast<int   >(top_k),
+                static_cast<double>(top_p),
+                static_cast<double>(temp),
                 m_rng
             );
             if (token_id == FastLlama::EOS) break;

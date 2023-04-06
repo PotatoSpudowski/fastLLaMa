@@ -94,7 +94,7 @@ namespace fastllama {
 
             if (last_i + unicode_len > str_len) {
                 m_num_of_chars_in_unicode_buffer = str_len - last_i;
-                std::copy(in_out.begin() + last_i, in_out.end(), m_unicode_backlog_buffer);
+                std::copy(in_out.begin() + static_cast<std::ptrdiff_t>(last_i), in_out.end(), m_unicode_backlog_buffer);
                 in_out.resize(last_i);
             }
         }

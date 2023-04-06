@@ -68,7 +68,7 @@ namespace fastllama{
         }
 
         constexpr auto seek(std::size_t offset, SeekReference ref = SeekReference::Begin) noexcept -> bool {
-            return fseek(m_file_ptr, offset, static_cast<int>(ref)) == 0;
+            return fseek(m_file_ptr, static_cast<long>(offset), static_cast<int>(ref)) == 0;
         }
 
         constexpr auto eof() const noexcept -> bool {

@@ -8,6 +8,7 @@ int main() {
     auto maybe_bridge = fastllama::FastLlama::builder()
         .set_number_of_threads(16)
         .set_number_of_batches(64)
+        .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
         .build("LLAMA-7B", "./models/7B/ggml-model-q4_0.bin");
     
@@ -42,7 +43,7 @@ int main() {
             std::cout.flush();
         }, 300, 40, 0.95f, 0.8f, 1.0f, { "User: " });
         
-        std::cout<<"User: ";
+        std::cout<<"\nUser: ";
     }
     
     return 0;

@@ -41,14 +41,14 @@ namespace fastllama {
         auto read_and_write(T* val, std::size_t num_of_objects = 1, Fn&& fn = Fn{}) noexcept -> bool {
             if (!m_reader.read(val, num_of_objects)) return false;
             auto* new_val = fn(val);
-            return m_writer.write(val, num_of_objects);
+            return m_writer.write(new_val, num_of_objects);
         }
         
         template<typename Fn = detail::IdentityFn<void>>
         auto read_and_write(void* val, std::size_t type_size_in_bytes, std::size_t num_of_objects = 1, Fn&& fn = Fn{}) noexcept -> bool {
             if (!m_reader.read(val, type_size_in_bytes, num_of_objects)) return false;
             auto* new_val = fn(val);
-            return m_writer.write(val, type_size_in_bytes, num_of_objects);
+            return m_writer.write(new_val, type_size_in_bytes, num_of_objects);
         }
 
         constexpr auto& get_reader() const noexcept { return m_reader; }
