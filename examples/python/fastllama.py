@@ -27,7 +27,7 @@ class Model:
         n_ctx: int = 512, # Size of the memory context to use
         last_n_size: int = 64, # Number of token that the model can remember
         seed: int = 0, # Random number seed to be used in model
-        tokens_to_keep: int = 48, # Number of tokens to keep when tokens are removed from buffer to save memory
+        tokens_to_keep: int = 200, # Number of tokens to keep when tokens are removed from buffer to save memory
         n_batch: int = 16, # Size of the token batch that will be processed at a given time
         logger: Optional[Logger] = None, # Logger to be used for reporting messages
         ):
@@ -59,8 +59,8 @@ class Model:
                 log_reset=logger.reset
             )
 
-    def ingest(self, prompt: str) -> bool:
-        return self.inner.ingest(prompt)
+    def ingest(self, prompt: str, is_system_prompt: bool = False) -> bool:
+        return self.inner.ingest(prompt, is_system_prompt)
     
     def generate(
             self,

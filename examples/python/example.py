@@ -26,7 +26,7 @@ Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.
 User: """
 
 print("\nIngesting model with prompt...")
-res = model.ingest(prompt) #ingest model with prompt
+res = model.ingest(prompt, is_system_prompt=True) #ingest model with prompt
 
 if res != True:
     print("\nFailed to ingest model")

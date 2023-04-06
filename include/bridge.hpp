@@ -45,7 +45,7 @@ namespace fastllama {
         FastLlama& operator=(FastLlama &&) noexcept = default;
         ~FastLlama() { m_model.unload(); }
 
-        bool ingest(std::string prompt);
+        bool ingest(std::string prompt, bool is_system_prompt = false);
         bool generate(
             std::function<void(std::string const&)> fn,
             std::size_t num_tokens,
@@ -82,6 +82,7 @@ namespace fastllama {
         std::vector<token_id_t> m_embd;
         RingBuffer<token_id_t> m_last_n_tokens{64};
         std::vector<float> m_logits;
+        std::vector<token_id_t> m_system_prompt;
     };
 
 } // namespace fastllama

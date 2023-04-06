@@ -140,11 +140,13 @@ namespace fastllama {
         if (len + n_past <= m_model.params.n_ctx) return false;
 
         auto const remaining = n_past - m_keep;
+        if (remaining <= 0) return false;
 
         n_past = m_keep;
-        
+        auto const system_prompt_size = static_cast<std::ptrdiff_t>(m_system_prompt.size());
         auto last_tokens_begin = m_last_n_tokens.begin() + m_model.params.n_ctx + (remaining >> 1) - len;
-        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.end() - static_cast<std::ptrdiff_t>(m_embd.size()));
+        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.end() - len - system_prompt_size);
+        m_embd.insert(m_embd.begin(), m_system_prompt.begin(), m_system_prompt.end());
         return true;
     }
 
@@ -152,12 +154,13 @@ namespace fastllama {
         return m_model.dump_vocab(filepath);
     }
 
-    bool FastLlama::ingest(std::string prompt) {
+    bool FastLlama::ingest(std::string prompt, bool is_system_prompt) {
         m_model.logger.reset();
         if (!m_model.is_valid) {
             m_model.logger.log_err("FastLlama::ingest", "tried to ingest using invalid model");
             return false;
         }
+
         prompt.insert(0, 1, ' ');
 
         auto embd_input = tokenize(m_model.vocabulary, prompt, true);
@@ -166,6 +169,14 @@ namespace fastllama {
         if (embd_input.size() > static_cast<std::size_t>(max_input_size)) {
             m_model.logger.log_err("ingest", "prompt size(='", embd_input.size(), "') exceeds maximum allowed size('", max_input_size, "')");
             return false;
+        }
+        
+        if (is_system_prompt) {
+            if (m_keep < static_cast<int>(embd_input.size())) {
+                m_model.logger.log_err("ingest", "system prompt size(='", embd_input.size(), "') exceeds 'n_keep'(='", m_keep, "')");
+                return false;
+            }
+            m_system_prompt = embd_input;
         }
 
         auto const n_batch = m_model.n_batch;

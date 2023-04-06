@@ -106,9 +106,9 @@ PYBIND11_MODULE(fastLlama, m) {
             py::arg("log_err") = make_def_err_logger_func(),
             py::arg("log_warn") = make_def_warn_logger_func(),
             py::arg("log_reset") = make_def_reset_logger_func()
-        ).def("ingest", [](PyFastLlama& self, std::string prompt) {
-            return self.inner.ingest(std::move(prompt));
-        }, py::arg("prompt"))
+        ).def("ingest", [](PyFastLlama& self, std::string prompt, bool is_system_prompt = false) {
+            return self.inner.ingest(std::move(prompt), is_system_prompt);
+        }, py::arg("prompt"), py::arg("is_system_prompt") = false)
         .def("generate", [](
             PyFastLlama& self,
             std::function<void(std::string const&)> fn,
