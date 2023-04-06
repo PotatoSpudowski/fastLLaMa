@@ -32,7 +32,7 @@ namespace fastllama {
         reader.read(&params.f16);
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size, bool has_padding = false) {
+    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size, bool has_padding, bool is_old_model) {
         vocab.id_to_token.resize(size);
         std::string word(64, ' ');
 
@@ -45,7 +45,7 @@ namespace fastllama {
             reader.read(word.data(), len);
 
             float score{};
-            reader.read(&score);
+            if (!is_old_model) reader.read(&score);
             vocab.set_word(static_cast<typename Vocab::id>(i), word, score);
         }
 
@@ -121,7 +121,7 @@ namespace fastllama {
         }
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger) -> bool {
+    FASTLLAMA_ALWAYS_INLINE static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger, bool is_old_model) -> bool {
         std::size_t number_of_tensors{};
         std::size_t total_size {};
         std::string name(64, ' ');
@@ -157,7 +157,7 @@ namespace fastllama {
                 return false;
             }
 
-            {
+            if (!is_old_model) {
                 // ensure tensor data is aligned
                 auto maybe_offset = reader.tell();
                 if (!maybe_offset) return false;
@@ -296,7 +296,7 @@ namespace fastllama {
         return true;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::vector<char>& file_buffer, std::string_view filepath, Model& model, std::size_t offset, Logger& logger) -> bool {
+    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::vector<char>& file_buffer, std::string_view filepath, Model& model, std::size_t offset, Logger& logger, bool is_old_model) -> bool {
         std::size_t n_parts{ model.model_id.config.number_of_parts };
         
         auto total_size = filepath.size();
@@ -326,13 +326,19 @@ namespace fastllama {
                 return false;
             }
 
-            load_model_weights(reader, model, part_id, n_parts, logger);
+            load_model_weights(reader, model, part_id, n_parts, logger, is_old_model);
         }
 
         return true;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto read_header(std::string_view filepath, Model& model, BinaryFileReader& reader, Logger& logger) -> std::optional<std::size_t> {
+    FASTLLAMA_ALWAYS_INLINE static auto read_header(
+        std::string_view filepath,
+        Model& model,
+        BinaryFileReader& reader,
+        Logger& logger,
+        bool is_old_model
+    ) -> std::optional<std::size_t> {
         using namespace ::fastllama::literals;
 
         if (!verify_magic_number(reader)) {
@@ -341,7 +347,7 @@ namespace fastllama {
         }
 
         std::uint32_t format_version{};
-        if (!verify_file_version(reader, &format_version)) {
+        if (!is_old_model && !verify_file_version(reader, &format_version)) {
             logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ", file_version_v, "\n");
             return std::nullopt;
         }
@@ -365,7 +371,7 @@ namespace fastllama {
             logger.log("Model", "n_parts = ", model.model_id.config.number_of_parts, '\n');
         }
 
-        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab), model.model_id.config.has_vocab_padding);
+        load_vocab(reader, model.vocabulary, static_cast<std::size_t>(model.params.n_vocab), model.model_id.config.has_vocab_padding, is_old_model);
         // for the big tensors, we have the option to store the data in 16-bit floats or quantized
         // in order to save memory and also to speed up the computation
         // wtype is for per-layer weights, while vtype is for other weights
@@ -532,7 +538,7 @@ namespace fastllama {
         return true;
     }
 
-    bool Model::load(std::string_view model_name, std::string_view filepath) {
+    bool Model::load(std::string_view model_name, std::string_view filepath, bool is_old_model) {
         using namespace ::fastllama::literals;
 
         logger.log("Model", "loading model from ", filepath, " - please wait ...\n");
@@ -570,14 +576,14 @@ namespace fastllama {
         std::vector<char> file_buffer((1 << 20));
         reader.set_buffer(file_buffer.data(), file_buffer.size());
 
-        auto maybe_offset = read_header(filepath, *this, reader, logger);
+        auto maybe_offset = read_header(filepath, *this, reader, logger, is_old_model);
         
         if (!maybe_offset.has_value()) return false;
         auto offset = maybe_offset.value();
 
         reader.close();
 
-        if (!parse_tensor_data(file_buffer, filepath, *this, offset, logger)) return false;
+        if (!parse_tensor_data(file_buffer, filepath, *this, offset, logger, is_old_model)) return false;
 
         this->is_valid = true;
         return true;

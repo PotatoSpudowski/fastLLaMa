@@ -121,7 +121,7 @@ namespace fastllama {
         temp.m_model.logger = std::move(logger);
         temp.set_seed(seed);
 
-        if (!temp.m_model.load(model_id, filepath)) {
+        if (!temp.m_model.load(model_id, filepath, is_old_model)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
             return std::nullopt;
         }
@@ -132,36 +132,6 @@ namespace fastllama {
         }
         return { std::move(temp) };
     }
-    
-    // FastLlama::FastLlama(std::string_view model_id, std::string_view const& filepath, int n_threads, int n_ctx, std::size_t last_n_size, int seed, int keep)
-    //     : m_seed(seed)
-    //     , m_keep(keep)
-    //     , m_last_n_tokens(last_n_size)
-    // {
-    //     m_model.params.n_ctx = n_ctx;
-    //     m_model.set_threads(n_threads);
-
-    //     if (!m_model.load(model_id, filepath)) {
-    //         throw std::runtime_error("Unable to load model");
-    //     }
-
-    //     if (!m_model.eval(0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)) {
-    //         throw std::runtime_error("Unable to evaluate model");
-    //     }
-    // }
-
-    // FastLlama::FastLlama(Model model, int n_threads, std::size_t last_n_size, int seed, int keep)
-    //     : m_seed(seed)
-    //     , m_keep(keep)
-    //     , m_model(std::move(model))
-    //     , m_last_n_tokens(last_n_size)
-    // {
-    //     m_model.set_threads(n_threads);
-
-    //     if (!m_model.eval(0, { 0, 1, 2, 3 }, m_logits, m_mem_per_token)) {
-    //         throw std::runtime_error("Unable to evaluate model");
-    //     }
-    // }
 
     auto FastLlama::recycle_embed_if_exceeds_context() -> bool {
         auto const len = static_cast<int>(m_embd.size());
@@ -184,6 +154,10 @@ namespace fastllama {
 
     bool FastLlama::ingest(std::string prompt) {
         m_model.logger.reset();
+        if (!m_model.is_valid) {
+            m_model.logger.log_err("FastLlama::ingest", "tried to ingest using invalid model");
+            return false;
+        }
         prompt.insert(0, 1, ' ');
 
         auto embd_input = tokenize(m_model.vocabulary, prompt, true);
@@ -230,6 +204,10 @@ namespace fastllama {
         std::vector<std::string> const& stop_words
     ) {
         m_model.logger.reset();
+        if (!m_model.is_valid) {
+            m_model.logger.log_err("FastLlama::generate", "tried to generate using invalid model");
+            return false;
+        }
         auto const max_token_buffer_size = std::accumulate(
             stop_words.begin(),
             stop_words.end(),

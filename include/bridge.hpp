@@ -22,6 +22,7 @@ namespace fastllama {
             int n_ctx{512};
             int n_threads{1};
             int n_batch{16};
+            bool is_old_model{false};
             std::size_t last_n_tokens{64};
             Logger logger{};
 
@@ -30,6 +31,7 @@ namespace fastllama {
             constexpr Params& set_number_of_contexts(int ctx) noexcept { this->n_ctx = ctx; return *this; }
             constexpr Params& set_number_of_threads(int threads) noexcept { this->n_threads = threads; return *this; }
             constexpr Params& set_number_of_batches(int batches) noexcept { this->n_batch = batches; return *this; }
+            constexpr Params& set_is_old_model(bool flag) noexcept { this->is_old_model = flag; return *this; }
             Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view model_id, std::string_view const& filepath);

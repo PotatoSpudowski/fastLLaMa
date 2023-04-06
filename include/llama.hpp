@@ -73,13 +73,13 @@ namespace fastllama {
         static constexpr bool use_scratch_buffer = false;
     #endif
 
-        bool load(std::string_view model_name, std::string_view filepath);
+        bool load(std::string_view model_name, std::string_view filepath, bool disable_version_check = false);
         auto unload() -> void;
         auto eval(
-            std::size_t n_past,
-            std::vector<vocab_id> const& embd_inp,
-            std::vector<float>& embd_w,
-            std::size_t& mem_per_token
+            std::size_t                     n_past,
+            std::vector<vocab_id> const&    embd_inp,
+            std::vector<float>&             embd_w,
+            std::size_t&                    mem_per_token
         ) -> bool;
 
         auto set_threads(int in_threads) noexcept {
