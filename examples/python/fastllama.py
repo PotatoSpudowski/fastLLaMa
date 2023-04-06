@@ -1,4 +1,5 @@
 import sys
+import multiprocessing
 from typing import Callable, List, Optional
 
 sys.path.append("./build/interfaces/python")
@@ -23,7 +24,7 @@ class Model:
         self,
         id: str, # Model Id. See the readme for support models and get the id
         path: str, # File path to the model
-        num_threads: int = 4, # Number of threads to use during evaluation of model
+        num_threads: int = multiprocessing.cpu_count(), # Number of threads to use during evaluation of model
         n_ctx: int = 512, # Size of the memory context to use
         last_n_size: int = 64, # Number of token that the model can remember
         seed: int = 0, # Random number seed to be used in model
@@ -31,7 +32,6 @@ class Model:
         n_batch: int = 16, # Size of the token batch that will be processed at a given time
         logger: Optional[Logger] = None, # Logger to be used for reporting messages
         ):
-
         if logger is None:
             self.inner = fastLlama.Model(
                 id,
