@@ -30,7 +30,7 @@ set_compiler_lib_and_flags(ggml_library)
 add_library(fast_llama_lib ${CMAKE_CURRENT_SOURCE_DIR}/lib/llama.cpp ${CMAKE_CURRENT_SOURCE_DIR}/lib/bridge.cpp)
 
 target_link_libraries(fast_llama_lib PRIVATE ggml_library)
-set_project_warnings(fast_llama_lib)
+# set_project_warnings(fast_llama_lib)
 set_compiler_lib_and_flags(fast_llama_lib)
 
 target_link_libraries(fast_llama_lib PRIVATE ${OPENMP_LIB})
