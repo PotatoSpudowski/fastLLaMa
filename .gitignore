@@ -28,3 +28,4 @@ cmake/CompilerFlagVariables.cmake
 cmake/GlobalVars.cmake
 
 __pycache__/
+build/

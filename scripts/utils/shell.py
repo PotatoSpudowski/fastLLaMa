@@ -3,6 +3,7 @@ import subprocess
 import sys
 from typing import List, Optional, Tuple, Union
 import inquirer
+from scripts.utils.paths import get_file_name_to_file_path_mapping
 from scripts.utils.python_version import get_python_exec_paths
 
 def run_shell(commands: List[Union[List[str], str]]) -> None:
@@ -53,3 +54,9 @@ def get_python_info(info_script_path: str) -> Optional[PythonInfo]:
     else:
         print(f"Error occurred while getting python information: code(='{result.returncode}'), ", result.stderr, file=sys.stderr)
         return None
+
+def select_language(search_dir: str) -> Tuple[str, str]:
+    all_langs = get_file_name_to_file_path_mapping(search_dir)
+    maybe_lang = choose_option("lang", "Select language to compile", [x.capitalize() for x in all_langs.keys()])
+    lang = maybe_lang.lower() if maybe_lang is not None else 'c'
+    return (lang, all_langs[lang])

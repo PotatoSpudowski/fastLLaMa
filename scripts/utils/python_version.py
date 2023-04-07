@@ -63,7 +63,7 @@ def pick_shortest_path(python_paths: List[str]) -> str:
             min_len = len(p)
             path = p
 
-    return p
+    return path
 
 def get_python_bin_from_paths(search_dirs: List[str]) -> List[str]:
     link_map: Mapping[str, List[str]] = {}

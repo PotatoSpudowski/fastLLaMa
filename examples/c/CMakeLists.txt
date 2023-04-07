@@ -1,4 +1,36 @@
-include_directories(${CMAKE_SOURCE_DIR}/interfaces/c)
+cmake_minimum_required(VERSION 3.20)
+project(fastLlama)
+
+set(GLOBAL_VARS_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/GlobalVars.cmake")
+
+if(EXISTS ${GLOBAL_VARS_FILE_PATH})
+  message(STATUS "Found '${GLOBAL_VARS_FILE_PATH}' for 'C'")
+  include(${GLOBAL_VARS_FILE_PATH})
+
+  include_directories(${PYTHON_INCLUDE_DIRS})
+  link_libraries(${PYTHON_LIBRARIES})
+else()
+  message(STATUS "Unable to find '${GLOBAL_VARS_FILE_PATH}' for 'C'")
+endif(EXISTS ${GLOBAL_VARS_FILE_PATH})
+
+include(${WORKSPACE}/cmake/OpenMP.cmake)
+include_directories(${WORKSPACE}/interfaces/c)
+link_directories(${WORKSPACE}/build/interfaces/c)
+link_directories(${WORKSPACE}/build)
+include(${WORKSPACE}/cmake/OpenBLAS.cmake)
 
 add_executable(example example.c)
 target_link_libraries(example PRIVATE cfastllama)
+target_link_libraries(example PRIVATE fast_llama_lib)
+target_link_libraries(example PRIVATE ggml_library)
+target_link_libraries(example PRIVATE stdc++)
+target_link_libraries(example PRIVATE ${OPENMP_LIB_C})
+
+if(DEFINED LLAMA_NO_ACCELERATE OR DEFINED LLAMA_OPENBLAS)
+    set_open_blas(example)
+else()
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_compile_definitions(example PRIVATE "GGML_USE_ACCELERATE")
+        target_link_libraries(example PRIVATE "-framework Accelerate")
+    endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+endif(DEFINED LLAMA_NO_ACCELERATE OR DEFINED LLAMA_OPENBLAS)
