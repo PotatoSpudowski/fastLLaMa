@@ -51,8 +51,8 @@ def set_global_cmake_variables(args: argparse.Namespace) -> None:
     g_selected_language = ('c', def_lang_path)
     if args.gui:
         g_selected_language = select_language(ALL_LANGUAGES_IN_INTERFACES_PATH)
-        if g_selected_language[0] == 'python':
-            set_python_version(cmake_global_vars)
+        # if g_selected_language[0] == 'python':
+        #     set_python_version(cmake_global_vars)
     elif args.language:
         g_selected_language = (args.language, ALL_LANGUAGES_IN_INTERFACES[args.language])
     
@@ -275,5 +275,4 @@ def main() -> None:
     build_example()
 
 if __name__ == "__main__":
-
     main()
