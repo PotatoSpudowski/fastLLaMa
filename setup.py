@@ -270,8 +270,8 @@ def build_example() -> None:
 def main() -> None:
     if not parse_args():
         return
-    # generate_compiler_flags()
-    # run_make()
+    generate_compiler_flags()
+    run_make()
     build_example()
 
 if __name__ == "__main__":
