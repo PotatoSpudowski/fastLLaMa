@@ -250,7 +250,7 @@ def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> 
 
 def set_cross_compile_target_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> None:
     cc_target = args.cc_target
-    
+
     if cc_target == 'android':
         set_cc_android_flags(cmake_vars, args)
     # if cc_target == 'android':
@@ -364,8 +364,8 @@ def main() -> None:
     if not parse_args():
         return
     generate_compiler_flags()
-    # run_make()
-    # build_example()
+    run_make()
+    build_example()
 
 if __name__ == "__main__":
     main()
