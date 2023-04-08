@@ -1,4 +1,4 @@
-from typing import List, Mapping
+from typing import List, MutableMapping
 import os
 import re
 
@@ -66,7 +66,7 @@ def pick_shortest_path(python_paths: List[str]) -> str:
     return path
 
 def get_python_bin_from_paths(search_dirs: List[str]) -> List[str]:
-    link_map: Mapping[str, List[str]] = {}
+    link_map: MutableMapping[str, List[str]] = {}
     for search_dir in search_dirs:
         paths = find_python_binaries_in_dir(search_dir)
         for path in paths:

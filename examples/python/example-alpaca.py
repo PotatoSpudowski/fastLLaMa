@@ -1,4 +1,4 @@
-import fastllama
+from build.fastllama import Model, ModelKind
 
 MODEL_PATH = "./models/ALPACA-LORA-30B/alpaca-lora-q4_0.bin"
 
@@ -8,8 +8,8 @@ def stream_token(x: str) -> None:
     """
     print(x, end='', flush=True)
 
-model = fastllama.Model(
-        id=fastllama.ModelKind.ALPACA_LORA_30B,
+model = Model(
+        id=ModelKind.ALPACA_LORA_30B,
         path=MODEL_PATH, #path to model
         num_threads=16, #number of threads to use
         n_ctx=512, #context size of model

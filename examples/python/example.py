@@ -1,4 +1,8 @@
-import fastllama
+import sys
+
+sys.path.append("./interfaces/python")
+
+from build.fastllama import Model, ModelKind
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
@@ -8,8 +12,8 @@ def stream_token(x: str) -> None:
     """
     print(x, end='', flush=True)
 
-model = fastllama.Model(
-        id=fastllama.ModelKind.LLAMA_7B,
+model = Model(
+        id=ModelKind.LLAMA_7B,
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model

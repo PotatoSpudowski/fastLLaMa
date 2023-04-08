@@ -10,12 +10,12 @@ import argparse
 
 cmake_variable_type = str
 
-CMAKE_FEATURE_FILE_PATH = "./cmake/CompilerFlagVariables.cmake"
+CMAKE_FEATURE_FILE_PATH = os.path.join('.', "cmake","CompilerFlagVariables.cmake")
 
-ALL_LANGUAGES_IN_INTERFACES_PATH = './interfaces'
+ALL_LANGUAGES_IN_INTERFACES_PATH = os.path.join('.', 'interfaces')
 ALL_LANGUAGES_IN_INTERFACES = get_file_name_to_file_path_mapping(ALL_LANGUAGES_IN_INTERFACES_PATH)
 
-g_selected_language: Tuple[str, str] = ('c', f'{ALL_LANGUAGES_IN_INTERFACES_PATH}/c')
+g_selected_language: Tuple[str, str] = ('c', os.path.join('.', ALL_LANGUAGES_IN_INTERFACES_PATH, 'c'))
 
 def save_cmake_vars_helper(filepath: str, var_map: Mapping[str, Union[List[str], bool, str]]) -> None:
     with open(filepath, "w") as f:
@@ -31,15 +31,28 @@ def save_cmake_vars_helper(filepath: str, var_map: Mapping[str, Union[List[str],
 def save_cmake_vars(var_map: Mapping[str, Union[List[str], bool]]) -> None:
     save_cmake_vars_helper(CMAKE_FEATURE_FILE_PATH, var_map)
 
+def set_python_version(cmake_global_vars: MutableMapping[str, Union[List[str], bool, str]]) -> None:
+    python_info = get_python_info(os.path.join(',', 'scripts', 'utils', 'python_info.py'))
+
+    if python_info is not None:
+        cmake_global_vars['PYTHON_EXECUTABLE'] = [python_info.binary_path]
+        cmake_global_vars['PYTHON_INCLUDE_DIR'] = [python_info.include_path]
+        cmake_global_vars['PYTHON_LIBRARY'] = [python_info.library_path]
+        print(f"Set python to '{python_info.binary_path}'")
+    else:
+        print("Auto detecting python version")
+
 def set_global_cmake_variables(args: argparse.Namespace) -> None:
     global g_selected_language
-    # python_info = get_python_info('./scripts/utils/python_info.py')
+
     cmake_global_vars: MutableMapping[str, Union[List[str], bool, str]] = {}
-    # print(ALL_LANGUAGES_IN_INTERFACES)
+
     def_lang_path = ALL_LANGUAGES_IN_INTERFACES['c']
     g_selected_language = ('c', def_lang_path)
     if args.gui:
         g_selected_language = select_language(ALL_LANGUAGES_IN_INTERFACES_PATH)
+        if g_selected_language[0] == 'python':
+            set_python_version(cmake_global_vars)
     elif args.language:
         g_selected_language = (args.language, ALL_LANGUAGES_IN_INTERFACES[args.language])
     
@@ -47,16 +60,7 @@ def set_global_cmake_variables(args: argparse.Namespace) -> None:
     cmake_global_vars[f'INTERFACES_{g_selected_language[0]}'] = True
     cmake_global_vars['WORKSPACE'] = os.getcwd()
 
-    # if python_info is not None:
-    #     cmake_global_vars['PYBIND11_PYTHON_VERSION'] = ['3.11']
-    #     cmake_global_vars['PYTHON_EXECUTABLE'] = [python_info.binary_path]
-    #     cmake_global_vars['PYTHON_INCLUDE_DIR'] = [python_info.include_path]
-    #     cmake_global_vars['PYTHON_LIBRARY'] = [python_info.library_path]
-    #     print(f"Set python to '{python_info.binary_path}'")
-    # else:
-    #     print("Auto detecting python version")
-
-    save_cmake_vars_helper('./cmake/GlobalVars.cmake', cmake_global_vars)
+    save_cmake_vars_helper(os.path.join('.', 'cmake', 'GlobalVars.cmake'), cmake_global_vars)
 
 def run_make(build_dir: str = "build") -> None:
     # Change the current working directory to the build directory
@@ -197,18 +201,18 @@ def generate_compiler_flags() -> None:
     save_cmake_vars(cmake_vars)
 
 def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
-    example_paths = [f'./examples/{l}' for l in ALL_LANGUAGES_IN_INTERFACES.keys()]
+    example_paths = [os.path.join('.', 'examples', l) for l in ALL_LANGUAGES_IN_INTERFACES.keys()]
     current_path = os.getcwd()
     for path in example_paths:
-        build_path = f'{path}/build'
+        build_path = os.path.join(path, 'build')
         if os.path.exists(build_path):
             os.chdir(build_path)
             try:
                 run_shell(cmd)
             finally:
                 os.chdir(current_path)
-    if os.path.exists('./build'):
-        os.chdir('./build')
+    if os.path.exists(os.path.join('.', 'build')):
+        os.chdir(os.path.join('.', 'build'))
         try:
             run_shell(cmd)
         finally:
@@ -220,10 +224,10 @@ def parse_args() -> bool:
         prog="Fastllama",
         description="Fastllama tries to provide llama wrapper interfaces for all popular languages."
     )
-    parser.add_argument('-l', '--language', choices=ALL_LANGUAGES_IN_INTERFACES.keys(), default='c')
-    parser.add_argument('-g', '--gui', action='store_true')
-    parser.add_argument('-clean', action='store_true')
-    parser.add_argument('-make', action='store_true')
+    parser.add_argument('-l', '--language', choices=ALL_LANGUAGES_IN_INTERFACES.keys(), default='c', help="Select a project language. Default is 'c'")
+    parser.add_argument('-g', '--gui', action='store_true', help="Select a project language using GUI.")
+    parser.add_argument('-c', '--clean', action='store_true', help="This command is equivalent to 'make clean'")
+    parser.add_argument('-m', '--make', action='store_true' , help="This command is equivalent to 'make'. This avoids complete rebuild process.")
 
     args = parser.parse_args(sys.argv[1:])
     if args.clean:
@@ -232,16 +236,17 @@ def parse_args() -> bool:
     if args.make:
         run_cmd_on_build_dirs(['make'])
         return False
+    
     set_global_cmake_variables(args)
     return True
 
 def build_example() -> None:
     global g_selected_language
-    example_path = f'./examples/{g_selected_language[0]}'
+    example_path = os.path.join('.', 'examples', g_selected_language[0])
     if not os.path.exists(example_path):
         return
     
-    if os.path.exists(f'{example_path}/CMakeLists.txt'):
+    if os.path.exists(os.path.join(example_path, 'CMakeLists.txt')):
         print('\n\nBuilding Examples....\n')
         current_dir = os.getcwd()
         os.chdir(example_path)
@@ -250,12 +255,23 @@ def build_example() -> None:
         finally:
             os.chdir(current_dir)
             print('\nBuilding examples completed\n')
+    if g_selected_language[0] == 'python':
+        module_path = os.path.join('.', 'interfaces', 'python', 'fastllama.py')
+        lib_path = os.path.join(example_path, 'build', 'fastllama.py')
+        if not os.path.exists(os.path.join(example_path, 'build')):
+            os.mkdir(os.path.join(example_path, 'build'))
+        if os.path.exists(lib_path):
+            return
+        # with open(os.path.join('.', 'interfaces', 'python', 'lib_path.py'), 'wt') as f:
+        #     f.write(f'WORKSPACE={os.getcwd()}')
+        os.chmod(module_path, 0o700)
+        os.symlink(os.path.abspath(module_path), os.path.abspath(lib_path))
 
 def main() -> None:
     if not parse_args():
         return
-    generate_compiler_flags()
-    run_make()
+    # generate_compiler_flags()
+    # run_make()
     build_example()
 
 if __name__ == "__main__":

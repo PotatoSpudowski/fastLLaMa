@@ -34,7 +34,9 @@ class PythonInfo:
     library_path: str
 
 def get_python_info(info_script_path: str) -> Optional[PythonInfo]:
+    print('', flush=True, end='')
     python_paths = get_python_exec_paths()
+    python_paths.sort()
 
     python_version = choose_option('python_version', 'Select a python version', python_paths)
     if python_version is None:
@@ -47,7 +49,7 @@ def get_python_info(info_script_path: str) -> Optional[PythonInfo]:
     result = subprocess.run([f'{python_version} {info_script_path}'], shell=True, text=True, capture_output=True)
     if result.returncode == 0:
         output = list(filter(lambda x: len(x.strip()) != 0, result.stdout.split(';')))
-        if len(output) != 2:
+        if len(output) != 3:
             print(f"Error occurred while getting python information. Needed both include and library path, but got one of it", file=sys.stderr)
             return None
         return PythonInfo(binary_path=python_version, library_path=output[0], include_path=output[1])
