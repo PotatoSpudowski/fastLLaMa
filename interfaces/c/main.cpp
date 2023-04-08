@@ -208,6 +208,11 @@ extern "C" {
         delete ctx;
     }
 
+    void llama_handle_signal(int) {
+        printf("Quitting the app...");
+        exit(0);
+    }
+
 #ifdef __cplusplus
 }
 #endif

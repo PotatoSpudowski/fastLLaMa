@@ -3,6 +3,7 @@ import ctypes
 from enum import Enum
 import multiprocessing
 from typing import Any, Callable, List, Optional, Type, Union, cast
+import signal
 
 LIBRARY_NAME='pyfastllama.so'
 
@@ -71,8 +72,14 @@ class Model:
         logger: Optional[Logger] = None, # Logger to be used for reporting messages
         library_path = get_library_path('build', 'interfaces','python')
         ):
-        print(os.getcwd(), library_path)
+
         self.lib = ctypes.cdll.LoadLibrary(library_path)
+
+        signal_handler_fn = self.lib.llama_handle_signal
+
+        signal_handler_fn.argtypes = [ctypes.c_int]
+
+        signal.signal(signal.SIGINT, lambda sig_num, _frame: signal_handler_fn(sig_num))
 
         normalized_id: str = cast(str, id.value if type(id) == ModelKind else id)
         ctx_args = self.__get_default_ctx_args__()
@@ -164,6 +171,7 @@ class Model:
         ))
     
     def __del__(self):
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
         lib = self.lib
         ctx = self.ctx
         free_fn = lib.llama_free_context
