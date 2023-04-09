@@ -45,6 +45,12 @@ namespace fastllama {
         std::int32_t f16     { 1 };
     };
 
+    // struct Perplexity {
+    //     std::size_t start;
+    //     std::size_t end;
+    //     double perplexity;
+    // };
+
     struct KVCacheBuffer {
 
         bool init(HyperParams const& params, Logger const& logger = Logger{});
@@ -126,6 +132,7 @@ namespace fastllama {
         ggml_tensor * output;
 
         std::vector<Layer> layers;
+        std::vector<float> embeddings;
 
         ggml_context * ctx;
         std::vector<unsigned char> buffer;
@@ -141,6 +148,8 @@ namespace fastllama {
         std::unordered_map<std::string, ggml_tensor*> tensors;
 
         bool is_valid{false};
+        bool embeddings_eval_enable{false};
+        bool should_put_all_logits{false};
         int threads{ static_cast<int>(std::thread::hardware_concurrency()) };
         int n_batch{64};
     };

@@ -3,6 +3,7 @@
 #include "token_buffer.hpp"
 #include <unordered_set>
 #include <numeric>
+#include <chrono>
 
 namespace fastllama {
 
@@ -120,6 +121,8 @@ namespace fastllama {
         temp.m_model.n_batch = n_batch;
         temp.m_model.logger = std::move(logger);
         temp.set_seed(seed);
+        temp.m_model.embeddings_eval_enable = embedding_eval_enabled;
+        temp.m_model.should_put_all_logits = should_get_all_logits;
 
         if (!temp.m_model.load(model_id, filepath, is_old_model)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -130,7 +133,22 @@ namespace fastllama {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to evaluate model\n");
             return std::nullopt;
         }
+
+        auto const logits_size = static_cast<std::size_t>(n_ctx * (should_get_all_logits ? temp.m_model.params.n_vocab : 1));
+        temp.m_logits.reserve(logits_size);
+
+        if (embedding_eval_enabled) {
+            temp.m_model.embeddings.reserve( static_cast<std::size_t>(temp.m_model.params.n_embd) );
+        }
         return { std::move(temp) };
+    }
+
+    std::vector<float> const& FastLlama::get_embeddings() const noexcept {
+        return m_model.embeddings;
+    }
+
+    std::vector<float> const& FastLlama::get_logits() const noexcept {
+        return m_logits;
     }
 
     std::optional<FastLlama> FastLlama::Params::build(ModelKind model_id, std::string_view const& filepath) {
@@ -277,6 +295,116 @@ namespace fastllama {
         token_buffer.flush_buffer();
 
         return true;
+    }
+
+    static auto softmax(std::vector<float> &prob_out, std::vector<float> const& logits) {
+        if (logits.empty()) return;
+        prob_out.resize(logits.size());
+
+        auto const max_val = *std::max_element(logits.begin(), logits.end());
+        auto sum_exp = float{};
+
+        for(auto i = std::size_t{}; i < logits.size(); ++i) {
+            // Subtract the maximum logit value from the current logit value for numerical stability
+            auto const normalized_logit = logits[i] - max_val;
+            auto const exp_logit = std::expf(normalized_logit);
+            sum_exp += exp_logit;
+            prob_out[i] = exp_logit;
+        }
+        std::transform(prob_out.begin(), prob_out.end(), prob_out.begin(), [sum_exp](float p) { return p / sum_exp; });
+    }
+
+    std::optional<float> FastLlama::perplexity(std::string_view prompt) {
+        auto old_all_logits = m_model.should_put_all_logits;
+        m_model.should_put_all_logits = true;
+
+        auto tokens = tokenize(m_model.vocabulary, prompt, true);
+
+        auto count = std::size_t{};
+        auto const block_size = static_cast<std::size_t>(m_model.params.n_ctx);
+        auto const token_len = tokens.size();
+        auto const q_blocks = token_len / block_size;
+        auto const r_block = token_len % block_size;
+
+        auto const blocks = q_blocks + static_cast<std::size_t>(r_block != 0);
+        get_logger().log(__func__, "calculating perplexity over ", blocks, " chunk(s)\n");
+        
+        double nll{};
+        double res{};
+
+        auto block_idx = std::size_t{1};
+        std::vector<float> probs;
+
+        for(auto i = std::size_t{}; i < token_len; i += block_size, ++block_idx) {
+            auto block = std::min(block_size, token_len - i);
+
+            auto token_begin = tokens.begin() + i;
+            auto embd_input = std::vector<token_id_t>(token_begin, token_begin + block_size);
+
+            auto const start_time = std::chrono::high_resolution_clock::now();
+
+            if (!m_model.eval(0, embd_input, m_logits, m_mem_per_token)) {
+                m_model.should_put_all_logits = old_all_logits;
+                return {};
+            }
+            
+            auto const end_time = std::chrono::high_resolution_clock::now();
+
+            if (i == 0) {
+                auto const secs = std::chrono::duration<float>(end_time - start_time).count();
+                char buff1[20] = {0};
+                auto sec_len = snprintf(buff1, sizeof(buff1), "%.2f", secs);
+                auto const secs_str = std::string_view{ buff1, static_cast<std::size_t>(sec_len) };
+                char buff2[20] = {0};
+                auto eta_len = snprintf(buff2, sizeof(buff2), "%.2f", (secs * blocks) / (60.f * 60.f));
+                get_logger().log(
+                    __func__,
+                    secs_str,
+                    " seconds per pass - ETA ",
+                    std::string_view{ buff2, static_cast<std::size_t>(eta_len) },
+                    " hours\n"
+                );
+            }
+
+            // We get the logits for all the tokens in the context window (params.n_ctx)
+            // from llama_eval above.  Now, based on https://huggingface.co/docs/transformers/perplexity,
+            // calculate the perplexity over the last half the window (so the model always has
+            // some context to predict the token).
+            //
+            // We rely on the fact that attention in the forward pass only looks at previous
+            // tokens here, so the logits returned for each token are an accurate representation
+            // of what the model would have predicted at that point.
+            //
+            // Example, we have a context window of 512, we will compute perplexity for each of the
+            // last 256 tokens.  Then, we split the input up into context window size chunks to
+            // process the entire prompt.
+
+            auto& logits = get_logits();
+            auto const vocab_size = static_cast<std::size_t>(m_model.params.n_vocab);
+
+            for(auto j = (block >> 1); j < block - 1; ++j) {
+                auto logits_begin = logits.begin() + (j * vocab_size);
+                auto tok_logits = std::vector<float>( logits_begin, logits_begin + vocab_size);
+
+                softmax(probs, tok_logits);
+                auto const prob = probs[tokens[i + j + 1]];
+                nll += static_cast<double>(-std::log(prob));
+                ++count;
+            }
+
+            res = std::exp(nll / static_cast<double>(count));
+
+            auto const total_end_time = std::chrono::high_resolution_clock::now();
+            auto const secs = std::chrono::duration<float>(total_end_time - start_time).count();
+
+            char fstring[64] = {};
+
+            auto len = snprintf(fstring, sizeof(fstring), "[%zu/%zu]: %.4f (took: %.2f secs)\n", block_idx, blocks, res, secs);
+            get_logger().log(__func__, std::string_view{ fstring, static_cast<std::size_t>(len) });
+        }
+
+        m_model.should_put_all_logits = old_all_logits;
+        return { res };
     }
 
 } // namespace fastllama

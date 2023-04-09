@@ -23,6 +23,8 @@ namespace fastllama {
             int n_threads{1};
             int n_batch{16};
             bool is_old_model{false};
+            bool embedding_eval_enabled{false};
+            bool should_get_all_logits{false};
             std::size_t last_n_tokens{64};
             Logger logger{};
 
@@ -32,6 +34,8 @@ namespace fastllama {
             constexpr Params& set_number_of_threads(int threads) noexcept { this->n_threads = threads; return *this; }
             constexpr Params& set_number_of_batches(int batches) noexcept { this->n_batch = batches; return *this; }
             constexpr Params& set_is_old_model(bool flag) noexcept { this->is_old_model = flag; return *this; }
+            constexpr Params& set_embedding_eval_enabled(bool flag) noexcept { this->embedding_eval_enabled = flag; return *this; }
+            constexpr Params& set_should_get_all_logits(bool flag) noexcept { this->should_get_all_logits = flag; return *this; }
             Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view model_id, std::string_view const& filepath);
@@ -56,6 +60,11 @@ namespace fastllama {
             float repeat_penalty,
             std::vector<std::string> const& stop_words = {}
         );
+
+        std::optional<float> perplexity(std::string_view prompt);
+
+        std::vector<float> const& get_embeddings() const noexcept;
+        std::vector<float> const& get_logits() const noexcept;
 
         bool dump_vocab(std::string_view filepath);
 

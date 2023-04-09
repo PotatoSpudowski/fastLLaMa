@@ -760,7 +760,7 @@ namespace fastllama {
         use_buf(ctx0, 0);
 
         // used at the end to optionally extract the embeddings
-        [[maybe_unused]] ggml_tensor * embeddings = nullptr;
+        ggml_tensor * embeddings = nullptr;
 
         // norm
         {
@@ -787,9 +787,21 @@ namespace fastllama {
         ggml_build_forward_expand(&gf, inpL);
         ggml_graph_compute       (ctx0, &gf);
 
-        // return result for just the last token
-        embd_w.resize(static_cast<std::size_t>(n_vocab));
-        memcpy(embd_w.data(), static_cast<float*>(ggml_get_data(inpL)) + (static_cast<std::size_t>(n_vocab)*(N-1)), sizeof(float)*static_cast<std::size_t>(n_vocab));
+        {
+            // return result for just the last token
+            auto const embd_w_len = static_cast<std::size_t>(n_vocab) * (should_put_all_logits ? N : 1ul);
+            auto const data_offset = static_cast<std::ptrdiff_t>(n_vocab) * (should_put_all_logits ? 0 : N - 1ul);
+            embd_w.resize(embd_w_len);
+            auto const* data_ptr = static_cast<float*>(ggml_get_data(inpL)) + data_offset;
+            std::copy_n(data_ptr, embd_w.size(), embd_w.begin());
+        }
+
+        if (embeddings_eval_enable) {
+            auto& embeddings_out = this->embeddings;
+            embeddings_out.resize(static_cast<std::size_t>(n_embd));
+            auto const* ggml_data_ptr = static_cast<float*>(ggml_get_data(embeddings)) + n_embd * (static_cast<int>(N) - 1);
+            std::copy_n(ggml_data_ptr, embeddings_out.size(), embeddings_out.begin());
+        }
 
         if (mem_per_token == 0) {
             mem_per_token = ggml_used_mem(ctx0) / N;
