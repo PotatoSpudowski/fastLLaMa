@@ -1,6 +1,7 @@
 #include "fastllama.h"
 #include "bridge.hpp"
 #include <stdarg.h>
+#include <stdio.h>
 
 struct llama_model_context {
     std::optional<fastllama::FastLlama> inner;
@@ -74,9 +75,11 @@ extern "C" {
 
         builder.logger = fastllama::Logger(std::move(def_logger));
 
-        auto result = new llama_model_context();
-        result->builder = builder;
-        result->inner = std::nullopt;
+        auto result = static_cast<llama_model_context*>(malloc(sizeof(llama_model_context)));
+        if (result) {
+            result->builder = builder;
+            result->inner = std::nullopt;
+        }
         return result;
     }
 
@@ -205,7 +208,7 @@ extern "C" {
     }
 
     void llama_free_context(struct llama_model_context* ctx) {
-        delete ctx;
+        free(ctx);
     }
 
     void llama_handle_signal(int) {
