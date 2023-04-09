@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "fastllama.h"
 
 void stream_fn(char const* token_stream, int len) {
@@ -23,8 +24,7 @@ int main() {
         "User: Hello, Bob.\n"
         "Bob: Hello. How may I help you today?\n"
         "User: Please tell me the largest city in Europe.\n"
-        "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n"
-        "User: ";
+        "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n";
 
     printf("Ingesting, please wait...\n");
     fflush(stdout);
@@ -36,18 +36,18 @@ int main() {
     printf("Ingestion complete!\n");
     fflush(stdout);
 
-    char prompt[256] = "User: ";
+    char prefix[] = "User: ";
+    char bot_prefix[] = "Bob: ";
+    char prompt[1024 + sizeof(prefix)] = {0};
+    strcpy(prompt, prefix);
 
     printf("User: ");
 
-    llama_set_stop_words(model_ctx, 1, "User:");
+    llama_set_stop_words(model_ctx, 1, "User: ");
 
     while(true) {
-        int len = scanf("%s", prompt + 6);
-        if (len < 0) break;
+        fgets(prompt + sizeof(prefix) - 1, sizeof(prompt), stdin);
 
-        prompt[len] = 0;
-        
         if (!llama_ingest(model_ctx, prompt)) {
             return 2;
         }
@@ -57,7 +57,7 @@ int main() {
         }
 
         
-        printf("\n\nnUser: ");
+        printf("\nUser: ");
     }
     
     return 0;
