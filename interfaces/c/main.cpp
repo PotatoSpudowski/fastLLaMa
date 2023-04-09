@@ -59,7 +59,8 @@ extern "C" {
     }
 
     struct llama_model_context* llama_create_context(struct llama_model_context_args arg) {
-        auto builder = fastllama::FastLlama::builder();
+        using namespace fastllama;
+        auto builder = FastLlama::builder();
         builder.last_n_tokens = arg.last_n_tokens;
         builder.n_batch = arg.n_batch;
         builder.n_ctx = arg.n_ctx;
@@ -67,17 +68,17 @@ extern "C" {
         builder.n_threads = arg.n_threads;
         builder.seed = arg.seed;
 
-        auto def_logger = fastllama::DefaultLogger{};
+        auto def_logger = DefaultLogger{};
         def_logger.log = arg.logger.log;
         def_logger.log_err = arg.logger.log_err;
         def_logger.log_warn = arg.logger.log_warn;
         def_logger.reset = arg.logger.reset;
 
-        builder.logger = fastllama::Logger(std::move(def_logger));
+        builder.logger = Logger(std::move(def_logger));
 
         auto result = static_cast<llama_model_context*>(malloc(sizeof(llama_model_context)));
         if (result) {
-            result->builder = builder;
+            result->builder = std::move(builder);
             result->inner = std::nullopt;
         }
         return result;

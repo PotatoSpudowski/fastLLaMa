@@ -16,7 +16,7 @@ int main() {
     if (!maybe_bridge) {
         return 1;
     }
-    auto bridge = maybe_bridge.value();
+    auto bridge = std::move(maybe_bridge.value());
     // bridge.dump_vocab("./vocab.txt");
     auto& logger = bridge.get_logger();
 

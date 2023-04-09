@@ -40,9 +40,9 @@ namespace fastllama {
 
         // FastLlama(std::string_view model_id, std::string_view const& filepath, int n_threads = 8, int n_ctx = 512, std::size_t last_n_size = 64, int seed = 0, int keep = 64);
         // FastLlama(Model model, int n_threads, std::size_t last_n_size = 64, int seed = 0, int keep = 64);
-        FastLlama(FastLlama const&) = default;
+        FastLlama(FastLlama const&) = delete;
         FastLlama(FastLlama &&) noexcept = default;
-        FastLlama& operator=(FastLlama const&) = default;
+        FastLlama& operator=(FastLlama const&) = delete;
         FastLlama& operator=(FastLlama &&) noexcept = default;
         ~FastLlama() { m_model.unload(); }
 
