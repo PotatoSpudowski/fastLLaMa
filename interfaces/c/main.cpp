@@ -4,9 +4,9 @@
 #include <stdio.h>
 
 struct llama_model_context {
-    std::optional<fastllama::FastLlama> inner;
-    std::vector<std::string> stop_words;
-    fastllama::FastLlama::Params builder;
+    std::optional<fastllama::FastLlama> inner{std::nullopt};
+    std::vector<std::string> stop_words{};
+    fastllama::FastLlama::Params builder{};
 };
 
 inline static LLAMA_LOGGER_FUNC make_def_info_logger_func() {
