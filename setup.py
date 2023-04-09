@@ -176,14 +176,15 @@ def init_cmake_vars(cmake_var: str, arch: str) -> List[str]:
 def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str]]:
     return { v : c(feature)  for v, c in COMPILER_LOOKUP_TABLE.items()}
 
-def fix_flags(vars: MutableMapping[cmake_variable_type, List[str]]) -> None:
+def fix_flags(vars: MutableMapping[cmake_variable_type, List[str]], global_compiler_flags: List[str]) -> None:
     for v, flags in vars.items():
         if v in COMPILER_FLAG_FIX_LOOKUP_TABLE:
-            vars[v] = COMPILER_FLAG_FIX_LOOKUP_TABLE[v](flags)
+            vars[v] = global_compiler_flags + COMPILER_FLAG_FIX_LOOKUP_TABLE[v](flags)
 
-def generate_compiler_flags() -> None:
+def generate_compiler_flags(global_compiler_flags: List[str]) -> None:
     info = get_cpu_info()
     arch: str = info['arch'] if 'arch' in info else ''
+
     cmake_vars: MutableMapping[cmake_variable_type, List[str]] = { v : init_cmake_vars(v, arch.upper()) for v in COMPILER_LOOKUP_TABLE.keys() }
     
     if 'flags' in info:
@@ -194,7 +195,7 @@ def generate_compiler_flags() -> None:
             for k, v in temp.items():
                 if v is not None:
                     cmake_vars[k].append(v)
-    fix_flags(cmake_vars)
+    fix_flags(cmake_vars, global_compiler_flags)
     save_cmake_vars(cmake_vars)
 
 def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
@@ -215,7 +216,7 @@ def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
             finally:
                 os.chdir(current_path)
 
-def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> None:
+def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace, global_compiler_flags: List[str]) -> None:
     ndk = args.android_ndk
     abi = args.android_abi
     mode = args.android_mode
@@ -246,13 +247,15 @@ def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> 
 
     if use_lld:
         cmake_vars['ANDROID_LD'] = True
+    
+    # global_compiler_flags.append("-march=armv8.4a+dotprod")
 
 
-def set_cross_compile_target_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> None:
+def set_cross_compile_target_flags(cmake_vars: CmakeVarType, args: argparse.Namespace, global_compiler_flags: List[str]) -> None:
     cc_target = args.cc_target
 
     if cc_target == 'android':
-        set_cc_android_flags(cmake_vars, args)
+        set_cc_android_flags(cmake_vars, args, global_compiler_flags)
     # if cc_target == 'android':
 
 def set_android_arg_parser(parser: argparse._SubParsersAction) -> None:
@@ -304,7 +307,7 @@ def set_android_arg_parser(parser: argparse._SubParsersAction) -> None:
     )
 
 
-def parse_args() -> bool:
+def parse_args(global_compiler_flags: List[str]) -> bool:
     parser = argparse.ArgumentParser(
         prog="Fastllama",
         description="Fastllama tries to provide llama wrapper interfaces for all popular languages."
@@ -329,7 +332,7 @@ def parse_args() -> bool:
     
     cmake_global_vars: CmakeVarType = {}
     set_global_cmake_variables(cmake_global_vars, args)
-    set_cross_compile_target_flags(cmake_global_vars, args)
+    set_cross_compile_target_flags(cmake_global_vars, args, global_compiler_flags)
     save_cmake_vars_helper(os.path.join('.', 'cmake', 'GlobalVars.cmake'), cmake_global_vars)
     return True
 
@@ -361,9 +364,10 @@ def build_example() -> None:
         os.symlink(os.path.abspath(module_path), os.path.abspath(lib_path))
 
 def main() -> None:
-    if not parse_args():
+    global_compiler_flags: List[str] = []
+    if not parse_args(global_compiler_flags):
         return
-    generate_compiler_flags()
+    generate_compiler_flags(global_compiler_flags)
     run_make()
     build_example()
 
