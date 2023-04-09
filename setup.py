@@ -200,6 +200,12 @@ def generate_compiler_flags() -> None:
 def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
     example_paths = [os.path.join('.', 'examples', l) for l in ALL_LANGUAGES_IN_INTERFACES.keys()]
     current_path = os.getcwd()
+    if os.path.exists(os.path.join('.', 'build')):
+        os.chdir(os.path.join('.', 'build'))
+        try:
+            run_shell(cmd)
+        finally:
+            os.chdir(current_path)
     for path in example_paths:
         build_path = os.path.join(path, 'build')
         if os.path.exists(build_path):
@@ -208,12 +214,6 @@ def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
                 run_shell(cmd)
             finally:
                 os.chdir(current_path)
-    if os.path.exists(os.path.join('.', 'build')):
-        os.chdir(os.path.join('.', 'build'))
-        try:
-            run_shell(cmd)
-        finally:
-            os.chdir(current_path)
 
 def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace) -> None:
     ndk = args.android_ndk
