@@ -44,7 +44,7 @@ class c_llama_logger(ctypes.Structure):
         ('reset', C_LLAMA_LOGGER_RESET_FUNC)
     ]
 
-class c_llama_array_view(ctypes.Structure):
+class llama_array_view_f(ctypes.Structure):
     _fields_ = [
         ('data', ctypes.POINTER(ctypes.c_float)),
         ('size', ctypes.c_size_t),
@@ -200,16 +200,16 @@ class Model:
     
     def get_embeddings(self) -> List[float]:
         getter = self.lib.llama_get_embeddings
-        getter.restype = c_llama_array_view
+        getter.restype = llama_array_view_f
         getter.argtypes = [c_llama_model_context_ptr]
-        res: c_llama_array_view = getter(self.ctx)
+        res: llama_array_view_f = getter(self.ctx)
         return res.data[:int(res.size)]
     
     def get_logits(self) -> List[float]:
         getter = self.lib.llama_get_logits
-        getter.restype = c_llama_array_view
+        getter.restype = llama_array_view_f
         getter.argtypes = [c_llama_model_context_ptr]
-        res: c_llama_array_view = getter(self.ctx)
+        res: llama_array_view_f = getter(self.ctx)
         return res.data[:int(res.size)]
     
     def __del__(self):

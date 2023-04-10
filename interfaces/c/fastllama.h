@@ -32,7 +32,7 @@ struct llama_logger {
     LLAMA_LOGGER_RESET_FUNC reset; // reset the log or anything else
 };
 
-struct llama_array_view {
+struct llama_array_view_f {
     float const*const data;
     size_t size;
 };
@@ -80,8 +80,8 @@ bool llama_generate(
  */
 float llama_perplexity(struct llama_model_context* ctx, char const* prompt);
 
-struct llama_array_view llama_get_embeddings(struct llama_model_context const* const ctx);
-struct llama_array_view llama_get_logits(struct llama_model_context const* const ctx);
+struct llama_array_view_f llama_get_embeddings(struct llama_model_context const* const ctx);
+struct llama_array_view_f llama_get_logits(struct llama_model_context const* const ctx);
 
 void llama_free_context(struct llama_model_context*);
 

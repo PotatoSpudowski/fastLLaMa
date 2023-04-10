@@ -212,16 +212,16 @@ extern "C" {
         return temp_res.value_or(-1);
     }
 
-    llama_array_view llama_get_embeddings(struct llama_model_context const* const model_context) {
+    llama_array_view_f llama_get_embeddings(struct llama_model_context const* const model_context) {
         if (!is_model_valid(model_context)) return { nullptr, 0ul };
         auto const& arr = model_context->inner->get_embeddings();
-        return llama_array_view{ arr.data(), arr.size() };
+        return llama_array_view_f{ arr.data(), arr.size() };
     }
 
-    llama_array_view llama_get_logits(struct llama_model_context const* const model_context) {
+    llama_array_view_f llama_get_logits(struct llama_model_context const* const model_context) {
         if (!is_model_valid(model_context)) return { nullptr, 0ul };
         auto const& arr = model_context->inner->get_logits();
-        return llama_array_view{ arr.data(), arr.size() };
+        return llama_array_view_f{ arr.data(), arr.size() };
     }
 
     void llama_handle_signal(int) {
