@@ -141,6 +141,7 @@ namespace fastllama {
     }
 
     Span<float> FastLlama::get_embeddings() const noexcept {
+        if (!m_model.embeddings_eval_enable) get_logger().log_warn(__func__, "Please set the flag `embeddings_eval_enable` to true before getting the embeddings.\n");
         return m_model.embeddings;
     }
 
