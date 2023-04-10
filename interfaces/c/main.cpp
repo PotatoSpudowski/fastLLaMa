@@ -157,22 +157,18 @@ extern "C" {
         return true;
     }
 
-    bool llama_set_stop_words(struct llama_model_context* model_context, int number_of_words, ...) {
+    bool llama_set_stop_words(struct llama_model_context* model_context, char const** words, size_t len) {
         if (model_context == nullptr) {
             fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
             return false;
         }
 
-        va_list args;
-        va_start(args, number_of_words);
-        model_context->stop_words.resize(number_of_words);
+        model_context->stop_words.resize(len);
 
-        for (auto i = 0; i < number_of_words; i++) {
-            std::string arg = va_arg(args, char const*);
-            model_context->stop_words[static_cast<std::size_t>(i)] = std::move(arg);
+        for (auto i = std::size_t{}; i < len; i++) {
+            model_context->stop_words[i] = words[i];
         }
 
-        va_end(args);
         return true;
     }
 

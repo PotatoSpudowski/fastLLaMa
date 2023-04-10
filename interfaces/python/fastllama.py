@@ -93,6 +93,7 @@ class Model:
         signal_handler_fn.argtypes = [ctypes.c_int]
 
         signal.signal(signal.SIGINT, lambda sig_num, _frame: signal_handler_fn(sig_num))
+        signal.siginterrupt(signal.SIGINT, True)
 
         normalized_id: str = cast(str, id.value if type(id) == ModelKind else id)
 
@@ -161,9 +162,9 @@ class Model:
             streaming_fn(arr.decode('utf-8'))
         stop_words_fn = self.lib.llama_set_stop_words
         stop_words_fn.restype = ctypes.c_bool
-        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, ctypes.c_int] + [ctypes.c_char_p for _ in stop_words])
+        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, ctypes.POINTER[ctypes.c_char_p]])
 
-        stop_words_fn(self.ctx, len(stop_words), *[bytes(s, 'utf-8') for s in stop_words])
+        stop_words_fn(self.ctx, [bytes(s, 'utf-8') for s in stop_words], len(stop_words))
 
         generate_fn = self.lib.llama_generate
         ctype_callback_fn = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int)
@@ -212,6 +213,7 @@ class Model:
     
     def __del__(self):
         signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.siginterrupt(signal.SIGINT, False)
         lib = self.lib
         ctx = self.ctx
         free_fn = lib.llama_free_context

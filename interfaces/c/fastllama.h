@@ -56,7 +56,7 @@ struct llama_model_context* llama_create_context(struct llama_model_context_args
 bool llama_load_model(struct llama_model_context* model_context, enum ModelKind kind, char const* filepath);
 bool llama_load_model_str(struct llama_model_context* model_context, char const* model_id, char const* filepath);
 
-bool llama_set_stop_words(struct llama_model_context* model_context, int number_of_words, ...);
+bool llama_set_stop_words(struct llama_model_context* model_context, char const** words, size_t len);
 
 bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt);
 bool llama_ingest(struct llama_model_context* model_context, char const* prompt);

@@ -43,7 +43,10 @@ int main() {
 
     printf("User: ");
 
-    llama_set_stop_words(model_ctx, 1, "User: ");
+    char const* stop_words[] = {
+        "User: ",
+    };
+    llama_set_stop_words(model_ctx, stop_words, sizeof(stop_words)/sizeof(stop_words[0]));
 
     while(true) {
         fgets(prompt + sizeof(prefix) - 1, sizeof(prompt), stdin);
