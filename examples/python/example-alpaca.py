@@ -26,7 +26,7 @@ while True:
     if user_input == "exit":
         break
 
-    user_input = "### Instruction:\n\n" + user_input + "\n\n ### Response:\n\n"
+    user_input = "\n\n### Instruction:\n\n" + user_input + "\n\n### Response:\n\n"
 
     res = model.ingest(user_input)
 
@@ -36,12 +36,12 @@ while True:
     print("\n")
 
     res = model.generate(
-        num_tokens=300, 
+        num_tokens=100, 
         top_p=0.95, #top p sampling (Optional)
         temp=0.8, #temperature (Optional)
         repeat_penalty=1.0, #repetition penalty (Optional)
         streaming_fn=stream_token, #streaming function
-        stop_words=[".\n", "# "] #stop generation when this word is encountered (Optional)
+        stop_words=["###"] #stop generation when this word is encountered (Optional)
         )
 
     print("\n")
