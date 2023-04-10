@@ -44,19 +44,30 @@ class c_llama_logger(ctypes.Structure):
         ('reset', C_LLAMA_LOGGER_RESET_FUNC)
     ]
 
+class c_llama_array_view(ctypes.Structure):
+    _fields_ = [
+        ('data', ctypes.POINTER(ctypes.c_float)),
+        ('size', ctypes.c_size_t),
+    ]
+
 class c_llama_model_context_args(ctypes.Structure):
     _fields_ = [
+        ('embedding_eval_enabled', ctypes.c_bool),
+        ('should_get_all_logits', ctypes.c_bool),
         ('seed', ctypes.c_int),
         ('n_keep', ctypes.c_int),
         ('n_ctx', ctypes.c_int),
         ('n_threads', ctypes.c_int),
         ('n_batch', ctypes.c_int),
         ('last_n_tokens', ctypes.c_size_t),
+        ('allocate_extra_mem', ctypes.c_size_t),
         ('logger', c_llama_logger)
     ]
 
 class c_llama_model_context(ctypes.Structure):
     pass
+
+c_llama_model_context_ptr = ctypes.POINTER(c_llama_model_context)
 
 class Model:
     def __init__(
@@ -69,6 +80,9 @@ class Model:
         seed: int = 0, # Random number seed to be used in model
         tokens_to_keep: int = 200, # Number of tokens to keep when tokens are removed from buffer to save memory
         n_batch: int = 16, # Size of the token batch that will be processed at a given time
+        should_get_all_logits: bool = False,
+        embedding_eval_enabled: bool = False,
+        allocate_extra_mem: int = 0,
         logger: Optional[Logger] = None, # Logger to be used for reporting messages
         library_path = get_library_path('build', 'interfaces','python')
         ):
@@ -76,12 +90,12 @@ class Model:
         self.lib = ctypes.cdll.LoadLibrary(library_path)
 
         signal_handler_fn = self.lib.llama_handle_signal
-
         signal_handler_fn.argtypes = [ctypes.c_int]
 
         signal.signal(signal.SIGINT, lambda sig_num, _frame: signal_handler_fn(sig_num))
 
         normalized_id: str = cast(str, id.value if type(id) == ModelKind else id)
+
         ctx_args = self.__get_default_ctx_args__()
 
         ctx_args.seed = seed
@@ -90,6 +104,9 @@ class Model:
         ctx_args.n_threads = num_threads
         ctx_args.n_batch = n_batch
         ctx_args.last_n_tokens = last_n_size
+        ctx_args.embedding_eval_enabled = embedding_eval_enabled
+        ctx_args.should_get_all_logits = should_get_all_logits
+        ctx_args.allocate_extra_mem = allocate_extra_mem
 
         if logger is not None:
             temp_logger = c_llama_logger()
@@ -103,7 +120,7 @@ class Model:
 
         load_fn = self.lib.llama_load_model_str
         load_fn.restype = ctypes.c_bool
-        load_fn.argtypes = [ctypes.POINTER(c_llama_model_context), ctypes.c_char_p, ctypes.c_char_p]
+        load_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p, ctypes.c_char_p]
         res = bool(load_fn(self.ctx, bytes(normalized_id, 'utf-8'), bytes(path, 'utf-8')))
         if not res:
             raise RuntimeError("Unable to load model")
@@ -115,7 +132,7 @@ class Model:
     
     def __create_model_ctx__(self, ctx_args: c_llama_model_context_args):
         fn = self.lib.llama_create_context
-        fn.restype = ctypes.POINTER(c_llama_model_context)
+        fn.restype = c_llama_model_context_ptr
         fn.argtypes = [c_llama_model_context_args]
         return fn(ctx_args)
 
@@ -125,7 +142,7 @@ class Model:
         else:
             ingest_fn = self.lib.llama_ingest
 
-        ingest_fn.argtypes = [ctypes.POINTER(c_llama_model_context), ctypes.c_char_p]
+        ingest_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
         ingest_fn.restype = ctypes.c_bool
         return bool(ingest_fn(self.ctx, bytes(prompt, 'utf-8')))
     
@@ -144,14 +161,14 @@ class Model:
             streaming_fn(arr.decode('utf-8'))
         stop_words_fn = self.lib.llama_set_stop_words
         stop_words_fn.restype = ctypes.c_bool
-        stop_words_fn.argtypes = cast(List[Type[Any]], [ctypes.POINTER(c_llama_model_context), ctypes.c_int] + [ctypes.c_char_p for _ in stop_words])
+        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, ctypes.c_int] + [ctypes.c_char_p for _ in stop_words])
 
         stop_words_fn(self.ctx, len(stop_words), *[bytes(s, 'utf-8') for s in stop_words])
 
         generate_fn = self.lib.llama_generate
         ctype_callback_fn = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int)
         generate_fn.argtypes = [
-            ctypes.POINTER(c_llama_model_context),
+            c_llama_model_context_ptr,
             ctype_callback_fn,
             ctypes.c_size_t,
             ctypes.c_float,
@@ -169,6 +186,29 @@ class Model:
             temp,
             repeat_penalty,
         ))
+    
+    def perplexity(self, prompt: str) -> float|None:
+        per_fun = self.lib.llama_perplexity
+        per_fun.restype = ctypes.c_float
+        per_fun.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        res = float(per_fun(self.ctx, bytes(prompt, 'utf-8')))
+        if res < 0:
+            return None
+        return res
+    
+    def get_embeddings(self) -> List[float]:
+        getter = self.lib.llama_get_embeddings
+        getter.restype = c_llama_array_view
+        getter.argtypes = [c_llama_model_context_ptr]
+        res: c_llama_array_view = getter(self.ctx)
+        return res.data[:int(res.size)]
+    
+    def get_logits(self) -> List[float]:
+        getter = self.lib.llama_get_logits
+        getter.restype = c_llama_array_view
+        getter.argtypes = [c_llama_model_context_ptr]
+        res: c_llama_array_view = getter(self.ctx)
+        return res.data[:int(res.size)]
     
     def __del__(self):
         signal.signal(signal.SIGINT, signal.SIG_DFL)

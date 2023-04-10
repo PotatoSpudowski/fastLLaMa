@@ -38,12 +38,15 @@ struct llama_array_view {
 };
 
 struct llama_model_context_args {
+    bool embedding_eval_enabled;
+    bool should_get_all_logits;
     int seed;
     int n_keep;
     int n_ctx;
     int n_threads;
     int n_batch;
     size_t last_n_tokens;
+    size_t allocate_extra_mem;
     struct llama_logger logger;
 };
 

@@ -117,6 +117,7 @@ namespace fastllama {
         temp.set_seed(seed);
         temp.m_model.embeddings_eval_enable = embedding_eval_enabled;
         temp.m_model.should_put_all_logits = should_get_all_logits;
+        temp.m_model.allocate_extra_mem = allocate_extra_mem;
 
         if (!temp.m_model.load(model_id, filepath, is_old_model)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -294,7 +295,7 @@ namespace fastllama {
         return true;
     }
 
-    static auto softmax(std::vector<float> &prob_out, std::vector<float> const& logits) {
+    static auto softmax(std::vector<float> &prob_out, Span<float> logits) {
         if (logits.empty()) return;
         prob_out.resize(logits.size());
 
@@ -315,7 +316,7 @@ namespace fastllama {
         auto old_all_logits = m_model.should_put_all_logits;
         m_model.should_put_all_logits = true;
 
-        auto tokens = tokenize(m_model.vocabulary, prompt, true);
+        auto const tokens = tokenize(m_model.vocabulary, prompt, true);
 
         auto count = std::size_t{};
         auto const block_size = static_cast<std::size_t>(m_model.params.n_ctx);
@@ -335,7 +336,7 @@ namespace fastllama {
         for(auto i = std::size_t{}; i < token_len; i += block_size, ++block_idx) {
             auto block = std::min(block_size, token_len - i);
 
-            auto embd_input = Span<token_id_t>(tokens.data() + i, block_size);
+            auto embd_input = Span(tokens.data() + i, block);
 
             auto const start_time = std::chrono::high_resolution_clock::now();
 
@@ -377,10 +378,11 @@ namespace fastllama {
 
             auto logits = get_logits();
             auto const vocab_size = static_cast<std::size_t>(m_model.params.n_vocab);
-
+            
             for(auto j = (block >> 1); j < block - 1; ++j) {
-                auto logits_begin = logits.begin() + (j * vocab_size);
-                auto tok_logits = std::vector<float>( logits_begin, logits_begin + vocab_size);
+                auto const start_pos = j * vocab_size;
+                auto const size = std::min(logits.size() - start_pos, vocab_size);
+                auto tok_logits = Span( logits.data() + start_pos, size );
 
                 softmax(probs, tok_logits);
                 auto const prob = probs[tokens[i + j + 1]];

@@ -144,7 +144,8 @@ namespace fastllama {
         std::vector<unsigned char> buf_scratch[max_number_of_scratch_buffer];
 
         int    buf_last = 0;
-        size_t buf_max_size[max_number_of_scratch_buffer] = { 0 };
+        std::size_t buf_max_size[max_number_of_scratch_buffer] = { 0 };
+        std::size_t allocate_extra_mem{};
 
         std::unordered_map<std::string, ggml_tensor*> tensors;
 

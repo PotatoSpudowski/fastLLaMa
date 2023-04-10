@@ -55,6 +55,9 @@ extern "C" {
         result.n_keep = builder.n_keep;
         result.n_threads = builder.n_threads;
         result.seed = builder.seed;
+        result.allocate_extra_mem = 0ul;
+        result.embedding_eval_enabled = false;
+        result.should_get_all_logits = false;
         return result;
     }
 
@@ -67,6 +70,9 @@ extern "C" {
         builder.n_keep = arg.n_keep;
         builder.n_threads = arg.n_threads;
         builder.seed = arg.seed;
+        builder.allocate_extra_mem = arg.allocate_extra_mem;
+        builder.should_get_all_logits = arg.should_get_all_logits;
+        builder.embedding_eval_enabled = arg.embedding_eval_enabled;
 
         auto def_logger = DefaultLogger{};
         def_logger.log = arg.logger.log;

@@ -13,7 +13,6 @@ namespace fastllama {
     struct Span {
         using value_type = std::decay_t<std::remove_cv_t<T>>;
         using pointer = std::add_pointer_t<std::add_const_t<value_type>>;
-        using reference = std::add_rvalue_reference_t<std::add_const_t<value_type>>;
         using size_type = std::size_t;
         using iterator = pointer;
         
@@ -53,7 +52,7 @@ namespace fastllama {
         constexpr iterator begin() const noexcept { return m_data; }
         constexpr iterator end() const noexcept { return m_data + m_size; }
 
-        constexpr reference operator[](size_type k) const noexcept { return m_data[k]; }
+        constexpr auto const& operator[](size_type k) const noexcept { return m_data[k]; }
 
         constexpr Span sub_view(size_type start, size_type end = dynamic_v) const noexcept {
             return { m_data + start, std::min(m_size, end) };

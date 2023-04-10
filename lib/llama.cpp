@@ -562,7 +562,7 @@ namespace fastllama {
 
         // Initialize compute buffers
         {
-            model_id.config.mem_required_for_eval += static_cast<std::size_t>(n_batch) * 20_MiB; // extra space large batch
+            model_id.config.mem_required_for_eval += static_cast<std::size_t>(n_batch) * 20_MiB + allocate_extra_mem; // extra space large batch
             buf_compute.resize(model_id.config.mem_required_for_eval);
             buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
             buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
