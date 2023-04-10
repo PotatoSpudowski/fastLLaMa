@@ -163,7 +163,7 @@ class Model:
         stop_words_ptr_type = (ctypes.c_char_p * len(stop_words))
         stop_words_fn = self.lib.llama_set_stop_words
         stop_words_fn.restype = ctypes.c_bool
-        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, stop_words_ptr_type ])
+        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, stop_words_ptr_type, ctypes.c_size_t])
 
         stop_words_fn(self.ctx, stop_words_ptr_type(*[bytes(s, 'utf-8') for s in stop_words]), len(stop_words))
 
