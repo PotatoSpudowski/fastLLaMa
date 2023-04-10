@@ -73,15 +73,29 @@ extern "C" {
         def_logger.log_err = arg.logger.log_err;
         def_logger.log_warn = arg.logger.log_warn;
         def_logger.reset = arg.logger.reset;
-
+        
         builder.logger = Logger(std::move(def_logger));
 
-        auto result = static_cast<llama_model_context*>(malloc(sizeof(llama_model_context)));
+        auto result = new llama_model_context();
         if (result) {
             result->builder = std::move(builder);
             result->inner = std::nullopt;
         }
         return result;
+    }
+
+    inline static constexpr bool is_model_valid(struct llama_model_context const* const ctx) noexcept {
+        if (ctx == nullptr) {
+            fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
+            return false;
+        }
+
+        if (ctx->inner == std::nullopt) {
+            fprintf(stderr, "model is not loaded. Please use `llama_load_model` to load a model.\n");
+            return false;
+        }
+        
+        return true;
     }
 
     bool llama_load_model_str(struct llama_model_context* model_context, char const* model_id, char const* filepath) {
@@ -157,29 +171,13 @@ extern "C" {
     }
 
     bool llama_ingest(struct llama_model_context* model_context, char const* prompt) {
-        if (model_context == nullptr) {
-            fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
-            return false;
-        }
-
-        if (model_context->inner == std::nullopt) {
-            fprintf(stderr, "model is not loaded. Please use `llama_load_model` to load a model.\n");
-            return false;
-        }
+        if (!is_model_valid(model_context)) return false;
 
         return model_context->inner->ingest(std::string(prompt), false);
     }
 
     bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt) {
-        if (model_context == nullptr) {
-            fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
-            return false;
-        }
-
-        if (model_context->inner == std::nullopt) {
-            fprintf(stderr, "model is not loaded. Please use `llama_load_model` to load a model.\n");
-            return false;
-        }
+        if (!is_model_valid(model_context)) return false;
 
         return model_context->inner->ingest(std::string(prompt), true);
     }
@@ -193,15 +191,7 @@ extern "C" {
         float temp,
         float repeat_penalty
     ) {
-        if (model_context == nullptr) {
-            fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
-            return false;
-        }
-
-        if (model_context->inner == std::nullopt) {
-            fprintf(stderr, "model is not loaded. Please use `llama_load_model` to load a model.\n");
-            return false;
-        }
+        if (!is_model_valid(model_context)) return false;
 
         return model_context->inner->generate([stream_fn](std::string const& s) {
             stream_fn(s.data(), static_cast<int>(s.size()));
@@ -209,7 +199,27 @@ extern "C" {
     }
 
     void llama_free_context(struct llama_model_context* ctx) {
-        free(ctx);
+        delete ctx;
+    }
+
+    float llama_perplexity(struct llama_model_context* model_context, char const* prompt) {
+        if (!is_model_valid(model_context)) return -1;
+
+        auto temp_res = model_context->inner->perplexity(prompt);
+
+        return temp_res.value_or(-1);
+    }
+
+    llama_array_view llama_get_embeddings(struct llama_model_context const* const model_context) {
+        if (!is_model_valid(model_context)) return { nullptr, 0ul };
+        auto const& arr = model_context->inner->get_embeddings();
+        return llama_array_view{ arr.data(), arr.size() };
+    }
+
+    llama_array_view llama_get_logits(struct llama_model_context const* const model_context) {
+        if (!is_model_valid(model_context)) return { nullptr, 0ul };
+        auto const& arr = model_context->inner->get_logits();
+        return llama_array_view{ arr.data(), arr.size() };
     }
 
     void llama_handle_signal(int) {

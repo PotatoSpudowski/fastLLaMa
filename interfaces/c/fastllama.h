@@ -32,6 +32,11 @@ struct llama_logger {
     LLAMA_LOGGER_RESET_FUNC reset; // reset the log or anything else
 };
 
+struct llama_array_view {
+    float const*const data;
+    size_t size;
+};
+
 struct llama_model_context_args {
     int seed;
     int n_keep;
@@ -62,6 +67,18 @@ bool llama_generate(
     float temp,
     float repeat_penalty
 );
+
+/**
+ * @brief This function calculates the perplexity of the model for a given prompt
+ * 
+ * @param ctx is a model context of type `llama_model_context`
+ * @param prompt is a C string that contains user prompt
+ * @return `llama_array_view` that will contain the perplexity but if it fails, it will return -1;
+ */
+float llama_perplexity(struct llama_model_context* ctx, char const* prompt);
+
+struct llama_array_view llama_get_embeddings(struct llama_model_context const* const ctx);
+struct llama_array_view llama_get_logits(struct llama_model_context const* const ctx);
 
 void llama_free_context(struct llama_model_context*);
 
