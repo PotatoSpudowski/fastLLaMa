@@ -48,3 +48,6 @@ _SET_OPTIONS_AND_LIB(example)
 
 add_executable(example-alpaca example-alpaca.c)
 _SET_OPTIONS_AND_LIB(example-alpaca)
+
+add_executable(perplexity perplexity.c)
+_SET_OPTIONS_AND_LIB(perplexity)
