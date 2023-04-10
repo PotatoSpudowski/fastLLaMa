@@ -13,9 +13,7 @@ namespace fastllama {
         std::partial_sort(
                 logits_id.begin(),
                 logits_id.begin() + top_k, logits_id.end(),
-                [](const std::pair<double, typename Vocab::id> & a, const std::pair<double, typename Vocab::id> & b) {
-                    return a.first > b.first;
-                }
+                [](auto const & a, auto const & b) { return a.first > b.first; }
         );
 
         logits_id.resize(static_cast<std::size_t>(top_k));
@@ -72,7 +70,8 @@ namespace fastllama {
         std::vector<double> probs;
         probs.reserve(logits_id.size());
 
-        double sum = 0.0;
+        double sum{};
+
         [[maybe_unused]] auto const logits_id_size = logits_id.size();
         #pragma omp parallel for if(logits_id_size > 256)
         for (const auto & kv : logits_id) {
@@ -83,12 +82,12 @@ namespace fastllama {
 
         // normalize the probs
         #pragma omp for simd
-        for (auto i = 0ul; i < probs.size(); ++i) {
-            probs[i] /= sum;
+        for (auto& p : probs) {
+            p /= sum;
         }
 
         if (top_p < 1.0) {
-            double cumsum = 0.0;
+            double cumsum{};
             for (auto i = 0ul; i < probs.size(); i++) {
                 cumsum += probs[i];
                 if (cumsum >= top_p) {
