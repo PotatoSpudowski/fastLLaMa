@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <numeric>
 #include <chrono>
+#include "span.hpp"
 
 namespace fastllama {
 
@@ -22,7 +23,7 @@ namespace fastllama {
 
     auto sample_top_p_top_k(
         Model const& model,
-        std::vector<float> const& logits,
+        Span<float> logits,
         RingBuffer<typename Vocab::id> const & last_n_tokens,
         double repeat_penalty,
         int top_k,
@@ -63,9 +64,9 @@ namespace fastllama {
             }
         }
 
-        sample_top_k(logits_id, top_k);
+        sample_top_k(logits_id, static_cast<int>(top_k > 0 ? std::min(static_cast<std::size_t>(top_k), n_logits) : n_logits));
 
-        double maxl = std::max_element(logits_id.begin(), logits_id.end(), [](auto const& p1, auto const& p2) { return p1.first < p2.first; })->first;
+        double maxl = logits_id[0].first;
 
         // compute probs for the top K tokens
         std::vector<double> probs;
@@ -81,8 +82,7 @@ namespace fastllama {
         }
 
         // normalize the probs
-        [[maybe_unused]] auto probs_size = probs.size();
-        #pragma omp parallel for if(probs_size > 256)
+        #pragma omp for simd
         for (auto i = 0ul; i < probs.size(); ++i) {
             probs[i] /= sum;
         }
@@ -98,12 +98,6 @@ namespace fastllama {
                 }
             }
 
-            cumsum = 1.0 / cumsum;
-            probs_size = probs.size();
-            #pragma omp parallel for if(probs_size > 256)
-            for (auto i = 0ul; i < probs.size(); i++) {
-                probs[i] *= cumsum;
-            }
         }
 
         std::discrete_distribution<> dist(probs.begin(), probs.end());
@@ -129,7 +123,9 @@ namespace fastllama {
             return std::nullopt;
         }
 
-        if (!temp.m_model.eval(0, { 0, 1, 2, 3 }, temp.m_logits, temp.m_mem_per_token)) {
+        token_id_t inputs[] = { 0, 1, 2, 3 };
+
+        if (!temp.m_model.eval(0, inputs, temp.m_logits, temp.m_mem_per_token)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to evaluate model\n");
             return std::nullopt;
         }
@@ -140,14 +136,15 @@ namespace fastllama {
         if (embedding_eval_enabled) {
             temp.m_model.embeddings.reserve( static_cast<std::size_t>(temp.m_model.params.n_embd) );
         }
+
         return { std::move(temp) };
     }
 
-    std::vector<float> const& FastLlama::get_embeddings() const noexcept {
+    Span<float> FastLlama::get_embeddings() const noexcept {
         return m_model.embeddings;
     }
 
-    std::vector<float> const& FastLlama::get_logits() const noexcept {
+    Span<float> FastLlama::get_logits() const noexcept {
         return m_logits;
     }
 
@@ -338,8 +335,7 @@ namespace fastllama {
         for(auto i = std::size_t{}; i < token_len; i += block_size, ++block_idx) {
             auto block = std::min(block_size, token_len - i);
 
-            auto token_begin = tokens.begin() + i;
-            auto embd_input = std::vector<token_id_t>(token_begin, token_begin + block_size);
+            auto embd_input = Span<token_id_t>(tokens.data() + i, block_size);
 
             auto const start_time = std::chrono::high_resolution_clock::now();
 
@@ -379,7 +375,7 @@ namespace fastllama {
             // last 256 tokens.  Then, we split the input up into context window size chunks to
             // process the entire prompt.
 
-            auto& logits = get_logits();
+            auto logits = get_logits();
             auto const vocab_size = static_cast<std::size_t>(m_model.params.n_vocab);
 
             for(auto j = (block >> 1); j < block - 1; ++j) {

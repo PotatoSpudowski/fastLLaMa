@@ -63,8 +63,8 @@ namespace fastllama {
 
         std::optional<float> perplexity(std::string_view prompt);
 
-        std::vector<float> const& get_embeddings() const noexcept;
-        std::vector<float> const& get_logits() const noexcept;
+        Span<float> get_embeddings() const noexcept;
+        Span<float> get_logits() const noexcept;
 
         bool dump_vocab(std::string_view filepath);
 

@@ -9,6 +9,7 @@
 #include <thread>
 #include <unordered_map>
 #include "logger.hpp"
+#include "span.hpp"
 
 namespace fastllama {
 
@@ -83,7 +84,7 @@ namespace fastllama {
         auto unload() -> void;
         auto eval(
             std::size_t                     n_past,
-            std::vector<vocab_id> const&    embd_inp,
+            Span<vocab_id>                  embd_inp,
             std::vector<float>&             embd_w,
             std::size_t&                    mem_per_token
         ) -> bool;

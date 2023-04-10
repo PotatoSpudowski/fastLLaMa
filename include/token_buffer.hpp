@@ -41,7 +41,7 @@ namespace fastllama {
             m_fn(std::move(temp));
         }
 
-        constexpr auto are_tokens_present_in_buffer(std::vector<std::string> const& tokens) noexcept -> std::pair<bool, std::string_view> {
+        constexpr auto are_tokens_present_in_buffer(Span<std::string> tokens) noexcept -> std::pair<bool, std::string_view> {
             if (tokens.empty()) return std::make_pair( false, std::string_view{} );
 
             assert(tokens.size() < (str_buffer_size - m_num_of_chars_in_unicode_buffer) && "Max token is reached");
