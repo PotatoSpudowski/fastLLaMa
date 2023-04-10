@@ -162,7 +162,7 @@ class Model:
             streaming_fn(arr.decode('utf-8'))
         stop_words_fn = self.lib.llama_set_stop_words
         stop_words_fn.restype = ctypes.c_bool
-        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, ctypes.POINTER[ctypes.c_char_p]])
+        stop_words_fn.argtypes = cast(List[Type[Any]], [c_llama_model_context_ptr, ctypes.POINTER(ctypes.c_char_p)])
 
         stop_words_fn(self.ctx, [bytes(s, 'utf-8') for s in stop_words], len(stop_words))
 
