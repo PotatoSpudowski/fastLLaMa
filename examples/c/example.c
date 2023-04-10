@@ -24,7 +24,9 @@ int main() {
         "User: Hello, Bob.\n"
         "Bob: Hello. How may I help you today?\n"
         "User: Please tell me the largest city in Europe.\n"
-        "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n";
+        "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n"
+        "User: What is the area of the city?\n"
+        "Bob: ";
 
     printf("Ingesting, please wait...\n");
     fflush(stdout);
@@ -36,31 +38,14 @@ int main() {
     printf("Ingestion complete!\n");
     fflush(stdout);
 
-    char prefix[] = "User: ";
-    char bot_prefix[] = "Bob: ";
-    char prompt[1024 + sizeof(prefix)] = {0};
-    strcpy(prompt, prefix);
-
-    printf("User: ");
-
     char const* stop_words[] = {
-        "User: ",
+        "User:",
     };
-    llama_set_stop_words(model_ctx, stop_words, sizeof(stop_words)/sizeof(stop_words[0]));
 
-    while(true) {
-        fgets(prompt + sizeof(prefix) - 1, sizeof(prompt), stdin);
+    llama_set_stop_words(model_ctx, stop_words, 1ul);
 
-        if (!llama_ingest(model_ctx, prompt)) {
-            return 2;
-        }
-
-        if (!llama_generate(model_ctx, &stream_fn, 300, 40, 0.95f, 0.8f, 1.0f)) {
-            return 3;
-        }
-
-        
-        printf("\nUser: ");
+    if (!llama_generate(model_ctx, &stream_fn, 300, 40, 0.95f, 0.8f, 1.0f)) {
+        return 3;
     }
     
     return 0;
