@@ -8,6 +8,7 @@
 #include "vocab.hpp"
 #include "logger.hpp"
 #include "ring_buffer.hpp"
+#include <optional>
 
 namespace fastllama {    
     struct FastLlama {

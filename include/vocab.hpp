@@ -15,7 +15,7 @@ namespace fastllama {
         using id    = std::int32_t;
         using token = std::string;
         
-        constexpr auto get_token_from_id(id token_id) const noexcept -> std::string_view {
+        auto get_token_from_id(id token_id) const noexcept -> std::string_view {
             auto temp_id = static_cast<std::size_t>(token_id);
             if (temp_id >= id_to_token.size()) return {};
             return id_to_token[temp_id].tok;

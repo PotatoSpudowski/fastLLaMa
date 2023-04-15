@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "fastllama.h"
 
@@ -16,7 +17,7 @@ int main() {
 
     struct llama_model_context* model_ctx = llama_create_context(args);
     
-    if (!llama_load_model(model_ctx, ALPACA_LORA_7B, "./models/alpaca-lora-7B/alpaca-model")) {
+    if (!llama_load_model(model_ctx, ALPACA_LORA_7B, "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin")) {
         return 1;
     }
 
@@ -24,7 +25,7 @@ int main() {
     char const suffix[] = "\n\n### Response:\n\n";
     size_t const prompt_size = 1024 + sizeof(prefix);
 
-    char prompt[prompt_size + sizeof(prefix) + sizeof(suffix)] = {0};
+    char* prompt = calloc(prompt_size + sizeof(prefix) + sizeof(suffix), sizeof(char));
     strcpy(prompt, prefix);
 
     printf("User: ");
@@ -35,7 +36,8 @@ int main() {
     llama_set_stop_words(model_ctx, stop_words, sizeof(stop_words)/sizeof(stop_words[0]));
 
     while(true) {
-        fgets(prompt + sizeof(prefix) - 1, prompt_size - 1, stdin);
+        char* res = fgets(prompt + sizeof(prefix) - 1, prompt_size - 1, stdin);
+        (void)res;
         size_t str_len = strlen(prompt);
         strcpy(prompt + str_len - 1, suffix);
         prompt[str_len + sizeof(suffix) - 1] = 0;
@@ -50,6 +52,8 @@ int main() {
 
         printf("\nUser: ");
     }
+
+    free(prompt);
     
     return 0;
 }

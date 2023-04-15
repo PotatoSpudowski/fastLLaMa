@@ -15,15 +15,15 @@ namespace fastllama{
             End = SEEK_END
         };
 
-        constexpr BinaryFileReader(std::string_view path) noexcept
+        BinaryFileReader(std::string_view path) noexcept
             : m_file_ptr(fopen(path.data(), "rb"))
         {}
         
-        constexpr BinaryFileReader(BinaryFileReader const& other) noexcept
+        BinaryFileReader(BinaryFileReader const& other) noexcept
             : m_file_ptr(other.m_file_ptr)
         {}
 
-        constexpr BinaryFileReader(BinaryFileReader&& other) noexcept 
+        BinaryFileReader(BinaryFileReader&& other) noexcept 
             : m_file_ptr(other.m_file_ptr)
         {
             if (this != &other) {
@@ -31,7 +31,7 @@ namespace fastllama{
             }
         }
         
-        constexpr BinaryFileReader& operator=(BinaryFileReader&& other) noexcept {
+        BinaryFileReader& operator=(BinaryFileReader&& other) noexcept {
             this->close();
             swap(other, *this);
             return *this;
@@ -61,26 +61,26 @@ namespace fastllama{
             return static_cast<bool>(m_file_ptr);
         }
 
-        constexpr auto tell() const noexcept -> std::optional<std::size_t> {
+        auto tell() const noexcept -> std::optional<std::size_t> {
             auto tell_val = ftell(m_file_ptr);
             if (tell_val < 0) return std::nullopt;
             return static_cast<std::size_t>(tell_val);
         }
 
-        constexpr auto seek(std::size_t offset, SeekReference ref = SeekReference::Begin) noexcept -> bool {
+        auto seek(std::size_t offset, SeekReference ref = SeekReference::Begin) noexcept -> bool {
             return fseek(m_file_ptr, static_cast<long>(offset), static_cast<int>(ref)) == 0;
         }
 
-        constexpr auto eof() const noexcept -> bool {
+        auto eof() const noexcept -> bool {
             return feof(m_file_ptr);
         }
 
-        constexpr auto close() noexcept -> void {
+        auto close() noexcept -> void {
             if (m_file_ptr) fclose(m_file_ptr);
             m_file_ptr = nullptr;
         }
 
-        constexpr auto set_buffer(char* buffer, std::size_t size) noexcept {
+        auto set_buffer(char* buffer, std::size_t size) noexcept {
             setvbuf(m_file_ptr, buffer, _IOFBF, size);
         }
 

@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <functional>
 
 namespace fastllama {
 

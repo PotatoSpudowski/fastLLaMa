@@ -21,12 +21,12 @@ namespace fastllama {
     
     
     struct BinaryFilePipe {
-        constexpr BinaryFilePipe(BinaryFileReader& reader, BinaryFileWriter& writer) noexcept
+        BinaryFilePipe(BinaryFileReader& reader, BinaryFileWriter& writer) noexcept
             : m_reader(std::move(reader))
             , m_writer(std::move(writer))
         {}
         
-        constexpr BinaryFilePipe(std::string_view reader_filepath, std::string_view& writer_filepath) noexcept
+        BinaryFilePipe(std::string_view reader_filepath, std::string_view& writer_filepath) noexcept
             : m_reader(reader_filepath)
             , m_writer(writer_filepath)
         {}
@@ -61,7 +61,7 @@ namespace fastllama {
             return m_reader && m_writer;
         }
 
-        constexpr void close() noexcept {
+        void close() noexcept {
             m_reader.close();
             m_writer.close();
         }

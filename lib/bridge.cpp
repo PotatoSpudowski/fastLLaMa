@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <numeric>
 #include <chrono>
+#include <cmath>
 #include "span.hpp"
 
 namespace fastllama {
@@ -75,15 +76,15 @@ namespace fastllama {
         [[maybe_unused]] auto const logits_id_size = logits_id.size();
         #pragma omp parallel for if(logits_id_size > 256)
         for (const auto & kv : logits_id) {
-            auto p = static_cast<double>(expf(static_cast<float>(kv.first - maxl)));
+            auto p = static_cast<double>(std::exp(static_cast<float>(kv.first - maxl)));
             probs.push_back(p);
             sum += p;
         }
 
         // normalize the probs
         #pragma omp for simd
-        for (auto& p : probs) {
-            p /= sum;
+        for (auto i = 0ul; i < probs.size(); i++) {
+            probs[i] /= sum;
         }
 
         if (top_p < 1.0) {
@@ -305,7 +306,7 @@ namespace fastllama {
         for(auto i = std::size_t{}; i < logits.size(); ++i) {
             // Subtract the maximum logit value from the current logit value for numerical stability
             auto const normalized_logit = logits[i] - max_val;
-            auto const exp_logit = std::expf(normalized_logit);
+            auto const exp_logit = std::exp(normalized_logit);
             sum_exp += exp_logit;
             prob_out[i] = exp_logit;
         }

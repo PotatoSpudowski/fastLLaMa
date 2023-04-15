@@ -7,23 +7,25 @@
 #include <numeric>
 #include <functional>
 #include "span.hpp"
+#include <cstring>
+#include <cmath>
 
 namespace fastllama {
 
-    FASTLLAMA_ALWAYS_INLINE static constexpr auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
+    static auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
         std::uint32_t magic{};
         reader.read(&magic);
         return magic == magic_number_v;
     }
     
-    FASTLLAMA_ALWAYS_INLINE static constexpr auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
+    static auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
         std::uint32_t version{};
         reader.read(&version);
         if (format_version != nullptr) *format_version = version;
         return version == file_version_v;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static constexpr auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
+    static auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
         reader.read(&params.n_vocab);
         reader.read(&params.n_embd);
         reader.read(&params.n_mult);
@@ -33,7 +35,7 @@ namespace fastllama {
         reader.read(&params.f16);
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size, bool has_padding, bool is_old_model) {
+    static auto load_vocab(BinaryFileReader& reader, Vocab& vocab, std::size_t size, bool has_padding, bool is_old_model) {
         vocab.id_to_token.resize(size);
         std::string word(64, ' ');
 
@@ -56,7 +58,7 @@ namespace fastllama {
         vocab.set_word(static_cast<typename Vocab::id>(new_size), std::move(pad_token), 0);
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto prepare_memory_for_weight(Model& model, ggml_type vtype, ggml_type wtype, int n_ff) {
+    static auto prepare_memory_for_weight(Model& model, ggml_type vtype, ggml_type wtype, int n_ff) {
         auto const& params  = model.params;
         auto const  n_embd  = params.n_embd;
         auto const  n_layer = params.n_layer;
@@ -122,7 +124,7 @@ namespace fastllama {
         }
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger, bool is_old_model) -> bool {
+    static auto load_model_weights(BinaryFileReader& reader, Model& model, std::size_t part_id, std::size_t n_parts, Logger& logger, bool is_old_model) -> bool {
         std::size_t number_of_tensors{};
         std::size_t total_size {};
         std::string name(64, ' ');
@@ -297,7 +299,7 @@ namespace fastllama {
         return true;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto parse_tensor_data(std::vector<char>& file_buffer, std::string_view filepath, Model& model, std::size_t offset, Logger& logger, bool is_old_model) -> bool {
+    static auto parse_tensor_data(std::vector<char>& file_buffer, std::string_view filepath, Model& model, std::size_t offset, Logger& logger, bool is_old_model) -> bool {
         std::size_t n_parts{ model.model_id.config.number_of_parts };
         
         auto total_size = filepath.size();
@@ -333,7 +335,7 @@ namespace fastllama {
         return true;
     }
 
-    FASTLLAMA_ALWAYS_INLINE static auto read_header(
+    static auto read_header(
         std::string_view filepath,
         Model& model,
         BinaryFileReader& reader,
@@ -529,7 +531,7 @@ namespace fastllama {
     }
 
     bool Model::dump_vocab(std::string_view filepath) {
-        std::ofstream f(filepath);
+        std::ofstream f{ std::string(filepath) };
         if (!f) return false;
 
         for(auto i = 0ul; i < vocabulary.id_to_token.size(); ++i) {
