@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.20)
-project(fastLlama)
 
 set(GLOBAL_VARS_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GlobalVars.cmake")
 
@@ -12,6 +11,8 @@ if(EXISTS ${GLOBAL_VARS_FILE_PATH})
 else()
   message(STATUS "Unable to find '${GLOBAL_VARS_FILE_PATH}'")
 endif(EXISTS ${GLOBAL_VARS_FILE_PATH})
+
+project(${PROJECT_NAME})
 
 set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_CXX_VISIBILITY_PRESET hidden)

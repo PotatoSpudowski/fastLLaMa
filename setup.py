@@ -57,9 +57,9 @@ def set_global_cmake_variables(cmake_global_vars: CmakeVarType, args: argparse.N
     
     cmake_global_vars[f'EXAMPLES_{g_selected_language[0]}'] = True
     cmake_global_vars[f'INTERFACES_{g_selected_language[0]}'] = True
-    cmake_global_vars['WORKSPACE'] = os.getcwd()
+    cmake_global_vars['WORKSPACE'] = os.path.normpath(os.getcwd()).replace('\\', '/')
 
-def run_make(build_dir: str = "build") -> None:
+def run_make(project_name: str, build_dir: str = "build") -> None:
     # Change the current working directory to the build directory
     if not os.path.exists(build_dir):
        os.mkdir(build_dir)
@@ -70,8 +70,8 @@ def run_make(build_dir: str = "build") -> None:
     try:
         # Run the 'make' command
         run_shell([
-            'cmake ..',
-            'make'
+            ['cmake', '..'],
+            ['make', '-j', '4'] if os.name == 'posix' else ['msbuild', f'{project_name}.sln']
         ])
     except subprocess.CalledProcessError as e:
         print("An error occurred while running 'make':", e)
@@ -307,7 +307,7 @@ def set_android_arg_parser(parser: argparse._SubParsersAction) -> None:
     )
 
 
-def parse_args(global_compiler_flags: List[str]) -> bool:
+def parse_args(project_name: str, global_compiler_flags: List[str]) -> bool:
     parser = argparse.ArgumentParser(
         prog="Fastllama",
         description="Fastllama tries to provide llama wrapper interfaces for all popular languages."
@@ -330,13 +330,15 @@ def parse_args(global_compiler_flags: List[str]) -> bool:
         run_cmd_on_build_dirs(['make'])
         return False
     
-    cmake_global_vars: CmakeVarType = {}
+    cmake_global_vars: CmakeVarType = {
+        'PROJECT_NAME': project_name,
+    }
     set_global_cmake_variables(cmake_global_vars, args)
     set_cross_compile_target_flags(cmake_global_vars, args, global_compiler_flags)
     save_cmake_vars_helper(os.path.join('.', 'cmake', 'GlobalVars.cmake'), cmake_global_vars)
     return True
 
-def build_example() -> None:
+def build_example(project_name: str) -> None:
     global g_selected_language
     example_path = os.path.join('.', 'examples', g_selected_language[0])
     if not os.path.exists(example_path):
@@ -347,7 +349,7 @@ def build_example() -> None:
         current_dir = os.getcwd()
         os.chdir(example_path)
         try:
-            run_make()
+            run_make(project_name)
         finally:
             os.chdir(current_dir)
             print('\nBuilding examples completed\n')
@@ -363,13 +365,14 @@ def build_example() -> None:
         os.chmod(module_path, 0o700)
         os.symlink(os.path.abspath(module_path), os.path.abspath(lib_path))
 
-def main() -> None:
+def main(project_name: str) -> None:
+    
     global_compiler_flags: List[str] = []
-    if not parse_args(global_compiler_flags):
+    if not parse_args(project_name, global_compiler_flags):
         return
     generate_compiler_flags(global_compiler_flags)
-    run_make()
-    build_example()
+    run_make(project_name)
+    build_example(project_name)
 
 if __name__ == "__main__":
-    main()
+    main('fastllama')

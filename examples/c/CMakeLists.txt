@@ -27,9 +27,11 @@ macro(_SET_OPTIONS_AND_LIB target)
   target_link_libraries(${target} PRIVATE cfastllama)
   target_link_libraries(${target} PRIVATE fast_llama_lib)
   target_link_libraries(${target} PRIVATE ggml_library)
-  target_link_libraries(${target} PRIVATE stdc++)
+
   target_link_libraries(${target} PRIVATE ${OPENMP_LIB_C})
+
   if (NOT WIN32)
+    target_link_libraries(${target} PRIVATE stdc++)
     target_link_libraries(${target} PRIVATE m)
   endif(NOT WIN32)
 

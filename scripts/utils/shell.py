@@ -8,9 +8,9 @@ from scripts.utils.python_version import get_python_exec_paths
 
 def run_shell(commands: List[Union[List[str], str]]) -> None:
     for cmd in commands:
-        normalized_command = [cmd] if type(cmd) == str else cmd
-        print(f"Setup executing command: {subprocess.list2cmdline(normalized_command)}")
-        result = subprocess.Popen(normalized_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        normalized_command = subprocess.list2cmdline([cmd] if type(cmd) == str else cmd)
+        print(f"Setup executing command: {normalized_command}")
+        result = subprocess.Popen([normalized_command], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         while True:
             if result.stdout is None:
                 break
