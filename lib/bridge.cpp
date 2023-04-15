@@ -48,8 +48,9 @@ namespace fastllama {
             const double scale = 1.0 / temp;
             auto const inv_repeat_penalty = 1.0 / repeat_penalty;
             
-            #pragma omp parallel for if (n_logits > 256)
-            for (auto i = 0ul; i < n_logits; ++i) {
+            auto const temp_n_logits = static_cast<std::ptrdiff_t>(logits_id.size());
+            #pragma omp parallel for if (temp_n_logits > 256)
+            for (auto i = 0l; i < temp_n_logits; ++i) {
                 // repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
                 // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
                 auto const scaled_logits = static_cast<double>(plogits[static_cast<std::ptrdiff_t>(i)]) * scale;
@@ -73,16 +74,16 @@ namespace fastllama {
 
         double sum{};
 
-        [[maybe_unused]] auto const logits_id_size = logits_id.size();
+        auto const logits_id_size = static_cast<std::ptrdiff_t>(logits_id.size());
         #pragma omp parallel for if(logits_id_size > 256)
-        for (const auto & kv : logits_id) {
+        for (auto i = 0l; i < logits_id_size; i++) {
+            auto const& kv = logits_id[static_cast<std::size_t>(i)];
             auto p = static_cast<double>(std::exp(static_cast<float>(kv.first - maxl)));
             probs.push_back(p);
             sum += p;
         }
 
         // normalize the probs
-        #pragma omp for simd
         for (auto i = 0ul; i < probs.size(); i++) {
             probs[i] /= sum;
         }

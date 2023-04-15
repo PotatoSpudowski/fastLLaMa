@@ -971,8 +971,9 @@ namespace fastllama {
                         pipe.get_reader().read(data_f16.data(), total_number_of_elements);
 
                         data_f32.resize(total_number_of_elements);
-                        #pragma omp parallel for if (total_number_of_elements > 512)
-                        for (auto i = 0ul; i < total_number_of_elements; ++i) {
+                        auto const n = static_cast<std::ptrdiff_t>(total_number_of_elements);
+                        #pragma omp parallel for if (n > 512)
+                        for (auto i = 0l; i < n; ++i) {
                             data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
                         }
                     } else {

@@ -170,7 +170,7 @@ COMPILER_FLAG_FIX_LOOKUP_TABLE: Mapping[cmake_variable_type, Callable[[List[str]
 
 def init_cmake_vars(cmake_var: str, arch: str) -> List[str]:
     if 'MSVC' in cmake_var:
-        return ['/GL']
+        return ['/GL', '/openmp:experimental']
     return []
 
 def get_compiler_flag(feature: str) -> Mapping[cmake_variable_type, Optional[str]]:
