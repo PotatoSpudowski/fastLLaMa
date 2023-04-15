@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include "span.hpp"
+#include "watermark.hpp"
 
 namespace fastllama {
 
@@ -119,6 +120,9 @@ namespace fastllama {
         temp.m_model.embeddings_eval_enable = embedding_eval_enabled;
         temp.m_model.should_put_all_logits = should_get_all_logits;
         temp.m_model.allocate_extra_mem = allocate_extra_mem;
+
+        printf("\n\n\x1b[32m%s\x1b[0m\n\n", internal::watermark);
+        fflush(stdout);
 
         if (!temp.m_model.load(model_id, filepath, is_old_model)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
@@ -321,7 +325,7 @@ namespace fastllama {
         auto const tokens = tokenize(m_model.vocabulary, prompt, true);
 
         auto count = std::size_t{};
-        auto const block_size = static_cast<std::size_t>(m_model.params.n_ctx);
+        auto const block_size = static_cast<std::size_t>(m_model.n_batch);
         auto const token_len = tokens.size();
         auto const q_blocks = token_len / block_size;
         auto const r_block = token_len % block_size;

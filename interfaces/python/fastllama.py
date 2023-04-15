@@ -69,6 +69,11 @@ class c_llama_model_context(ctypes.Structure):
 
 c_llama_model_context_ptr = ctypes.POINTER(c_llama_model_context)
 
+def make_c_logger_func(func: Callable[[str, str], None]) -> C_LLAMA_LOGGER_FUNC:
+    def c_logger_func(func_name: ctypes.c_char_p, func_name_len: ctypes.c_int, message: ctypes.c_char_p, message_len: ctypes.c_int) -> None:
+        func(ctypes.string_at(func_name, func_name_len).decode('utf-8'), ctypes.string_at(message, message_len).decode('utf-8'))
+    return C_LLAMA_LOGGER_FUNC(c_logger_func)
+
 class Model:
     def __init__(
         self,
@@ -111,10 +116,10 @@ class Model:
 
         if logger is not None:
             temp_logger = c_llama_logger()
-            temp_logger.log = logger.log_info
-            temp_logger.log_err = logger.log_err
-            temp_logger.log_warn = logger.log_warn
-            temp_logger.reset = logger.reset
+            temp_logger.log = make_c_logger_func(logger.log_info)
+            temp_logger.log_err = make_c_logger_func(logger.log_err)
+            temp_logger.log_warn = make_c_logger_func(logger.log_warn)
+            temp_logger.reset = C_LLAMA_LOGGER_RESET_FUNC(lambda: logger.reset())
             ctx_args.logger = temp_logger
 
         self.ctx = self.__create_model_ctx__(ctx_args)

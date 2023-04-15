@@ -189,9 +189,9 @@ python export-alpaca-lora.py
 
 # python [PythonFile] [ModelPath] [Floattype] [SplitType]
 # SplitType should be 1 for Alpaca-Lora models exported from HF
-python3 scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0 0
+python3 scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 
-./build/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
+./build/src/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
 python example-alpaca.py
 ```
