@@ -198,7 +198,7 @@ def generate_compiler_flags(global_compiler_flags: List[str]) -> None:
     fix_flags(cmake_vars, global_compiler_flags)
     save_cmake_vars(cmake_vars)
 
-def run_cmd_on_build_dirs(cmd: List[List[str] | str]) -> None:
+def run_cmd_on_build_dirs(cmd: List[Union[List[str], str]]) -> None:
     example_paths = [os.path.join('.', 'examples', l) for l in ALL_LANGUAGES_IN_INTERFACES.keys()]
     current_path = os.getcwd()
     if os.path.exists(os.path.join('.', 'build')):
