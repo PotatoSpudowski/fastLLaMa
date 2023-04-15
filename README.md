@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Python wrapper to run Inference of [LLaMA](https://arxiv.org/abs/2302.13971) models using C++
+Framework to run inference of Decoder only LLMs like [LLaMA](https://arxiv.org/abs/2302.13971) in 4bit quantization in Python using C/C++ backend.
 
 This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp)
 
@@ -93,23 +93,25 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 ### Example
 ```sh
 git clone https://github.com/PotatoSpudowski/fastLLaMa
-cd fast_llama
+cd fastLLaMa
 
-python setup.py
+# install Python dependencies
+pip install -r requirements.txt
+
+python setup.py -l python
 
 # obtain the original LLaMA model weights and place them in ./models
 ls ./models
 65B 30B 13B 7B tokenizer_checklist.chk tokenizer.model
 
-# install Python dependencies
-pip install -r requirements.txt
-
 # convert the 7B model to ggml FP16 format
-# python [PythonFile] [ModelPath] [Floattype] [SplitType]
-python3 convert-pth-to-ggml.py models/7B/ 1 0
+# python [PythonFile] [ModelPath] [Floattype] [Vocab Only] [SplitType]
+python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0
 
 # quantize the model to 4-bits
 python3 quantize.py 7B
+#or
+#./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
 
 # run the inference
 python example.py
@@ -119,22 +121,22 @@ python example.py
 ```python
 import sys
 
-sys.path.append("./build/")
+sys.path.append("./interfaces/python")
 
-import fastLlama
+from build.fastllama import Model, ModelKind
 ```
 
 ### Initializing the Model
 ```python
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
-model = fastLlama.Model(
-        id=MODEL_ID
+model = Model(
+        id=ModelKind.LLAMA_7B,
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model
         last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
-        seed=0 #seed for random number generator (Optional)
+        seed=0, #seed for random number generator (Optional)
     )
 ```
 
@@ -148,7 +150,7 @@ User: Please tell me the largest city in Europe.
 Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.
 User: """
 
-res = model.ingest(prompt) 
+res = model.ingest(prompt, is_system_prompt=True) #ingest model with prompt
 ```
 ### Generating Output
 ```python
@@ -168,7 +170,7 @@ res = model.generate(
     )
 ```
 
-### Saving Model State
+<!-- ### Saving Model State
 ```python
 res = model.save_state("./models/fast_llama.bin")
 ```
@@ -176,7 +178,7 @@ res = model.save_state("./models/fast_llama.bin")
 ### Loading Model State
 ```python
 res = model.load_state("./models/fast_llama.bin")
-```
+``` -->
 
 ### Running Alpaca-LoRA
 
@@ -189,9 +191,9 @@ python export-alpaca-lora.py
 
 # python [PythonFile] [ModelPath] [Floattype] [SplitType]
 # SplitType should be 1 for Alpaca-Lora models exported from HF
-python3 convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 1
+python3 scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 
-./build/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
+./build/src/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
 python example-alpaca.py
 ```
@@ -208,7 +210,7 @@ and sufficient RAM to load them. At the moment, memory and disk requirements are
 | 30B   | 60 GB         | 19.5 GB                |
 | 65B   | 120 GB        | 38.5 GB                |
 
-
+<!-- 
 ### Example Dockerfile
 This is a Dockerfile to build a minimal working example. Note that it does not download any models for you. It is also compatible with Alpaca models.
 
@@ -246,12 +248,12 @@ RUN python3.9 -m pip install --upgrade pip && python3.9 -m pip install setuptool
 RUN python3.9 -m pip install -r requirements.txt
 
 CMD ["python3.9", "example.py"]
-```
+``` -->
 
 ### Notes
-* Tested on 
-    * M1 Pro Mac
-    * Intel Mac
-    * Ubuntu:18.04 - Python 3.9
+* Tested on
+    * Hardware: Apple silicon, Intel, Arm (Pending)
+    * OS: MacOs, Linux, Windows (Building done, Running Pending), Android (Pending)
+  
 * The whole inspiration behind fastLLaMa is to let the community test the capabilities of LLaMA by creating custom workflows using Python. 
 * This project was possible because of [llama.cpp](https://github.com/ggerganov/llama.cpp), Do have a look at it as well.

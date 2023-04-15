@@ -25,3 +25,7 @@ arm_neon.h
 compile_commands.json
 
 cmake/CompilerFlagVariables.cmake
+cmake/GlobalVars.cmake
+
+__pycache__/
+build/

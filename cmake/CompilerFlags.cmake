@@ -45,8 +45,6 @@ function(set_compiler_lib_and_flags project_name)
     set(COMPILER_LDFLAGS_LIST "")
     set(COMPILER_DEF_FLAGS_LIST "")
 
-    message(STATUS "FLAGS: ${COMPILER_FLAGS_LIST}")
-
     if(Threads_FOUND)
         target_link_libraries(${project_name} PRIVATE Threads::Threads)
     endif(Threads_FOUND)
@@ -75,6 +73,20 @@ function(set_compiler_lib_and_flags project_name)
         _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "${_ARM_FLAG}" "${_ARM_FLAG}" "")
         unset(_ARM_FLAG)
     endif()
+
+    if (NOT WIN32)
+        target_link_libraries(${project_name} PRIVATE m)
+    endif(NOT WIN32)
+
+    if(NO_EXCEPTION EQUAL TRUE)
+        _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-exceptions" "-fno-exceptions" "/EHs-c-")
+    endif(NO_EXCEPTION EQUAL TRUE)
+    
+    _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-rtti" "-fno-rtti" "/GR-")
+
+    message(STATUS "Compiler flags used: ${COMPILER_FLAGS_LIST}")
+    message(STATUS "Linking flags used: ${COMPILER_LDFLAGS_LIST}")
+    message(STATUS "Macros defined: ${COMPILER_DEF_FLAGS_LIST}")
 
     target_compile_options(${project_name} PRIVATE ${COMPILER_FLAGS_LIST})
     target_link_options(${project_name} PRIVATE ${COMPILER_LDFLAGS_LIST})

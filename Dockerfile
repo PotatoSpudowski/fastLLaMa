@@ -2,7 +2,7 @@ FROM ubuntu:18.04
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-#TODO: Its should be cleaned up.
+# Set up the environment to run fastLLaMA
 
 # Add GCC and G++ New
 RUN apt-get update && \
@@ -30,6 +30,6 @@ WORKDIR /app
 COPY ./ ./
 RUN python3.9 -m pip install --upgrade setuptools pip distlib && \
     python3.9 -m pip install --upgrade -r requirements.txt && \
-    python3.9 setup.py
+    python3.9 setup.py -l python
 
 CMD ["python3.9", "example.py"]
