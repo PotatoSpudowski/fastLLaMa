@@ -11,7 +11,6 @@ int main() {
         .set_number_of_batches(64)
         .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
-        .set_should_get_all_logits(true)
         .build(fastllama::ModelKind::ALPACA_LORA_7B, "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin");
     
     if (!maybe_bridge) {
