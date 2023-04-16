@@ -480,10 +480,8 @@ namespace fastllama {
 
         std::size_t embd_size;
         reader.read(&embd_size);
-        auto const old_embd_size = m_embd.size();
         m_embd.resize(embd_size);
         reader.read(m_embd.data(), embd_size);
-        m_embd.resize(old_embd_size);
 
         get_logger().log(__func__, "loading embed vector\n");
 
@@ -500,10 +498,8 @@ namespace fastllama {
 
         std::size_t m_logits_size;
         reader.read(&m_logits_size);
-        auto const old_logits_size = m_logits.size();
         m_logits.resize(m_logits_size);
         reader.read(m_logits.data(), m_logits_size);
-        m_logits.resize(old_logits_size);
 
         get_logger().log(__func__, "loading logits\n");
 

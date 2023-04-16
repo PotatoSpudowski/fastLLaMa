@@ -761,6 +761,7 @@ namespace fastllama {
         auto const n_rot   = params.n_embd / params.n_head;
 
         ggml_init_params mem_params {};
+        // buf_compute.resize(mem_per_token);
         mem_params.mem_size   = buf_compute.size();
         mem_params.mem_buffer = reinterpret_cast<void*>(buf_compute.data());
 
