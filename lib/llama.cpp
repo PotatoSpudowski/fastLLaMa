@@ -530,6 +530,146 @@ namespace fastllama {
         ctx = nullptr;
     }
 
+    template<typename U = std::ptrdiff_t, typename T>
+    inline static U calculate_relative_ptr(T const*const ptr, std::ptrdiff_t with_respect_to) noexcept {
+        auto ptr_address = reinterpret_cast<std::ptrdiff_t>(ptr);
+        return reinterpret_cast<U>(with_respect_to - ptr_address);
+    }
+    
+    template<typename T, typename U = std::ptrdiff_t>
+    inline static T resolve_relative_ptr(U rel_ptr, std::ptrdiff_t with_respect_to) noexcept {
+        auto ptr_address = with_respect_to + reinterpret_cast<std::ptrdiff_t>(rel_ptr);
+        return reinterpret_cast<T>(ptr_address);
+    }
+    
+    template<typename T>
+    inline static T read_relative_ptr(BinaryFileReader& reader, std::ptrdiff_t with_respect_to) noexcept {
+        std::ptrdiff_t rel_ptr{};
+        reader.read(&rel_ptr);
+        return resolve_relative_ptr<T>(rel_ptr, with_respect_to);
+    }
+
+    inline static constexpr bool transform_tensor_for_serialization(ggml_tensor* tensor, std::ptrdiff_t ctx_ptr) noexcept {
+        if (tensor == nullptr) return true;
+        auto& t = *tensor;
+
+        transform_tensor_for_serialization(t.grad, ctx_ptr);
+        t.grad = calculate_relative_ptr<ggml_tensor*>(t.grad, ctx_ptr);
+        transform_tensor_for_serialization(t.src0, ctx_ptr);
+        t.src0 = calculate_relative_ptr<ggml_tensor*>(t.src0, ctx_ptr);
+        transform_tensor_for_serialization(t.src1, ctx_ptr);
+        t.src1 = calculate_relative_ptr<ggml_tensor*>(t.src1, ctx_ptr);
+
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) transform_tensor_for_serialization(t.opt[i], ctx_ptr);
+
+        t.data = calculate_relative_ptr<void*>(t.data, ctx_ptr);
+        return true;
+    }
+
+    inline static constexpr bool transform_tensor_after_deserialization(ggml_tensor* tensor, std::ptrdiff_t ctx_ptr) noexcept {
+        if (tensor == nullptr) return true;
+        auto& t = *tensor;
+
+        transform_tensor_after_deserialization(t.grad, ctx_ptr);
+        t.grad = resolve_relative_ptr<ggml_tensor*>(t.grad, ctx_ptr);
+        transform_tensor_after_deserialization(t.src0, ctx_ptr);
+        t.src0 = resolve_relative_ptr<ggml_tensor*>(t.src0, ctx_ptr);
+        transform_tensor_after_deserialization(t.src1, ctx_ptr);
+        t.src1 = resolve_relative_ptr<ggml_tensor*>(t.src1, ctx_ptr);
+
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) transform_tensor_after_deserialization(t.opt[i], ctx_ptr);
+
+        t.data = resolve_relative_ptr<void*>(t.data, ctx_ptr);
+        return true;
+    }
+
+    bool KVCacheBuffer::saveSate(BinaryFileWriter& writer) const noexcept {
+        writer.write(&memory_type);
+        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+
+        transform_tensor_for_serialization(k, ctx_ptr);
+        transform_tensor_for_serialization(v, ctx_ptr);
+        auto k_ptr = calculate_relative_ptr(k, ctx_ptr);
+        auto v_ptr = calculate_relative_ptr(v, ctx_ptr);
+
+        auto const buffer_size = buffer.size();
+        writer.write(&buffer_size);
+        writer.write(buffer.data(), buffer_size);
+        writer.write(&k_ptr);
+        writer.write(&v_ptr);
+        writer.write(&number_of_tokens_in_cache);
+
+        transform_tensor_after_deserialization(k, ctx_ptr);
+        transform_tensor_after_deserialization(v, ctx_ptr);
+        return true;
+    }
+
+    bool KVCacheBuffer::loadSate(BinaryFileReader& reader) noexcept {
+        reader.read(&memory_type);
+        auto buffer_size = buffer.size();
+
+        reader.read(&buffer_size);
+        buffer.resize(buffer_size);
+        reader.read(buffer.data(), buffer_size);
+        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+
+        k = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+        v = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+
+        transform_tensor_after_deserialization(k, ctx_ptr);
+        transform_tensor_after_deserialization(v, ctx_ptr);
+        return true;
+    }
+
+    // Assumption 1: Layer is not being modified. Therefore, we can skip it
+    // Assumption 2: User will only load state of correct model
+    // Assumption 3: Embeddings vector is not needed for the save and load
+    bool Model::saveSate(BinaryFileWriter& writer) const noexcept {
+
+        auto const buffer_size = buffer.size();
+        writer.write(&buffer_size);
+        writer.write(buffer.data(), buffer_size);
+
+        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+        transform_tensor_for_serialization(tok_embeddings, ctx_ptr);
+        transform_tensor_for_serialization(norm, ctx_ptr);
+        transform_tensor_for_serialization(output, ctx_ptr);
+        auto tok_ptr = calculate_relative_ptr(tok_embeddings, ctx_ptr);
+        auto norm_ptr = calculate_relative_ptr(norm, ctx_ptr);
+        auto out_ptr = calculate_relative_ptr(output, ctx_ptr);
+
+        writer.write(&tok_ptr);
+        writer.write(&norm_ptr);
+        writer.write(&out_ptr);
+
+        transform_tensor_after_deserialization(tok_embeddings, ctx_ptr);
+        transform_tensor_after_deserialization(norm, ctx_ptr);
+        transform_tensor_after_deserialization(output, ctx_ptr);
+
+        kv_self.saveSate(writer);
+        return true;
+    }
+
+    bool Model::loadSate(BinaryFileReader& reader) noexcept {
+        auto buffer_size = buffer.size();
+        reader.read(&buffer_size);
+        buffer.resize(buffer_size);
+        reader.read(buffer.data(), buffer_size);
+        
+        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+        tok_embeddings = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+        norm = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+        output = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+
+        transform_tensor_after_deserialization(tok_embeddings, ctx_ptr);
+        transform_tensor_after_deserialization(norm, ctx_ptr);
+        transform_tensor_after_deserialization(output, ctx_ptr);
+
+        kv_self.loadSate(reader);
+        return true;
+    }
+
+
     bool Model::dump_vocab(std::string_view filepath) {
         std::ofstream f{ std::string(filepath) };
         if (!f) return false;
@@ -566,8 +706,10 @@ namespace fastllama {
         {
             model_id.config.mem_required_for_eval += static_cast<std::size_t>(n_batch) * 20_MiB + allocate_extra_mem; // extra space large batch
             buf_compute.resize(model_id.config.mem_required_for_eval);
-            buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
-            buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
+            if constexpr (use_scratch_buffer) {
+                buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
+                buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
+            }
         }
 
         auto reader = fastllama::BinaryFileReader(filepath);

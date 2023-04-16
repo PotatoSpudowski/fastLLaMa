@@ -73,10 +73,9 @@ namespace fastllama {
 
         static Params builder() noexcept { return {}; }
 
-        constexpr Logger const& get_logger() const noexcept {
-            return m_model.logger;
-        }
-
+        constexpr Logger const& get_logger() const noexcept { return m_model.logger; }
+        bool saveSate(std::string_view filepath) const noexcept;
+        bool loadSate(std::string_view filepath) noexcept;
     private:
         auto recycle_embed_if_exceeds_context() -> bool;
 

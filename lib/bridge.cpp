@@ -411,4 +411,22 @@ namespace fastllama {
         return { res };
     }
 
+    bool FastLlama::saveSate(std::string_view filepath) const noexcept {
+        auto writer = BinaryFileWriter(filepath);
+        if (!writer) {
+            get_logger().log_err(__func__, "unable to open the file saving the model state");
+            return false;
+        }
+        return m_model.saveSate(writer);
+    }
+
+    bool FastLlama::loadSate(std::string_view filepath) noexcept {
+        auto reader = BinaryFileReader(filepath);
+        if (!reader) {
+            get_logger().log_err(__func__, "unable to open the file loading the model state");
+            return false;
+        }
+        return m_model.loadSate(reader);
+    }
+
 } // namespace fastllama

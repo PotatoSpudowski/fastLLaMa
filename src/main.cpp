@@ -1,10 +1,26 @@
 #include "bridge.hpp"
 #include <thread>
 #include <chrono>
+#include "concurrency/pool.hpp"
 
 using namespace std::chrono_literals;
+using namespace fastllama;
+
+std::mutex mu;
+struct LoadWorker {
+    void operator()() noexcept {
+        std::lock_guard lk{mu};
+        std::cout<<"Hello Worker: "<<std::this_thread::get_id()<<"\n";
+    }
+};
 
 int main() {
+    // ThreadPool<LoadWorker> w(2);
+    // for(auto i = 0ul; i < 10; ++i) {
+    //     w.add_work({});
+    // }
+
+    // w.wait();
     auto maybe_bridge = fastllama::FastLlama::builder()
         .set_number_of_threads(16)
         .set_number_of_batches(64)
@@ -29,22 +45,23 @@ int main() {
     );
     logger.log_warn("main", "Ingestion complete!\n");
 
-    std::string prompt;
+    bridge.saveSate("./models/fast_llama.bin");
+    // std::string prompt;
 
-    std::cout<<"User: ";
+    // std::cout<<"User: ";
 
-    while(std::getline(std::cin, prompt)) {
-        prompt = "User: " + prompt;
+    // while(std::getline(std::cin, prompt)) {
+    //     prompt = "User: " + prompt;
         
-        bridge.ingest(prompt);
+    //     bridge.ingest(prompt);
 
-        bridge.generate([](std::string const& s) {
-            std::cout<<s;
-            std::cout.flush();
-        }, 300, 40, 0.95f, 0.8f, 1.0f, { "User: " });
+    //     bridge.generate([](std::string const& s) {
+    //         std::cout<<s;
+    //         std::cout.flush();
+    //     }, 300, 40, 0.95f, 0.8f, 1.0f, { "User: " });
         
-        std::cout<<"\nUser: ";
-    }
+    //     std::cout<<"\nUser: ";
+    // }
     
     return 0;
 }

@@ -1,6 +1,10 @@
 from build.fastllama import Model, ModelKind
 
+<<<<<<< Updated upstream
 MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
+=======
+MODEL_PATH = "./models/alpaca-lora-7B/alpaca-model"
+>>>>>>> Stashed changes
 
 def stream_token(x: str) -> None:
     """
