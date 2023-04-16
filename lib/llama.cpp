@@ -583,48 +583,30 @@ namespace fastllama {
         return true;
     }
 
-    // bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
-    //     writer.write(&memory_type);
-    //     auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+    bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
+        writer.write(&memory_type);
 
-    //     transform_tensor_for_serialization(k, ctx_ptr);
-    //     transform_tensor_for_serialization(v, ctx_ptr);
-    //     auto k_ptr = calculate_relative_ptr(k, ctx_ptr);
-    //     auto v_ptr = calculate_relative_ptr(v, ctx_ptr);
+        writer.write(k->data, sizeof(char), ggml_nbytes(k));
+        writer.write(v->data, sizeof(char), ggml_nbytes(k));
+        return true;
+    }
 
-    //     auto const buffer_size = buffer.size();
-    //     writer.write(&buffer_size);
-    //     writer.write(buffer.data(), buffer_size);
-    //     writer.write(&k_ptr);
-    //     writer.write(&v_ptr);
-    //     writer.write(&number_of_tokens_in_cache);
+    bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
+        reader.read(&memory_type);
 
-    //     transform_tensor_after_deserialization(k, ctx_ptr);
-    //     transform_tensor_after_deserialization(v, ctx_ptr);
-    //     return true;
-    // }
-
-    // bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
-    //     reader.read(&memory_type);
-    //     auto buffer_size = buffer.size();
-
-    //     reader.read(&buffer_size);
-    //     buffer.resize(buffer_size);
-    //     reader.read(buffer.data(), buffer_size);
-    //     auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
-
-    //     k = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
-    //     v = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
-
-    //     transform_tensor_after_deserialization(k, ctx_ptr);
-    //     transform_tensor_after_deserialization(v, ctx_ptr);
-    //     return true;
-    // }
+        reader.read(k->data, sizeof(char), ggml_nbytes(k));
+        reader.read(v->data, sizeof(char), ggml_nbytes(k));
+        return true;
+    }
 
     // Assumption 1: Layer is not being modified. Therefore, we can skip it
     // Assumption 2: User will only load state of correct model
     // Assumption 3: Embeddings vector is not needed for the save and load
     bool Model::save_state(BinaryFileWriter& writer) const noexcept {
+
+        // std::size_t const buf_compute_size = buf_compute.size();
+        // writer.write(&buf_compute_size);
+        // writer.write(buf_compute.data(), buf_compute_size);
 
         std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
         writer.write(&tok_embeddings_size);
@@ -644,15 +626,26 @@ namespace fastllama {
 
         logger.log(__func__, "saving output\n");
 
-        // kv_self.save_state(writer);
+        kv_self.save_state(writer);
         return true;
     }
 
     bool Model::load_state(BinaryFileReader& reader) noexcept {
         
+        // std::size_t buf_compute_size = buf_compute.size();
+        // reader.read(&buf_compute_size);
+        // buf_compute.resize(buf_compute_size);
+        // reader.read(buf_compute.data(), buf_compute_size);
+
         std::size_t tok_embeddings_size{};
         reader.read(&tok_embeddings_size);
         reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
+
+        tok_embeddings->grad = nullptr;
+        tok_embeddings->src0 = nullptr;
+        tok_embeddings->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) tok_embeddings->opt[i] = nullptr;
+        
 
         logger.log(__func__, "loading token embedings\n");
 
@@ -660,15 +653,25 @@ namespace fastllama {
         reader.read(&norm_size);
         reader.read(norm->data, sizeof(char), norm_size);
 
+        norm->grad = nullptr;
+        norm->src0 = nullptr;
+        norm->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) norm->opt[i] = nullptr;
+
         logger.log(__func__, "loading norm\n");
 
         std::size_t output_size{};
         reader.read(&output_size);
         reader.read(output->data, sizeof(char), output_size);
 
+        output->grad = nullptr;
+        output->src0 = nullptr;
+        output->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) output->opt[i] = nullptr;
+
         logger.log(__func__, "loading output\n");
 
-        // kv_self.load_state(reader);
+        kv_self.load_state(reader);
         return true;
     }
 
@@ -766,7 +769,7 @@ namespace fastllama {
         gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
 
         ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, static_cast<std::int64_t>(N));
-        memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
+        std::copy_n(embd_inp.begin(), N, static_cast<vocab_id*>(embd->data));
 
         ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
         

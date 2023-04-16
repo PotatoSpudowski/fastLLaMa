@@ -71,16 +71,15 @@ namespace fastllama {
 
         // compute probs for the top K tokens
         std::vector<double> probs;
-        probs.reserve(logits_id.size());
+        probs.resize(logits_id.size());
 
         double sum{};
 
         auto const logits_id_size = static_cast<std::ptrdiff_t>(logits_id.size());
-        #pragma omp parallel for if(logits_id_size > 256)
         for (auto i = 0l; i < logits_id_size; i++) {
             auto const& kv = logits_id[static_cast<std::size_t>(i)];
             auto p = static_cast<double>(std::exp(static_cast<float>(kv.first - maxl)));
-            probs.push_back(p);
+            probs[i] = p;
             sum += p;
         }
 
@@ -105,7 +104,7 @@ namespace fastllama {
         std::discrete_distribution<> dist(probs.begin(), probs.end());
         int idx = dist(rng);
 
-        return logits_id[static_cast<std::size_t>(idx)].second;
+        return logits_id[idx].second;
     }
 
     std::optional<FastLlama> FastLlama::Params::build(std::string_view model_id, std::string_view const& filepath) {
@@ -417,6 +416,20 @@ namespace fastllama {
             get_logger().log_err(__func__, "unable to open the file saving the model state");
             return false;
         }
+
+        writer.write(&n_past);
+        
+        std::stringstream ss;
+        ss << m_rng;
+        auto const rng_str = ss.str();
+        auto const rng_str_size = rng_str.size();
+        writer.write(&rng_str_size);
+        writer.write(rng_str.data(), rng_str_size);
+
+        get_logger().log(__func__, "saving random number generate\n");
+
+        writer.write(&m_mem_per_token);
+
         std::size_t const embd_size = m_embd.size();
         writer.write(&embd_size);
         writer.write(m_embd.data(), embd_size);
@@ -450,6 +463,20 @@ namespace fastllama {
             get_logger().log_err(__func__, "unable to open the file loading the model state");
             return false;
         }
+
+        reader.read(&n_past);
+
+        std::stringstream ss;
+        std::size_t rng_str_size;
+        reader.read(&rng_str_size);
+        std::string rng_str(rng_str_size, '\0');
+        reader.read(rng_str.data(), rng_str_size);
+        ss << rng_str;
+        ss >> m_rng;
+
+        get_logger().log(__func__, "loading random number generator\n");
+
+        reader.read(&m_mem_per_token);
 
         std::size_t embd_size;
         reader.read(&embd_size);
