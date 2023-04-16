@@ -411,22 +411,83 @@ namespace fastllama {
         return { res };
     }
 
-    bool FastLlama::saveSate(std::string_view filepath) const noexcept {
+    bool FastLlama::save_state(std::string_view filepath) const noexcept {
         auto writer = BinaryFileWriter(filepath);
         if (!writer) {
             get_logger().log_err(__func__, "unable to open the file saving the model state");
             return false;
         }
-        return m_model.saveSate(writer);
+        std::size_t const embd_size = m_embd.size();
+        writer.write(&embd_size);
+        writer.write(m_embd.data(), embd_size);
+
+        get_logger().log(__func__, "saving embed vector\n");
+
+        std::size_t m_last_n_tokens_size = m_last_n_tokens.size();
+        writer.write(&m_last_n_tokens_size);
+        for(auto const& token : m_last_n_tokens) writer.write(&token);
+
+        get_logger().log(__func__, "saving last n tokens\n");
+
+        std::size_t m_logits_size = m_logits.size();
+        writer.write(&m_logits_size);
+        writer.write(m_logits.data(), m_logits_size);
+
+        get_logger().log(__func__, "saving logits\n");
+
+        std::size_t m_system_prompt_size = m_system_prompt.size();
+        writer.write(&m_system_prompt_size);
+        writer.write(m_system_prompt.data(), m_system_prompt_size);
+
+        get_logger().log(__func__, "saving system prompt\n");
+
+        return m_model.save_state(writer);
     }
 
-    bool FastLlama::loadSate(std::string_view filepath) noexcept {
+    bool FastLlama::load_state(std::string_view filepath) noexcept {
         auto reader = BinaryFileReader(filepath);
         if (!reader) {
             get_logger().log_err(__func__, "unable to open the file loading the model state");
             return false;
         }
-        return m_model.loadSate(reader);
+
+        std::size_t embd_size;
+        reader.read(&embd_size);
+        auto const old_embd_size = m_embd.size();
+        m_embd.resize(embd_size);
+        reader.read(m_embd.data(), embd_size);
+        m_embd.resize(old_embd_size);
+
+        get_logger().log(__func__, "loading embed vector\n");
+
+        std::size_t m_last_n_tokens_size;
+        reader.read(&m_last_n_tokens_size);
+        m_last_n_tokens.clear();
+        for(auto i = 0ul; i < m_last_n_tokens_size; ++i) {
+            token_id_t token;
+            reader.read(&token);
+            m_last_n_tokens.push_back(token);
+        }
+
+        get_logger().log(__func__, "loading last n tokens\n");
+
+        std::size_t m_logits_size;
+        reader.read(&m_logits_size);
+        auto const old_logits_size = m_logits.size();
+        m_logits.resize(m_logits_size);
+        reader.read(m_logits.data(), m_logits_size);
+        m_logits.resize(old_logits_size);
+
+        get_logger().log(__func__, "loading logits\n");
+
+        std::size_t m_system_prompt_size;
+        reader.read(&m_system_prompt_size);
+        m_system_prompt.resize(m_system_prompt_size);
+        reader.read(m_system_prompt.data(), m_system_prompt_size);
+
+        get_logger().log(__func__, "loading system prompt\n");
+
+        return m_model.load_state(reader);
     }
 
 } // namespace fastllama

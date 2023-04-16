@@ -37,31 +37,43 @@ int main() {
 
     logger.log_warn("main", "Ingesting, please wait...\n");
     bridge.ingest(
-        "Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.\n"
-        "User: Hello, Bob.\n"
-        "Bob: Hello. How may I help you today?\n"
-        "User: Please tell me the largest city in Europe.\n"
-        "Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.\n"
+        R"(Transcript of a dialog, where the User interacts with an Assistant named Bob. Bob is helpful, kind, honest, good at writing, and never fails to answer the User's requests immediately and with precision.
+        User: Hello, Bob.
+        Bob: Hello. How may I help you today?
+        User: Please tell me the largest city in Europe.
+        Bob: Sure. The largest city in Europe is Moscow, the capital of Russia.)"
     );
     logger.log_warn("main", "Ingestion complete!\n");
 
-    bridge.saveSate("./models/fast_llama.bin");
-    // std::string prompt;
+    // bridge.save_state("./models/fast_llama.bin");
+    // bridge.load_state("./models/fast_llama.bin");
+    std::string prompt;
 
-    // std::cout<<"User: ";
+    std::cout<<"User: ";
 
-    // while(std::getline(std::cin, prompt)) {
-    //     prompt = "User: " + prompt;
+    while(std::getline(std::cin, prompt)) {
+        if (prompt == "save") {
+            bridge.save_state("./models/fast_llama.bin");
+            std::cout<<"User: ";
+            continue;
+        } else if (prompt == "exit") {
+            exit(0);
+        } else if (prompt == "load") {
+            bridge.load_state("./models/fast_llama.bin");
+            std::cout<<"User: ";
+            continue;
+        }
+        prompt = "User: " + prompt;
         
-    //     bridge.ingest(prompt);
+        bridge.ingest(prompt);
 
-    //     bridge.generate([](std::string const& s) {
-    //         std::cout<<s;
-    //         std::cout.flush();
-    //     }, 300, 40, 0.95f, 0.8f, 1.0f, { "User: " });
+        bridge.generate([](std::string const& s) {
+            std::cout<<s;
+            std::cout.flush();
+        }, 50, 40, 0.95f, 0.8f, 1.0f, { "User: " });
         
-    //     std::cout<<"\nUser: ";
-    // }
+        std::cout<<"\nUser: ";
+    }
     
     return 0;
 }

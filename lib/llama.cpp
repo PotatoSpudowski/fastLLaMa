@@ -583,89 +583,92 @@ namespace fastllama {
         return true;
     }
 
-    bool KVCacheBuffer::saveSate(BinaryFileWriter& writer) const noexcept {
-        writer.write(&memory_type);
-        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+    // bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
+    //     writer.write(&memory_type);
+    //     auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
 
-        transform_tensor_for_serialization(k, ctx_ptr);
-        transform_tensor_for_serialization(v, ctx_ptr);
-        auto k_ptr = calculate_relative_ptr(k, ctx_ptr);
-        auto v_ptr = calculate_relative_ptr(v, ctx_ptr);
+    //     transform_tensor_for_serialization(k, ctx_ptr);
+    //     transform_tensor_for_serialization(v, ctx_ptr);
+    //     auto k_ptr = calculate_relative_ptr(k, ctx_ptr);
+    //     auto v_ptr = calculate_relative_ptr(v, ctx_ptr);
 
-        auto const buffer_size = buffer.size();
-        writer.write(&buffer_size);
-        writer.write(buffer.data(), buffer_size);
-        writer.write(&k_ptr);
-        writer.write(&v_ptr);
-        writer.write(&number_of_tokens_in_cache);
+    //     auto const buffer_size = buffer.size();
+    //     writer.write(&buffer_size);
+    //     writer.write(buffer.data(), buffer_size);
+    //     writer.write(&k_ptr);
+    //     writer.write(&v_ptr);
+    //     writer.write(&number_of_tokens_in_cache);
 
-        transform_tensor_after_deserialization(k, ctx_ptr);
-        transform_tensor_after_deserialization(v, ctx_ptr);
-        return true;
-    }
+    //     transform_tensor_after_deserialization(k, ctx_ptr);
+    //     transform_tensor_after_deserialization(v, ctx_ptr);
+    //     return true;
+    // }
 
-    bool KVCacheBuffer::loadSate(BinaryFileReader& reader) noexcept {
-        reader.read(&memory_type);
-        auto buffer_size = buffer.size();
+    // bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
+    //     reader.read(&memory_type);
+    //     auto buffer_size = buffer.size();
 
-        reader.read(&buffer_size);
-        buffer.resize(buffer_size);
-        reader.read(buffer.data(), buffer_size);
-        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
+    //     reader.read(&buffer_size);
+    //     buffer.resize(buffer_size);
+    //     reader.read(buffer.data(), buffer_size);
+    //     auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
 
-        k = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
-        v = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+    //     k = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+    //     v = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
 
-        transform_tensor_after_deserialization(k, ctx_ptr);
-        transform_tensor_after_deserialization(v, ctx_ptr);
-        return true;
-    }
+    //     transform_tensor_after_deserialization(k, ctx_ptr);
+    //     transform_tensor_after_deserialization(v, ctx_ptr);
+    //     return true;
+    // }
 
     // Assumption 1: Layer is not being modified. Therefore, we can skip it
     // Assumption 2: User will only load state of correct model
     // Assumption 3: Embeddings vector is not needed for the save and load
-    bool Model::saveSate(BinaryFileWriter& writer) const noexcept {
+    bool Model::save_state(BinaryFileWriter& writer) const noexcept {
 
-        auto const buffer_size = buffer.size();
-        writer.write(&buffer_size);
-        writer.write(buffer.data(), buffer_size);
+        std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
+        writer.write(&tok_embeddings_size);
+        writer.write(tok_embeddings->data, sizeof(char), tok_embeddings_size);
 
-        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
-        transform_tensor_for_serialization(tok_embeddings, ctx_ptr);
-        transform_tensor_for_serialization(norm, ctx_ptr);
-        transform_tensor_for_serialization(output, ctx_ptr);
-        auto tok_ptr = calculate_relative_ptr(tok_embeddings, ctx_ptr);
-        auto norm_ptr = calculate_relative_ptr(norm, ctx_ptr);
-        auto out_ptr = calculate_relative_ptr(output, ctx_ptr);
+        logger.log(__func__, "saving token embeddings\n");
 
-        writer.write(&tok_ptr);
-        writer.write(&norm_ptr);
-        writer.write(&out_ptr);
+        std::size_t const norm_size = ggml_nbytes(norm);
+        writer.write(&norm_size);
+        writer.write(norm->data, sizeof(char), norm_size);
 
-        transform_tensor_after_deserialization(tok_embeddings, ctx_ptr);
-        transform_tensor_after_deserialization(norm, ctx_ptr);
-        transform_tensor_after_deserialization(output, ctx_ptr);
+        logger.log(__func__, "saving norm\n");
 
-        kv_self.saveSate(writer);
+        std::size_t const output_size = ggml_nbytes(output);
+        writer.write(&output_size);
+        writer.write(output->data, sizeof(char), output_size);
+
+        logger.log(__func__, "saving output\n");
+
+        // kv_self.save_state(writer);
         return true;
     }
 
-    bool Model::loadSate(BinaryFileReader& reader) noexcept {
-        auto buffer_size = buffer.size();
-        reader.read(&buffer_size);
-        buffer.resize(buffer_size);
-        reader.read(buffer.data(), buffer_size);
+    bool Model::load_state(BinaryFileReader& reader) noexcept {
         
-        auto const ctx_ptr = reinterpret_cast<std::ptrdiff_t>(buffer.data());
-        tok_embeddings = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
-        norm = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
-        output = read_relative_ptr<ggml_tensor*>(reader, ctx_ptr);
+        std::size_t tok_embeddings_size{};
+        reader.read(&tok_embeddings_size);
+        reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
 
-        transform_tensor_after_deserialization(tok_embeddings, ctx_ptr);
-        transform_tensor_after_deserialization(norm, ctx_ptr);
-        transform_tensor_after_deserialization(output, ctx_ptr);
+        logger.log(__func__, "loading token embedings\n");
 
-        kv_self.loadSate(reader);
+        std::size_t norm_size{};
+        reader.read(&norm_size);
+        reader.read(norm->data, sizeof(char), norm_size);
+
+        logger.log(__func__, "loading norm\n");
+
+        std::size_t output_size{};
+        reader.read(&output_size);
+        reader.read(output->data, sizeof(char), output_size);
+
+        logger.log(__func__, "loading output\n");
+
+        // kv_self.load_state(reader);
         return true;
     }
 
