@@ -5,21 +5,7 @@
 using namespace std::chrono_literals;
 using namespace fastllama;
 
-std::mutex mu;
-struct LoadWorker {
-    void operator()() noexcept {
-        std::lock_guard lk{mu};
-        std::cout<<"Hello Worker: "<<std::this_thread::get_id()<<"\n";
-    }
-};
-
 int main() {
-    // ThreadPool<LoadWorker> w(2);
-    // for(auto i = 0ul; i < 10; ++i) {
-    //     w.add_work({});
-    // }
-
-    // w.wait();
     auto maybe_bridge = fastllama::FastLlama::builder()
         .set_number_of_threads(16)
         .set_number_of_batches(64)
