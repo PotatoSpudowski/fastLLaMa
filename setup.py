@@ -59,7 +59,7 @@ def set_global_cmake_variables(cmake_global_vars: CmakeVarType, args: argparse.N
     cmake_global_vars[f'INTERFACES_{g_selected_language[0]}'] = True
     cmake_global_vars['WORKSPACE'] = os.path.normpath(os.getcwd()).replace('\\', '/')
 
-def run_make(project_name: str, build_dir: str = "build") -> None:
+def run_make(project_name: str, args: Optional[argparse.Namespace], build_dir: str = "build") -> None:
     # Change the current working directory to the build directory
     if not os.path.exists(build_dir):
        os.mkdir(build_dir)
@@ -67,11 +67,15 @@ def run_make(project_name: str, build_dir: str = "build") -> None:
     current_dir = os.getcwd()
     os.chdir(build_dir)
 
+    threads = args.threads if args is not None else None
+
+    make_cmd = ['make', '-j', f'{threads}'] if threads is not None and threads > 1 else ['make']
+
     try:
         # Run the 'make' command
         run_shell([
             ['cmake', '..'],
-            ['make', '-j', '4'] if os.name == 'posix' else ['msbuild', f'{project_name}.sln']
+            make_cmd if os.name == 'posix' else ['msbuild', f'{project_name}.sln']
         ])
     except subprocess.CalledProcessError as e:
         print("An error occurred while running 'make':", e)
@@ -307,11 +311,12 @@ def set_android_arg_parser(parser: argparse._SubParsersAction) -> None:
     )
 
 
-def parse_args(project_name: str, global_compiler_flags: List[str]) -> bool:
+def parse_args(project_name: str, global_compiler_flags: List[str]) -> Tuple[bool, Optional[argparse.Namespace]]:
     parser = argparse.ArgumentParser(
         prog="Fastllama",
         description="Fastllama tries to provide llama wrapper interfaces for all popular languages."
     )
+    parser.add_argument('-j', help="Number of threads to use for compilation for 'make'. Default is 1", default=1, type=int, dest="threads")
     parser.add_argument('-l', '--language', choices=ALL_LANGUAGES_IN_INTERFACES.keys(), default='c', help="Select a project language. Default is 'c'")
     parser.add_argument('-g', '--gui', action='store_true', help="Select a project language using GUI.")
     parser.add_argument('-c', '--clean', action='store_true', help="This command is equivalent to 'make clean'")
@@ -325,10 +330,10 @@ def parse_args(project_name: str, global_compiler_flags: List[str]) -> bool:
     args = parser.parse_args(sys.argv[1:])
     if args.clean:
         run_cmd_on_build_dirs([['make', 'clean']])
-        return False
+        return (False, None)
     if args.make:
         run_cmd_on_build_dirs(['make'])
-        return False
+        return (False, None)
     
     cmake_global_vars: CmakeVarType = {
         'PROJECT_NAME': project_name,
@@ -336,9 +341,9 @@ def parse_args(project_name: str, global_compiler_flags: List[str]) -> bool:
     set_global_cmake_variables(cmake_global_vars, args)
     set_cross_compile_target_flags(cmake_global_vars, args, global_compiler_flags)
     save_cmake_vars_helper(os.path.join('.', 'cmake', 'GlobalVars.cmake'), cmake_global_vars)
-    return True
+    return (True, args)
 
-def build_example(project_name: str) -> None:
+def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None:
     global g_selected_language
     example_path = os.path.join('.', 'examples', g_selected_language[0])
     if not os.path.exists(example_path):
@@ -349,7 +354,7 @@ def build_example(project_name: str) -> None:
         current_dir = os.getcwd()
         os.chdir(example_path)
         try:
-            run_make(project_name)
+            run_make(project_name, args)
         finally:
             os.chdir(current_dir)
             print('\nBuilding examples completed\n')
@@ -368,11 +373,12 @@ def build_example(project_name: str) -> None:
 def main(project_name: str) -> None:
     
     global_compiler_flags: List[str] = []
-    if not parse_args(project_name, global_compiler_flags):
+    (should_continue, args) = parse_args(project_name, global_compiler_flags)
+    if not should_continue:
         return
     generate_compiler_flags(global_compiler_flags)
-    run_make(project_name)
-    build_example(project_name)
+    run_make(project_name, args)
+    build_example(project_name, args)
 
 if __name__ == "__main__":
     main('fastllama')
