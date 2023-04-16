@@ -65,6 +65,7 @@ namespace fastllama {
 
         template<typename... Args>
         void log(std::string_view func_name, Args&&... args) const {
+            if (!m_sink.log) return;
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
@@ -73,6 +74,7 @@ namespace fastllama {
         
         template<typename... Args>
         void log_err(std::string_view func_name, Args&&... args) const {
+            if (!m_sink.log_err) return;
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
@@ -81,6 +83,7 @@ namespace fastllama {
         
         template<typename... Args>
         void log_warn(std::string_view func_name, Args&&... args) const {
+            if (!m_sink.log_warn) return;
             std::stringstream ss;
             ((ss << args), ...);
             auto message = ss.str();
