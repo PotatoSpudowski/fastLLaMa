@@ -1,7 +1,6 @@
 #include "bridge.hpp"
 #include <thread>
 #include <chrono>
-#include "concurrency/pool.hpp"
 
 using namespace std::chrono_literals;
 using namespace fastllama;
