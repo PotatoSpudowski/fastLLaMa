@@ -530,6 +530,142 @@ namespace fastllama {
         ctx = nullptr;
     }
 
+    template<typename U = std::ptrdiff_t, typename T>
+    inline static U calculate_relative_ptr(T const*const ptr, std::ptrdiff_t with_respect_to) noexcept {
+        auto ptr_address = reinterpret_cast<std::ptrdiff_t>(ptr);
+        return reinterpret_cast<U>(with_respect_to - ptr_address);
+    }
+    
+    template<typename T, typename U = std::ptrdiff_t>
+    inline static T resolve_relative_ptr(U rel_ptr, std::ptrdiff_t with_respect_to) noexcept {
+        auto ptr_address = with_respect_to + reinterpret_cast<std::ptrdiff_t>(rel_ptr);
+        return reinterpret_cast<T>(ptr_address);
+    }
+    
+    template<typename T>
+    inline static T read_relative_ptr(BinaryFileReader& reader, std::ptrdiff_t with_respect_to) noexcept {
+        std::ptrdiff_t rel_ptr{};
+        reader.read(&rel_ptr);
+        return resolve_relative_ptr<T>(rel_ptr, with_respect_to);
+    }
+
+    inline static constexpr bool transform_tensor_for_serialization(ggml_tensor* tensor, std::ptrdiff_t ctx_ptr) noexcept {
+        if (tensor == nullptr) return true;
+        auto& t = *tensor;
+
+        transform_tensor_for_serialization(t.grad, ctx_ptr);
+        t.grad = calculate_relative_ptr<ggml_tensor*>(t.grad, ctx_ptr);
+        transform_tensor_for_serialization(t.src0, ctx_ptr);
+        t.src0 = calculate_relative_ptr<ggml_tensor*>(t.src0, ctx_ptr);
+        transform_tensor_for_serialization(t.src1, ctx_ptr);
+        t.src1 = calculate_relative_ptr<ggml_tensor*>(t.src1, ctx_ptr);
+
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) transform_tensor_for_serialization(t.opt[i], ctx_ptr);
+
+        t.data = calculate_relative_ptr<void*>(t.data, ctx_ptr);
+        return true;
+    }
+
+    inline static constexpr bool transform_tensor_after_deserialization(ggml_tensor* tensor, std::ptrdiff_t ctx_ptr) noexcept {
+        if (tensor == nullptr) return true;
+        auto& t = *tensor;
+
+        transform_tensor_after_deserialization(t.grad, ctx_ptr);
+        t.grad = resolve_relative_ptr<ggml_tensor*>(t.grad, ctx_ptr);
+        transform_tensor_after_deserialization(t.src0, ctx_ptr);
+        t.src0 = resolve_relative_ptr<ggml_tensor*>(t.src0, ctx_ptr);
+        transform_tensor_after_deserialization(t.src1, ctx_ptr);
+        t.src1 = resolve_relative_ptr<ggml_tensor*>(t.src1, ctx_ptr);
+
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) transform_tensor_after_deserialization(t.opt[i], ctx_ptr);
+
+        t.data = resolve_relative_ptr<void*>(t.data, ctx_ptr);
+        return true;
+    }
+
+    bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
+        writer.write(&memory_type);
+
+        writer.write(k->data, sizeof(char), ggml_nbytes(k));
+        writer.write(v->data, sizeof(char), ggml_nbytes(k));
+        return true;
+    }
+
+    bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
+        reader.read(&memory_type);
+
+        reader.read(k->data, sizeof(char), ggml_nbytes(k));
+        reader.read(v->data, sizeof(char), ggml_nbytes(k));
+        return true;
+    }
+
+    // Assumption 1: Layer is not being modified. Therefore, we can skip it
+    // Assumption 2: User will only load the state of a correct model
+    bool Model::save_state(BinaryFileWriter& writer) const noexcept {
+
+        std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
+        writer.write(&tok_embeddings_size);
+        writer.write(tok_embeddings->data, sizeof(char), tok_embeddings_size);
+
+        logger.log(__func__, "saving token embeddings\n");
+
+        std::size_t const norm_size = ggml_nbytes(norm);
+        writer.write(&norm_size);
+        writer.write(norm->data, sizeof(char), norm_size);
+
+        logger.log(__func__, "saving norm\n");
+
+        std::size_t const output_size = ggml_nbytes(output);
+        writer.write(&output_size);
+        writer.write(output->data, sizeof(char), output_size);
+
+        logger.log(__func__, "saving output\n");
+
+        kv_self.save_state(writer);
+        return true;
+    }
+
+    bool Model::load_state(BinaryFileReader& reader) noexcept {
+        
+        std::size_t tok_embeddings_size{};
+        reader.read(&tok_embeddings_size);
+        reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
+
+        tok_embeddings->grad = nullptr;
+        tok_embeddings->src0 = nullptr;
+        tok_embeddings->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) tok_embeddings->opt[i] = nullptr;
+        
+
+        logger.log(__func__, "loading token embeddings\n");
+
+        std::size_t norm_size{};
+        reader.read(&norm_size);
+        reader.read(norm->data, sizeof(char), norm_size);
+
+        norm->grad = nullptr;
+        norm->src0 = nullptr;
+        norm->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) norm->opt[i] = nullptr;
+
+        logger.log(__func__, "loading norm\n");
+
+        std::size_t output_size{};
+        reader.read(&output_size);
+        reader.read(output->data, sizeof(char), output_size);
+
+        output->grad = nullptr;
+        output->src0 = nullptr;
+        output->src1 = nullptr;
+        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) output->opt[i] = nullptr;
+
+        logger.log(__func__, "loading output\n");
+
+        kv_self.load_state(reader);
+        return true;
+    }
+
+
     bool Model::dump_vocab(std::string_view filepath) {
         std::ofstream f{ std::string(filepath) };
         if (!f) return false;
@@ -566,8 +702,10 @@ namespace fastllama {
         {
             model_id.config.mem_required_for_eval += static_cast<std::size_t>(n_batch) * 20_MiB + allocate_extra_mem; // extra space large batch
             buf_compute.resize(model_id.config.mem_required_for_eval);
-            buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
-            buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
+            if constexpr (use_scratch_buffer) {
+                buf_scratch[0].resize(model_id.config.mem_required_for_scratch_buff_0);
+                buf_scratch[1].resize(model_id.config.mem_required_for_scratch_buff_1);
+            }
         }
 
         auto reader = fastllama::BinaryFileReader(filepath);
@@ -613,6 +751,7 @@ namespace fastllama {
         auto const n_rot   = params.n_embd / params.n_head;
 
         ggml_init_params mem_params {};
+        // buf_compute.resize(mem_per_token);
         mem_params.mem_size   = buf_compute.size();
         mem_params.mem_buffer = reinterpret_cast<void*>(buf_compute.data());
 
@@ -621,7 +760,7 @@ namespace fastllama {
         gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
 
         ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, static_cast<std::int64_t>(N));
-        memcpy(embd->data, embd_inp.data(), N * ggml_element_size(embd));
+        std::copy_n(embd_inp.begin(), N, static_cast<vocab_id*>(embd->data));
 
         ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
         

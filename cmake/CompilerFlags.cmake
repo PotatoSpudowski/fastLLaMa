@@ -26,9 +26,15 @@ if (EXISTS ${COMPILER_FLAG_VARS_FILE_PATH})
     if(NATIVE_C_FLAG_SUPPORTED)
         _COMPILER_SWITCH_SET(COMPILER_CXX_FLAG "-march=native" "-march=native" "")
     endif(NATIVE_C_FLAG_SUPPORTED)
-    _NORMALIZE_COMPILER_FLAGS(NORMALIZED_GCC_FLAGS "${GCC_CXXFLAG}")
-    _NORMALIZE_COMPILER_FLAGS(NORMALIZED_CLANG_FLAGS "${CLANG_CXXFLAG}")
-    _NORMALIZE_COMPILER_FLAGS(NORMALIZED_MSVC_FLAGS "${MSVC_CXXFLAG}")
+    
+    if(MSVC)
+        _NORMALIZE_COMPILER_FLAGS(NORMALIZED_MSVC_FLAGS "${MSVC_CXXFLAG}")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$")
+        _NORMALIZE_COMPILER_FLAGS(NORMALIZED_CLANG_FLAGS "${CLANG_CXXFLAG}")
+    else()
+        _NORMALIZE_COMPILER_FLAGS(NORMALIZED_GCC_FLAGS "${GCC_CXXFLAG}")
+    endif()
+    
     _COMPILER_SWITCH_SET(COMPILER_CXX_FLAG "${NORMALIZED_GCC_FLAGS}" "${NORMALIZED_CLANG_FLAGS}" "${NORMALIZED_MSVC_FLAGS}")
 else()
     if(NATIVE_C_FLAG_SUPPORTED)
@@ -37,7 +43,7 @@ else()
 endif(EXISTS ${COMPILER_FLAG_VARS_FILE_PATH})
 
 
-function(set_compiler_lib_and_flags project_name)
+function(set_compiler_lib_and_flags project_name compiled_lang)
     set(THREADS_PREFER_PTHREAD_FLAG TRUE)
     find_package(Threads REQUIRED)
 
@@ -78,11 +84,15 @@ function(set_compiler_lib_and_flags project_name)
         target_link_libraries(${project_name} PRIVATE m)
     endif(NOT WIN32)
 
-    if(NO_EXCEPTION EQUAL TRUE)
-        _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-exceptions" "-fno-exceptions" "/EHs-c-")
-    endif(NO_EXCEPTION EQUAL TRUE)
-    
-    _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-rtti" "-fno-rtti" "/GR-")
+    if(${compiled_lang} STREQUAL "CXX")    
+        
+        if(NO_EXCEPTION EQUAL TRUE)
+            _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-exceptions" "-fno-exceptions" "/EHs-c-")
+        endif(NO_EXCEPTION EQUAL TRUE)
+        
+        _COMPILER_SWITCH_APPEND(COMPILER_FLAGS_LIST "-fno-rtti" "-fno-rtti" "/GR-")
+        
+    endif()
 
     message(STATUS "Compiler flags used: ${COMPILER_FLAGS_LIST}")
     message(STATUS "Linking flags used: ${COMPILER_LDFLAGS_LIST}")

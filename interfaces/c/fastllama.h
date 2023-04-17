@@ -171,6 +171,24 @@ struct llama_array_view_f llama_get_embeddings(struct llama_model_context const*
 struct llama_array_view_f llama_get_logits(struct llama_model_context const* const model_context);
 
 /**
+ * @brief Saves the model state to the file path.
+ * 
+ * @param model_context is the context that is constructed using `llama_create_context`.
+ * @param filepath is the path to the file where the model state will be saved.
+ * @return true if it successfully saves the model state.
+ */
+bool llama_save_state(struct llama_model_context* model_context, char const* filepath);
+
+/**
+ * @brief Loads the model state from the file path.
+ * 
+ * @param model_context is the context that is constructed using `llama_create_context`.
+ * @param filepath is the path to the file where the model state will be loaded.
+ * @return true if it successfully loads the model state.
+ */
+bool llama_load_state(struct llama_model_context* model_context, char const* filepath);
+
+/**
  * @brief Frees the model context.
  * 
  */

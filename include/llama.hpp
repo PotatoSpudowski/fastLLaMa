@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include "logger.hpp"
 #include "span.hpp"
+#include "file_writer.hpp"
+#include "file_reader.hpp"
 
 namespace fastllama {
 
@@ -46,16 +48,12 @@ namespace fastllama {
         std::int32_t f16     { 1 };
     };
 
-    // struct Perplexity {
-    //     std::size_t start;
-    //     std::size_t end;
-    //     double perplexity;
-    // };
-
     struct KVCacheBuffer {
 
         bool init(HyperParams const& params, Logger const& logger = Logger{});
         void deinit(Logger const& logger = Logger{});
+        bool save_state(BinaryFileWriter& writer) const noexcept;
+        bool load_state(BinaryFileReader& reader) noexcept;
 
         ggml_type memory_type{ GGML_TYPE_F32 };
 
@@ -120,6 +118,9 @@ namespace fastllama {
             }
         }
 
+        bool save_state(BinaryFileWriter& writer) const noexcept;
+        bool load_state(BinaryFileReader& reader) noexcept;
+
         Logger logger{};
 
         ModelId model_id{};
@@ -149,11 +150,11 @@ namespace fastllama {
 
         std::unordered_map<std::string, ggml_tensor*> tensors;
 
-        bool is_valid{false};
-        bool embeddings_eval_enable{false};
-        bool should_put_all_logits{false};
-        int threads{ static_cast<int>(std::thread::hardware_concurrency()) };
-        int n_batch{64};
+        bool    is_valid{false};
+        bool    embeddings_eval_enable{false};
+        bool    should_put_all_logits{false};
+        int     threads{ static_cast<int>(std::thread::hardware_concurrency()) };
+        int     n_batch{64};
     };
 
     bool quantize(std::string_view in_filepath, std::string_view out_filepath, int itype);
