@@ -2,10 +2,10 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Framework to run inference of Decoder only LLMs like [LLaMA](https://arxiv.org/abs/2302.13971) in 4bit quantization in Python using C/C++ backend.
+`fastLLaMa` is a high-performance framework designed to tackle the challenges associated with deploying large language models (LLMs) in production environments. 
 
-This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp)
 
+It offers a user-friendly Python interface to a C++ library, [llama.cpp](https://github.com/ggerganov/llama.cpp), enabling developers to create custom workflows, implement adaptable logging, and seamlessly switch contexts between sessions. This framework is geared towards enhancing the efficiency of operating LLMs at scale, with ongoing development focused on introducing features such as optimized cold boot times, Int4 support for NVIDIA GPUs, model artifact management, and multiple programming language support.
 
 ```
                 ___            __    _    _         __ __      
@@ -54,9 +54,15 @@ This repo was built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp
 ---
 
 ## Features
-* Easy-to-use Python interface to the C++ library.
-* High performance compared to the original [LLaMA repo](https://github.com/facebookresearch/llama), thanks to the C++ implementation.
-* Ability to save and load the state of the model with system prompts.
+- [x]  Easy-to-use Python interface that allows developers to build custom workflows.
+- [x]  Ability to ingest system prompts. 
+    (Normal prompts will be recycled but system prompts will remain in runtime memory)
+- [x]  Quick context switching between sessions.
+- [x] Customisable logger support.
+- [ ]  Int4 support for NVIDIA GPUs.
+- [ ] Cold boot time optimization using multithreading.
+- [ ] Model artifact management support.
+- [ ] Multiple programming language support.
 
 ### Supported Models
 
@@ -98,6 +104,7 @@ cd fastLLaMa
 # install Python dependencies
 pip install -r requirements.txt
 
+
 python setup.py -l python
 
 # obtain the original LLaMA model weights and place them in ./models
@@ -114,16 +121,8 @@ python3 quantize.py 7B
 #./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
 
 # run the inference
-python example.py
-```
-
-### Importing fastLlama
-```python
-import sys
-
-sys.path.append("./interfaces/python")
-
-from build.fastllama import Model, ModelKind
+#Run the scripts from the root dir of the project for now!
+python ./examples/python/example.py
 ```
 
 ### Initializing the Model
@@ -170,7 +169,7 @@ res = model.generate(
     )
 ```
 
-<!-- ### Saving Model State
+### Saving Model State
 ```python
 res = model.save_state("./models/fast_llama.bin")
 ```
@@ -178,7 +177,7 @@ res = model.save_state("./models/fast_llama.bin")
 ### Loading Model State
 ```python
 res = model.load_state("./models/fast_llama.bin")
-``` -->
+```
 
 ### Running Alpaca-LoRA
 
@@ -186,16 +185,14 @@ res = model.load_state("./models/fast_llama.bin")
 pip install -r requirements.txt
 
 #Before running this command
-#You need to provide the HF model paths as found in the original script 
-python export-alpaca-lora.py
+#You need to provide the HF model paths here
+python ./scripts/export-from-huggingface.py
 
-# python [PythonFile] [ModelPath] [Floattype] [SplitType]
-# SplitType should be 1 for Alpaca-Lora models exported from HF
-python3 scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
+python3 ./scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 
 ./build/src/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
-python example-alpaca.py
+python ./examples/python/example-alpaca.py
 ```
 
 ### Memory/Disk Requirements
@@ -209,6 +206,9 @@ and sufficient RAM to load them. At the moment, memory and disk requirements are
 | 13B   | 24 GB         | 7.8 GB                 |
 | 30B   | 60 GB         | 19.5 GB                |
 | 65B   | 120 GB        | 38.5 GB                |
+
+**Info:** Run time may require extra memory during inference!\
+(Depends on hyperparmeters used during model initialization)
 
 <!-- 
 ### Example Dockerfile
@@ -250,10 +250,15 @@ RUN python3.9 -m pip install -r requirements.txt
 CMD ["python3.9", "example.py"]
 ``` -->
 
+### Contributing
+* Contributors can open PRs
+* Collaborators can push to branches to the repo and merge PRs into the main branch
+* Collaborators will be invited based on contributions
+* Any help with managing issues and PRs is very appreciated!
+* Make sure to read about our [vision](https://github.com/PotatoSpudowski/fastLLaMa/discussions/46)
+
 ### Notes
+
 * Tested on
     * Hardware: Apple silicon, Intel, Arm (Pending)
-    * OS: MacOs, Linux, Windows (Building done, Running Pending), Android (Pending)
-  
-* The whole inspiration behind fastLLaMa is to let the community test the capabilities of LLaMA by creating custom workflows using Python. 
-* This project was possible because of [llama.cpp](https://github.com/ggerganov/llama.cpp), Do have a look at it as well.
+    * OS: MacOs, Linux, Windows (Pending), Android (Pending)
