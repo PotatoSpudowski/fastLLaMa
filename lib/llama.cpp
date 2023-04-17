@@ -600,13 +600,8 @@ namespace fastllama {
     }
 
     // Assumption 1: Layer is not being modified. Therefore, we can skip it
-    // Assumption 2: User will only load state of correct model
-    // Assumption 3: Embeddings vector is not needed for the save and load
+    // Assumption 2: User will only load the state of a correct model
     bool Model::save_state(BinaryFileWriter& writer) const noexcept {
-
-        // std::size_t const buf_compute_size = buf_compute.size();
-        // writer.write(&buf_compute_size);
-        // writer.write(buf_compute.data(), buf_compute_size);
 
         std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
         writer.write(&tok_embeddings_size);
@@ -632,11 +627,6 @@ namespace fastllama {
 
     bool Model::load_state(BinaryFileReader& reader) noexcept {
         
-        // std::size_t buf_compute_size = buf_compute.size();
-        // reader.read(&buf_compute_size);
-        // buf_compute.resize(buf_compute_size);
-        // reader.read(buf_compute.data(), buf_compute_size);
-
         std::size_t tok_embeddings_size{};
         reader.read(&tok_embeddings_size);
         reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
@@ -647,7 +637,7 @@ namespace fastllama {
         for(auto i = 0ul; i < GGML_MAX_OPT; ++i) tok_embeddings->opt[i] = nullptr;
         
 
-        logger.log(__func__, "loading token embedings\n");
+        logger.log(__func__, "loading token embeddings\n");
 
         std::size_t norm_size{};
         reader.read(&norm_size);
