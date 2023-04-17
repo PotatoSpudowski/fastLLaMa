@@ -69,10 +69,15 @@ class c_llama_model_context(ctypes.Structure):
 
 c_llama_model_context_ptr = ctypes.POINTER(c_llama_model_context)
 
-def make_c_logger_func(func: Callable[[str, str], None]) -> C_LLAMA_LOGGER_FUNC:
+def make_c_logger_func(func: Callable[[str, str], None]) -> ctypes._FuncPointer:
     def c_logger_func(func_name: ctypes.c_char_p, func_name_len: ctypes.c_int, message: ctypes.c_char_p, message_len: ctypes.c_int) -> None:
-        func(ctypes.string_at(func_name, func_name_len).decode('utf-8'), ctypes.string_at(message, message_len).decode('utf-8'))
+        func(ctypes.string_at(func_name, int(func_name_len)).decode('utf-8'), ctypes.string_at(message, int(message_len)).decode('utf-8'))
     return C_LLAMA_LOGGER_FUNC(c_logger_func)
+
+def make_c_logger_reset_func(func: Callable[[], None]) -> ctypes._FuncPointer:
+    def c_logger_func() -> None:
+        func()
+    return C_LLAMA_LOGGER_RESET_FUNC(c_logger_func)
 
 class Model:
     def __init__(
@@ -119,7 +124,7 @@ class Model:
             temp_logger.log = make_c_logger_func(logger.log_info)
             temp_logger.log_err = make_c_logger_func(logger.log_err)
             temp_logger.log_warn = make_c_logger_func(logger.log_warn)
-            temp_logger.reset = C_LLAMA_LOGGER_RESET_FUNC(lambda: logger.reset())
+            temp_logger.reset = make_c_logger_reset_func(logger.reset)
             ctx_args.logger = temp_logger
 
         self.ctx = self.__create_model_ctx__(ctx_args)
