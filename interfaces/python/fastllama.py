@@ -69,12 +69,12 @@ class c_llama_model_context(ctypes.Structure):
 
 c_llama_model_context_ptr = ctypes.POINTER(c_llama_model_context)
 
-def make_c_logger_func(func: Callable[[str, str], None]) -> ctypes._FuncPointer:
+def make_c_logger_func(func: Callable[[str, str], None]) -> Any:
     def c_logger_func(func_name: ctypes.c_char_p, func_name_len: ctypes.c_int, message: ctypes.c_char_p, message_len: ctypes.c_int) -> None:
         func(ctypes.string_at(func_name, int(func_name_len)).decode('utf-8'), ctypes.string_at(message, int(message_len)).decode('utf-8'))
     return C_LLAMA_LOGGER_FUNC(c_logger_func)
 
-def make_c_logger_reset_func(func: Callable[[], None]) -> ctypes._FuncPointer:
+def make_c_logger_reset_func(func: Callable[[], None]) -> Any:
     def c_logger_func() -> None:
         func()
     return C_LLAMA_LOGGER_RESET_FUNC(c_logger_func)
