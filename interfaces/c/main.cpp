@@ -224,6 +224,16 @@ extern "C" {
         return llama_array_view_f{ arr.data(), arr.size() };
     }
 
+    bool llama_save_state(struct llama_model_context* model_context, char const* filepath) {
+        if (!is_model_valid(model_context)) return false;
+        return model_context->inner->save_state(filepath);
+    }
+    
+    bool llama_load_state(struct llama_model_context* model_context, char const* filepath) {
+        if (!is_model_valid(model_context)) return false;
+        return model_context->inner->load_state(filepath);
+    }
+
     void llama_handle_signal(int) {
         printf("Quitting the app...");
         exit(0);

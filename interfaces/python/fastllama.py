@@ -146,6 +146,18 @@ class Model:
         fn.restype = c_llama_model_context_ptr
         fn.argtypes = [c_llama_model_context_args]
         return fn(ctx_args)
+    
+    def save_state(self, filepath: str) -> bool:
+        fn = self.lib.llama_save_state
+        fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        fn.restype = ctypes.c_bool
+        return bool(fn(self.ctx, bytes(filepath, 'utf-8')))
+    
+    def load_state(self, filepath: str) -> bool:
+        fn = self.lib.llama_load_state
+        fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        fn.restype = ctypes.c_bool
+        return bool(fn(self.ctx, bytes(filepath, 'utf-8')))
 
     def ingest(self, prompt: str, is_system_prompt: bool = False) -> bool:
         if is_system_prompt:
