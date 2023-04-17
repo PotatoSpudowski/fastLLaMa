@@ -254,7 +254,7 @@ class Model:
         return bool(fn(self.ctx, bytes(filepath, 'utf-8')))
 
     def ingest(self, prompt: str, is_system_prompt: bool = False) -> bool:
-         """
+        """
         Ingests a prompt into the model.
 
         :param prompt: The prompt to be ingested.
