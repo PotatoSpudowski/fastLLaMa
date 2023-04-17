@@ -194,7 +194,7 @@ class Model:
             repeat_penalty,
         ))
     
-    def perplexity(self, prompt: str) -> float|None:
+    def perplexity(self, prompt: str) -> Optional[float]:
         per_fun = self.lib.llama_perplexity
         per_fun.restype = ctypes.c_float
         per_fun.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
