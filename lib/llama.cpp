@@ -583,18 +583,25 @@ namespace fastllama {
         return true;
     }
 
-    bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
+    bool KVCacheBuffer::save_state(BinaryFileWriter& writer, Logger const& logger) const noexcept {
         writer.write(&memory_type);
 
+
+        logger.log(__func__, "saving key cache\n");
         writer.write(k->data, sizeof(char), ggml_nbytes(k));
+        
+        logger.log(__func__, "saving value cache\n");
         writer.write(v->data, sizeof(char), ggml_nbytes(k));
         return true;
     }
 
-    bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
+    bool KVCacheBuffer::load_state(BinaryFileReader& reader, Logger const& logger) noexcept {
         reader.read(&memory_type);
 
+        logger.log(__func__, "loading key cache\n");
         reader.read(k->data, sizeof(char), ggml_nbytes(k));
+        
+        logger.log(__func__, "loading value cache\n");
         reader.read(v->data, sizeof(char), ggml_nbytes(k));
         return true;
     }
@@ -602,66 +609,12 @@ namespace fastllama {
     // Assumption 1: Layer is not being modified. Therefore, we can skip it
     // Assumption 2: User will only load the state of a correct model
     bool Model::save_state(BinaryFileWriter& writer) const noexcept {
-
-        std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
-        writer.write(&tok_embeddings_size);
-        writer.write(tok_embeddings->data, sizeof(char), tok_embeddings_size);
-
-        logger.log(__func__, "saving token embeddings\n");
-
-        std::size_t const norm_size = ggml_nbytes(norm);
-        writer.write(&norm_size);
-        writer.write(norm->data, sizeof(char), norm_size);
-
-        logger.log(__func__, "saving norm\n");
-
-        std::size_t const output_size = ggml_nbytes(output);
-        writer.write(&output_size);
-        writer.write(output->data, sizeof(char), output_size);
-
-        logger.log(__func__, "saving output\n");
-
-        kv_self.save_state(writer);
+        kv_self.save_state(writer, logger);
         return true;
     }
 
     bool Model::load_state(BinaryFileReader& reader) noexcept {
-        
-        std::size_t tok_embeddings_size{};
-        reader.read(&tok_embeddings_size);
-        reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
-
-        tok_embeddings->grad = nullptr;
-        tok_embeddings->src0 = nullptr;
-        tok_embeddings->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) tok_embeddings->opt[i] = nullptr;
-        
-
-        logger.log(__func__, "loading token embeddings\n");
-
-        std::size_t norm_size{};
-        reader.read(&norm_size);
-        reader.read(norm->data, sizeof(char), norm_size);
-
-        norm->grad = nullptr;
-        norm->src0 = nullptr;
-        norm->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) norm->opt[i] = nullptr;
-
-        logger.log(__func__, "loading norm\n");
-
-        std::size_t output_size{};
-        reader.read(&output_size);
-        reader.read(output->data, sizeof(char), output_size);
-
-        output->grad = nullptr;
-        output->src0 = nullptr;
-        output->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) output->opt[i] = nullptr;
-
-        logger.log(__func__, "loading output\n");
-
-        kv_self.load_state(reader);
+        kv_self.load_state(reader, logger);
         return true;
     }
 
