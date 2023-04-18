@@ -31,7 +31,7 @@ namespace fastllama{
         
         template<typename T>
         struct ArrayBuffer {
-            static_assert(std::is_trivially_destructible_v<T> && std::is_constructible_v<T>);
+            static_assert(std::is_constructible_v<T>);
             using size_type = std::size_t;
             using base_type = std::unique_ptr<T[]>;
 
