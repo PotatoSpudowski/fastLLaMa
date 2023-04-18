@@ -47,6 +47,10 @@ int main() {
             bridge.load_state("./models/fast_llama.bin");
             std::cout<<"User: ";
             continue;
+        } else if (prompt == "load_lora") {
+            bridge.attach_lora("./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin");
+            std::cout<<"User: ";
+            continue;
         }
         prompt = "\n\n### Instruction:\n\n" + prompt + "\n\n### Response:\n\n";
         
