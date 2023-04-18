@@ -15,8 +15,12 @@
 
 namespace fastllama {
 
-    inline static constexpr std::uint32_t magic_number_v = 0x67676d6c;
-    inline static constexpr std::uint32_t file_version_v = 1;
+    inline static constexpr std::uint8_t magic_number_v[] = { 'g', 'g', 'm', '\0' };
+
+    enum class FileVersion : std::uint8_t {
+        NoVersion = 0,
+        V1 = 1,
+    };
     
     struct Layer {
         // normalization
@@ -52,8 +56,8 @@ namespace fastllama {
 
         bool init(HyperParams const& params, Logger const& logger = Logger{});
         void deinit(Logger const& logger = Logger{});
-        bool save_state(BinaryFileWriter& writer) const noexcept;
-        bool load_state(BinaryFileReader& reader) noexcept;
+        bool save_state(BinaryFileWriter& writer, Logger const& logger) const noexcept;
+        bool load_state(BinaryFileReader& reader, Logger const& logger) noexcept;
 
         ggml_type memory_type{ GGML_TYPE_F32 };
 

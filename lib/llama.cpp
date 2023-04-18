@@ -13,16 +13,27 @@
 namespace fastllama {
 
     static auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
-        std::uint32_t magic{};
-        reader.read(&magic);
-        return magic == magic_number_v;
+        std::uint8_t magic[4] = {};
+        reader.read(magic, sizeof(magic));
+        auto const is_rev = magic[0] == magic_number_v[0] ? false : true;
+
+        for(auto i = 0ul; i < sizeof(magic) - 1; ++i) {
+            auto const el = magic[is_rev ? sizeof(magic) - i - 1 : i];
+            if (el != magic_number_v[i]) return false;
+        }
+
+        auto const last_c = magic[is_rev ? 0 : sizeof(magic) - 1];
+        switch(last_c) {
+            case 'a': case 'l': case 'f':return true;
+            default:return false;
+        }
     }
     
     static auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
         std::uint32_t version{};
         reader.read(&version);
         if (format_version != nullptr) *format_version = version;
-        return version == file_version_v;
+        return version == static_cast<std::uint32_t>(FileVersion::V1);
     }
 
     static auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
@@ -351,7 +362,8 @@ namespace fastllama {
 
         std::uint32_t format_version{};
         if (!is_old_model && !verify_file_version(reader, &format_version)) {
-            logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ", file_version_v, "\n");
+            logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ",
+                static_cast<std::int32_t>(FileVersion::V1), "\n");
             return std::nullopt;
         }
 
@@ -583,18 +595,25 @@ namespace fastllama {
         return true;
     }
 
-    bool KVCacheBuffer::save_state(BinaryFileWriter& writer) const noexcept {
+    bool KVCacheBuffer::save_state(BinaryFileWriter& writer, Logger const& logger) const noexcept {
         writer.write(&memory_type);
 
+
+        logger.log(__func__, "saving key cache\n");
         writer.write(k->data, sizeof(char), ggml_nbytes(k));
+        
+        logger.log(__func__, "saving value cache\n");
         writer.write(v->data, sizeof(char), ggml_nbytes(k));
         return true;
     }
 
-    bool KVCacheBuffer::load_state(BinaryFileReader& reader) noexcept {
+    bool KVCacheBuffer::load_state(BinaryFileReader& reader, Logger const& logger) noexcept {
         reader.read(&memory_type);
 
+        logger.log(__func__, "loading key cache\n");
         reader.read(k->data, sizeof(char), ggml_nbytes(k));
+        
+        logger.log(__func__, "loading value cache\n");
         reader.read(v->data, sizeof(char), ggml_nbytes(k));
         return true;
     }
@@ -602,66 +621,12 @@ namespace fastllama {
     // Assumption 1: Layer is not being modified. Therefore, we can skip it
     // Assumption 2: User will only load the state of a correct model
     bool Model::save_state(BinaryFileWriter& writer) const noexcept {
-
-        std::size_t const tok_embeddings_size = ggml_nbytes(tok_embeddings);
-        writer.write(&tok_embeddings_size);
-        writer.write(tok_embeddings->data, sizeof(char), tok_embeddings_size);
-
-        logger.log(__func__, "saving token embeddings\n");
-
-        std::size_t const norm_size = ggml_nbytes(norm);
-        writer.write(&norm_size);
-        writer.write(norm->data, sizeof(char), norm_size);
-
-        logger.log(__func__, "saving norm\n");
-
-        std::size_t const output_size = ggml_nbytes(output);
-        writer.write(&output_size);
-        writer.write(output->data, sizeof(char), output_size);
-
-        logger.log(__func__, "saving output\n");
-
-        kv_self.save_state(writer);
+        kv_self.save_state(writer, logger);
         return true;
     }
 
     bool Model::load_state(BinaryFileReader& reader) noexcept {
-        
-        std::size_t tok_embeddings_size{};
-        reader.read(&tok_embeddings_size);
-        reader.read(tok_embeddings->data, sizeof(char), tok_embeddings_size);
-
-        tok_embeddings->grad = nullptr;
-        tok_embeddings->src0 = nullptr;
-        tok_embeddings->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) tok_embeddings->opt[i] = nullptr;
-        
-
-        logger.log(__func__, "loading token embeddings\n");
-
-        std::size_t norm_size{};
-        reader.read(&norm_size);
-        reader.read(norm->data, sizeof(char), norm_size);
-
-        norm->grad = nullptr;
-        norm->src0 = nullptr;
-        norm->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) norm->opt[i] = nullptr;
-
-        logger.log(__func__, "loading norm\n");
-
-        std::size_t output_size{};
-        reader.read(&output_size);
-        reader.read(output->data, sizeof(char), output_size);
-
-        output->grad = nullptr;
-        output->src0 = nullptr;
-        output->src1 = nullptr;
-        for(auto i = 0ul; i < GGML_MAX_OPT; ++i) output->opt[i] = nullptr;
-
-        logger.log(__func__, "loading output\n");
-
-        kv_self.load_state(reader);
+        kv_self.load_state(reader, logger);
         return true;
     }
 
@@ -998,7 +963,7 @@ namespace fastllama {
         std::uint32_t format_version{};
         if (!verify_file_version(pipe.get_reader(), &format_version)) {
             fprintf(stderr, "%s: invalid model file '%.*s' (unsupported format version %zu, expected %d)\n",
-                    __func__, static_cast<int>(in_filepath.size()), in_filepath.data(), static_cast<std::size_t>(format_version), file_version_v);
+                    __func__, static_cast<int>(in_filepath.size()), in_filepath.data(), static_cast<std::size_t>(format_version), static_cast<std::int32_t>(FileVersion::V1));
             return false;
         }
 

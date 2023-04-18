@@ -29,7 +29,7 @@ def write_header(f_out, header):
         raise Exception('Invalid file magic. Must be an old style ggml file.')
 
     values = [
-        0x67676d66,  # magic: ggml in hex
+        0x67676d66,  # magic: ggmf in hex
         1, # file version
         vocab_size,
         dim,
