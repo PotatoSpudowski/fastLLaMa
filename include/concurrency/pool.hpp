@@ -23,8 +23,8 @@ namespace fastllama {
         {
             for(auto i = 0ul; i < workers; ++i) {
                 m_workers.emplace_back(this, i);
-                m_threads.emplace_back([&worker=m_workers[i], &mu=m_mu[i], &cv=m_cv[i], &stop=m_stop, this] {
-                    worker.run(stop, mu, cv, [this](size_type id){ return this->try_steal(id); });
+                m_threads.emplace_back([i, this] {
+                    m_workers[i].run(m_force_stop, m_stop, m_mu[i], m_cv[i], [this](size_type id){ return this->try_steal(id); });
                 });
             }
         }
@@ -38,16 +38,38 @@ namespace fastllama {
             m_cv[idx].notify_all();
         }
 
-        void wait() {
-            for(auto& t : m_threads) t.join();
-        }
-
-        ~ThreadPool() {
-            stop();
+        void notify_all() {
             for(auto i = 0ul; i < m_workers.size(); ++i) {
                 m_cv[i].notify_all();
             }
+        }
+
+        void wait() {
+            stop();
+            notify_all();
+            join_workers();
+        }
+        
+        void force_stop() {
+            m_force_stop = true;
+        }
+
+        void force_stop_wait() {
+            force_stop();
+            notify_all();
+            join_workers();
+        }
+
+        ~ThreadPool() {
             wait();
+        }
+
+    private:
+
+        void join_workers() {
+            for(auto& t : m_threads) {
+                if (t.joinable()) t.join();
+            }
         }
 
     private:
@@ -67,6 +89,7 @@ namespace fastllama {
         std::vector<std::thread> m_threads;
         size_type m_current_work_receiver_id{}; // Used for round robin work so that all threads get some work
         bool m_stop{false};
+        bool m_force_stop{false};
     };
 
     template <typename W>
@@ -93,24 +116,30 @@ namespace fastllama {
         ~Worker() = default;
 
         template<typename Fn>
-        void run(bool const& stop, std::mutex& mu, std::condition_variable& cv, Fn&& try_steal_from_worker_fn) noexcept {
-            auto i = 0;
-            while (++i < 20) {
+        void run(bool const& m_force_stop, bool const& stop, std::mutex& mu, std::condition_variable& cv, Fn&& try_steal_from_worker_fn) noexcept {
+            while (!m_force_stop) {
                 {
                     std::unique_lock lk{mu};
-                    cv.wait(lk, [this, &stop, &try_steal_from_worker_fn]{
+                    cv.wait(lk, [this, &stop, &try_steal_from_worker_fn, &m_force_stop]{
                         if (m_local_queue.empty()) {
                             auto item = try_steal_from_worker_fn(m_worker_id);
-                            if (item) this->m_local_queue.emplace(std::move(*item));
+                            if (item) {
+                                this->m_local_queue.emplace(std::move(*item));
+                                return true;
+                            }
                         }
-                        return stop || !m_local_queue.empty();
+                        return m_force_stop || stop || !m_local_queue.empty();
                     });
                 }
 
+                std::cout<<m_force_stop<<"\n";
+
+                if (m_force_stop) break;
+
                 if (m_local_queue.empty()) {
-                    if (stop) break;
                     auto item = try_steal_from_worker_fn(m_worker_id);
                     if (item) this->m_local_queue.emplace(std::move(*item));
+                    else if (stop) break;
                 }
 
                 while(!m_local_queue.empty()) {
@@ -124,12 +153,13 @@ namespace fastllama {
 
         void add_work(W&& work) noexcept {
             m_local_queue.emplace(std::move(work));
-            // std::this_thread::sleep_for(1s);
-            // std::cout<<"Id: "<<m_worker_id<<", Size: "<<m_local_queue.size()<<", Empty: "<<m_local_queue.empty()<<std::endl;
+            std::this_thread::sleep_for(1s);
+            std::cout<<"Id: "<<m_worker_id<<", Size: "<<m_local_queue.size()<<", Empty: "<<m_local_queue.empty()<<std::endl;
             // exit(0);
         }
 
         std::optional<W> try_steal_local_work() noexcept {
+            if (!m_pool) return {};
             return std::move(m_local_queue.steal());
         }
 
