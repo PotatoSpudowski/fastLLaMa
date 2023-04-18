@@ -13,16 +13,27 @@
 namespace fastllama {
 
     static auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
-        std::uint32_t magic{};
-        reader.read(&magic);
-        return magic == magic_number_v;
+        std::uint8_t magic[4] = {};
+        reader.read(magic, sizeof(magic));
+        auto const is_rev = magic[0] == magic_number_v[0] ? false : true;
+
+        for(auto i = 0ul; i < sizeof(magic) - 1; ++i) {
+            auto const el = magic[is_rev ? sizeof(magic) - i - 1 : i];
+            if (el != magic_number_v[i]) return false;
+        }
+
+        auto const last_c = magic[is_rev ? 0 : sizeof(magic) - 1];
+        switch(last_c) {
+            case 'a': case 'l': case 'f':return true;
+            default:return false;
+        }
     }
     
     static auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
         std::uint32_t version{};
         reader.read(&version);
         if (format_version != nullptr) *format_version = version;
-        return version == file_version_v;
+        return version == static_cast<std::uint32_t>(FileVersion::V1);
     }
 
     static auto load_hyperparams(BinaryFileReader& reader, HyperParams& params) {
@@ -351,7 +362,8 @@ namespace fastllama {
 
         std::uint32_t format_version{};
         if (!is_old_model && !verify_file_version(reader, &format_version)) {
-            logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ", file_version_v, "\n");
+            logger.log_err("Model", "invalid  model file ", filepath, "(unsupported format version ", format_version, " expected ",
+                static_cast<std::int32_t>(FileVersion::V1), "\n");
             return std::nullopt;
         }
 
@@ -946,7 +958,7 @@ namespace fastllama {
         std::uint32_t format_version{};
         if (!verify_file_version(pipe.get_reader(), &format_version)) {
             fprintf(stderr, "%s: invalid model file '%.*s' (unsupported format version %zu, expected %d)\n",
-                    __func__, static_cast<int>(in_filepath.size()), in_filepath.data(), static_cast<std::size_t>(format_version), file_version_v);
+                    __func__, static_cast<int>(in_filepath.size()), in_filepath.data(), static_cast<std::size_t>(format_version), static_cast<std::int32_t>(FileVersion::V1));
             return false;
         }
 
