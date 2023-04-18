@@ -72,7 +72,7 @@ namespace fastllama {
         std::vector<ggml_tensor*> tensors;
         std::unordered_map<std::string, std::size_t> tensor_names;
 
-        constexpr auto operator[](std::size_t k) const noexcept -> ggml_tensor* {
+        auto operator[](std::size_t k) const noexcept -> ggml_tensor* {
             return tensors[k];
         }
 
