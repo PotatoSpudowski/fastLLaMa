@@ -52,8 +52,8 @@ namespace fastllama {
 
         bool init(HyperParams const& params, Logger const& logger = Logger{});
         void deinit(Logger const& logger = Logger{});
-        bool save_state(BinaryFileWriter& writer) const noexcept;
-        bool load_state(BinaryFileReader& reader) noexcept;
+        bool save_state(BinaryFileWriter& writer, Logger const& logger) const noexcept;
+        bool load_state(BinaryFileReader& reader, Logger const& logger) noexcept;
 
         ggml_type memory_type{ GGML_TYPE_F32 };
 
