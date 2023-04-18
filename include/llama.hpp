@@ -15,8 +15,12 @@
 
 namespace fastllama {
 
-    inline static constexpr std::uint32_t magic_number_v = 0x67676d6c;
-    inline static constexpr std::uint32_t file_version_v = 1;
+    inline static constexpr std::uint8_t magic_number_v[] = { 'g', 'g', 'm', '\0' };
+
+    enum class FileVersion : std::uint8_t {
+        NoVersion = 0,
+        V1 = 1,
+    };
     
     struct Layer {
         // normalization
