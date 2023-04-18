@@ -43,23 +43,16 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
                                                                            
 
 ```
-
-
----
-
-## Description
-
-`fastLLaMa` is a Python package that provides a Pythonic interface to a C++ library, llama.cpp. It allows you to use the functionality of the C++ library from within Python, without having to write C++ code or deal with low-level C++ APIs.
-
 ---
 
 ## Features
-- [x]  Easy-to-use Python interface that allows developers to build custom workflows.
-- [x]  Ability to ingest system prompts. 
-    (Normal prompts will be recycled but system prompts will remain in runtime memory)
-- [x]  Quick context switching between sessions.
+- [x] Easy-to-use Python interface that allows developers to build custom workflows.
+- [x] Ability to ingest system prompts.\
+(System prompts will remain in runtime memory, normal prompts are recycled)
 - [x] Customisable logger support.
-- [ ]  Int4 support for NVIDIA GPUs.
+- [x] Quick context switching between sessions.
+- [ ] Quick LoRA adapter switching during runtime.
+- [ ] Int4 support for NVIDIA GPUs.
 - [ ] Cold boot time optimization using multithreading.
 - [ ] Model artifact management support.
 - [ ] Multiple programming language support.
