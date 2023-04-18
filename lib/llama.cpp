@@ -741,7 +741,7 @@ namespace fastllama {
             logger.log_err(__func__, "model is not valid\n");
             return false;
         };
-        auto const N = embd_inp.size();
+        auto const N = static_cast<std::int64_t>(embd_inp.size());
 
         auto const n_embd  = params.n_embd;
         auto const n_layer = params.n_layer;
@@ -759,12 +759,14 @@ namespace fastllama {
         ggml_cgraph gf{};
         gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
 
-        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, static_cast<std::int64_t>(N));
+        ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
         std::copy_n(embd_inp.begin(), N, static_cast<vocab_id*>(embd->data));
 
         ggml_tensor* inpL = ggml_get_rows(ctx0, tok_embeddings, embd);
+
+        auto const past_size = static_cast<std::int64_t>(n_past);
         
-        for (auto il = 0ul; il < static_cast<std::size_t>(n_layer); ++il) {
+        for (auto il = 0ul; il < layers.size(); ++il) {
             ggml_tensor * inpSA = inpL;
 
             ggml_tensor * cur;
@@ -783,38 +785,35 @@ namespace fastllama {
 
             // self-attention
             {
-                ggml_tensor * Qcur = ggml_mul_mat(ctx0, layers[il].wq, cur);
-                ggml_tensor * Kcur = ggml_mul_mat(ctx0, layers[il].wk, cur);
-                ggml_tensor * Vcur = ggml_mul_mat(ctx0, layers[il].wv, cur);
+                // compute Q and K and RoPE them
+                ggml_tensor* Qcur = ggml_rope(ctx0, ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, layers[il].wq, cur), n_embd/n_head, n_head, N), past_size, n_rot, 0);
+                ggml_tensor* Kcur = ggml_rope(ctx0, ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, layers[il].wk, cur), n_embd/n_head, n_head, N), past_size, n_rot, 0);
 
                 // store key and value to memory
-                if (N >= 1) {
-                    auto const ne0 = static_cast<std::int64_t>(N * static_cast<std::size_t>(n_embd));
-                    ggml_tensor * k = ggml_view_1d(ctx0, kv_self.k, ne0, (ggml_element_size(kv_self.k)*static_cast<std::size_t>(n_embd))*(il*static_cast<std::size_t>(n_ctx) + n_past));
-                    ggml_tensor * v = ggml_view_1d(ctx0, kv_self.v, ne0, (ggml_element_size(kv_self.v)*static_cast<std::size_t>(n_embd))*(il*static_cast<std::size_t>(n_ctx) + n_past));
+                {
+                    // compute the transposed [N, n_embd] V matrix
+                    ggml_tensor* Vcur = ggml_transpose(ctx0, ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, layers[il].wv, cur), n_embd, N));
 
+                    ggml_tensor* k = ggml_view_1d(ctx0, kv_self.k, N*n_embd, (ggml_element_size(kv_self.k)*n_embd)*(il*n_ctx + past_size));
+                    ggml_tensor* v = ggml_view_2d(ctx0, kv_self.v, N, n_embd,
+                            (   n_ctx)*ggml_element_size(kv_self.v),
+                            (il*n_ctx)*ggml_element_size(kv_self.v)*n_embd + past_size*ggml_element_size(kv_self.v));
+
+                    // important: storing RoPE-ed version of K in the KV cache!
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Kcur, k));
                     ggml_build_forward_expand(&gf, ggml_cpy(ctx0, Vcur, v));
                 }
 
-                // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0, 2, 1, 3)
-                ggml_tensor * Q =
+                ggml_tensor* Q =
                     ggml_permute(ctx0,
-                            ggml_rope(ctx0,
-                                ggml_cpy(ctx0,
-                                    Qcur,
-                                    ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd/n_head, n_head, static_cast<std::int64_t>(N))),
-                                static_cast<int>(n_past), n_rot, 0),
+                            Qcur,
                             0, 2, 1, 3);
 
-                // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-                ggml_tensor * K =
+                ggml_tensor* K =
                     ggml_permute(ctx0,
-                            ggml_rope(ctx0,
-                                ggml_reshape_3d(ctx0,
-                                    ggml_view_1d(ctx0, kv_self.k, static_cast<std::int64_t>((n_past + N)*static_cast<std::size_t>(n_embd)), il*static_cast<std::size_t>(n_ctx)*ggml_element_size(kv_self.k)*static_cast<std::size_t>(n_embd)),
-                                    n_embd/n_head, n_head, static_cast<std::int64_t>(n_past + N)),
-                                static_cast<int>(n_past), n_rot, 1),
+                            ggml_reshape_3d(ctx0,
+                                ggml_view_1d(ctx0, kv_self.k, (past_size + N)*n_embd, il*n_ctx*ggml_element_size(kv_self.k)*n_embd),
+                                n_embd/n_head, n_head, past_size + N),
                             0, 2, 1, 3);
 
                 // K * Q
@@ -827,23 +826,29 @@ namespace fastllama {
                             ggml_new_f32(ctx0, 1.0f/sqrtf(float(n_embd)/n_head)));
 
                 // KQ_masked = mask_past(KQ_scaled)
-                ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, static_cast<int>(n_past));
+                ggml_tensor * KQ_masked = ggml_diag_mask_inf(ctx0, KQ_scaled, past_size);
 
                 // KQ = soft_max(KQ_masked)
                 ggml_tensor * KQ_soft_max = ggml_soft_max(ctx0, KQ_masked);
 
-                // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
-                ggml_tensor * V_trans =
-                    ggml_cpy(ctx0,
-                        ggml_permute(ctx0,
-                                ggml_reshape_3d(ctx0,
-                                    ggml_view_1d(ctx0, kv_self.v, static_cast<std::int64_t>((n_past + N)*static_cast<std::size_t>(n_embd)), il*static_cast<std::size_t>(n_ctx)*ggml_element_size(kv_self.v)*static_cast<std::size_t>(n_embd)),
-                                    n_embd/n_head, n_head, static_cast<std::int64_t>(n_past + N)),
-                                1, 2, 0, 3),
-                        ggml_new_tensor_3d(ctx0, kv_self.v->type, static_cast<std::int64_t>(n_past + N), n_embd/n_head, n_head));
+                // split cached V into n_head heads
+                ggml_tensor* V =
+                    ggml_view_3d(ctx0, kv_self.v,
+                            past_size + N, n_embd/n_head, n_head,
+                            n_ctx*ggml_element_size(kv_self.v),
+                            n_ctx*ggml_element_size(kv_self.v)*n_embd/n_head,
+                            il*n_ctx*ggml_element_size(kv_self.v)*n_embd);
 
-                // KQV = transpose(V) * KQ_soft_max
-                ggml_tensor * KQV = ggml_mul_mat(ctx0, V_trans, KQ_soft_max);
+                
+#if 1
+                ggml_tensor* KQV = ggml_mul_mat(ctx0, V, KQ_soft_max);
+#else
+                // make V contiguous in memory to speed up the matmul, however we waste time on the copy
+                // on M1 this is faster for the perplexity computation, but ~5% slower for the single-token generation
+                // is there a better way?
+                ggml_tensor* V_cont = ggml_cpy(ctx0, V, ggml_new_tensor_3d(ctx0, kv_self.v->type, past_size + N, n_embd/n_head, n_head));
+                ggml_tensor* KQV = ggml_mul_mat(ctx0, V_cont, KQ_soft_max);
+#endif
 
                 // KQV_merged = KQV.permute(0, 2, 1, 3)
                 ggml_tensor * KQV_merged = ggml_permute(ctx0, KQV, 0, 2, 1, 3);
@@ -851,7 +856,7 @@ namespace fastllama {
                 // cur = KQV_merged.contiguous().view(n_embd, N)
                 cur = ggml_cpy(ctx0,
                         KQV_merged,
-                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, static_cast<std::int64_t>(N)));
+                        ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_embd, N));
 
                 // projection (no bias)
                 cur = ggml_mul_mat(ctx0,
