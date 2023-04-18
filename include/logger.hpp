@@ -101,6 +101,12 @@ namespace fastllama {
     }
 
     template<typename... Ts>
+    std::string_view format_str(char *buff, std::size_t n, char const* fmt, Ts&&... args) {
+        auto size = snprintf(buff, n, fmt, std::forward<Ts>(args)...);
+        return { buff, static_cast<std::size_t>(size) };
+    }
+
+    template<typename... Ts>
     std::string dyn_format_str(char const* fmt, Ts&&... args) {
         std::string buff(256, '\0');
         auto size = sprintf(buff.data(), fmt, std::forward<Ts>(args)...);

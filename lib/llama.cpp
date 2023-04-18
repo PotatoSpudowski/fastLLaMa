@@ -17,13 +17,22 @@ namespace fastllama {
         reader.read(magic, sizeof(magic));
         auto const is_rev = magic[0] == magic_number_v[0] ? false : true;
 
-        for(auto i = 0ul; i < sizeof(magic) - 1; ++i) {
-            auto const el = magic[is_rev ? sizeof(magic) - i - 1 : i];
-            if (el != magic_number_v[i]) return false;
+        auto const c0 = magic[is_rev ? 3 : 0];
+        auto const c1 = magic[is_rev ? 2 : 1];
+        auto const c2 = magic[is_rev ? 1 : 2];
+        auto const c3 = magic[is_rev ? 0 : 3];
+
+
+        if ( c0 != magic_number_v[0] || c1 != magic_number_v[1] ) {
+            return false;
         }
 
-        auto const last_c = magic[is_rev ? 0 : sizeof(magic) - 1];
-        switch(last_c) {
+        switch(c2) {
+            case 'm': case 'l':break;
+            default:return false;
+        }
+
+        switch(c3) {
             case 'a': case 'l': case 'f':return true;
             default:return false;
         }
@@ -1213,7 +1222,7 @@ namespace fastllama {
         auto const scaling = static_cast<float>(alpha) / static_cast<float>(r);
         char format_buff[1024];
 
-        logger.log(__func__, "LoRa model: r = ", r, ", alpha = ", alpha, format_str(format_buff, ", scaling = %.2Lf", scaling), "\n");
+        logger.log(__func__, "LoRa model: r = ", r, ", alpha = ", alpha, format_str(format_buff, sizeof(format_buff), ", scaling = %.2f", scaling), "\n");
 
         std::vector<unsigned char> buff(1_GiB);
         ggml_init_params params = {};
@@ -1227,6 +1236,8 @@ namespace fastllama {
         std::unordered_map<std::string, ggml_tensor*> model_tensors = tensors.make_tensors_by_name();
 
         auto n_tensors = std::size_t{};
+
+        bool warned{false};
 
         while(!reader.eof()) {
             int32_t n_dims;
@@ -1300,11 +1311,14 @@ namespace fastllama {
             auto loraB_str = base_name + ".loraB";
 
             if ((lora_tensors.find(loraA_str) != lora_tensors.end())
-                || lora_tensors.find(loraB_str) != lora_tensors.end())
+                && lora_tensors.find(loraB_str) != lora_tensors.end())
             {
                 ggml_tensor* base_t = model_tensors[base_name];
-                if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
-                    logger.log_warn(__func__, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+                if (!warned) {
+                    if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
+                        logger.log_warn(__func__, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+                        warned = true;
+                    }
                 }
 
                 ggml_tensor * loraA = lora_tensors[loraA_str];
@@ -1332,7 +1346,7 @@ namespace fastllama {
                 //     r = ggml_cpy(lora_ctx, r, dest_t);
                 // }
 
-                struct ggml_cgraph gf = ggml_build_forward(r);
+                ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = threads;
                 ggml_graph_compute(lora_ctx, &gf);
 
