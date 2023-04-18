@@ -50,7 +50,8 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 - [x] Ability to ingest system prompts.\
 (System prompts will remain in runtime memory, normal prompts are recycled)
 - [x] Customisable logger support.
-- [x] Quick context switching between sessions.
+- [x] Quick context switching between sessions.\
+(Ability to save and load session states)
 - [ ] Quick LoRA adapter switching during runtime.
 - [ ] Int4 support for NVIDIA GPUs.
 - [ ] Cold boot time optimization using multithreading.
@@ -109,9 +110,7 @@ ls ./models
 python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0
 
 # quantize the model to 4-bits
-python3 quantize.py 7B
-#or
-#./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
+./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
 
 # run the inference
 #Run the scripts from the root dir of the project for now!
