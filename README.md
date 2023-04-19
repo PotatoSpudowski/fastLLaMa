@@ -47,12 +47,14 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 
 ## Features
 - [x] Easy-to-use Python interface that allows developers to build custom workflows.
-- [x] Ability to ingest system prompts.\
-(System prompts will remain in runtime memory, normal prompts are recycled)
+- [x] Ability to ingest system prompts.
+    - [x] System prompts will remain in runtime memory, normal prompts are recycled)
 - [x] Customisable logger support.
-- [x] Quick context switching between sessions.\
-(Ability to save and load session states)
-- [ ] Quick LoRA adapter switching during runtime.
+- [x] Quick context switching between sessions.
+    - [x] Ability to save and load session states
+- [x] Quick LoRA adapter switching during runtime.
+    - [x] During the conversion of LoRA adapters to bin file, we are caching the result of matrix multiplication to avoid expensive caclulation for every context switch.
+    - [ ] Possible quantization of LoRA adapters with minimal performance degradation (To reduce size of adapters)
 - [ ] Int4 support for NVIDIA GPUs.
 - [ ] Cold boot time optimization using multithreading.
 - [ ] Model artifact management support.
@@ -171,13 +173,13 @@ res = model.save_state("./models/fast_llama.bin")
 res = model.load_state("./models/fast_llama.bin")
 ```
 
-### Running Alpaca-LoRA
+### Running Alpaca-LoRA 
 
 ```sh
 pip install -r requirements.txt
 
-#Before running this command
-#You need to provide the HF model paths here
+# Before running this command
+# You need to provide the HF model paths here
 python ./scripts/export-from-huggingface.py
 
 python3 ./scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
@@ -185,6 +187,24 @@ python3 ./scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 ./build/src/quantize models/ALPACA-LORA-7B/ggml-model-f16.bin models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin 2
 
 python ./examples/python/example-alpaca.py
+```
+
+### Using LoRA adapters during runtime
+
+```sh
+# Download lora adapters and paste them inside models folder
+# https://huggingface.co/tloen/alpaca-lora-7b
+
+
+python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/
+
+python examples/python/example-lora-adapter.py
+
+# Make sure to set paths correctly for the base model and adapter inside the example
+# Commands: 
+# load_lora: Attaches the adapter to the base model 
+# unload_lora: Deattaches the adapter
+# reset: Resets the model state
 ```
 
 ### Memory/Disk Requirements

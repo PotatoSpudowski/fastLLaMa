@@ -363,6 +363,40 @@ class Model:
         res: llama_array_view_f = getter(self.ctx)
         return res.data[:int(res.size)]
     
+    def attach_lora(self, filepath: str) -> bool:
+        """
+        Attaches a Lora model to the current model.
+
+        :param filepath: Path to the Lora model file.
+        :return: True if successful, False otherwise.
+        """
+        fn = self.lib.llama_attach_lora
+        fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        fn.restype = ctypes.c_bool
+        return bool(fn(self.ctx, bytes(filepath, 'utf-8')))
+
+    def detach_lora(self) -> bool:
+        """
+        Detaches the Lora model from the current model.
+
+        :return: True if successful, False otherwise.
+        """
+        fn = self.lib.llama_detach_lora
+        fn.argtypes = [c_llama_model_context_ptr]
+        fn.restype = ctypes.c_bool
+        return bool(fn(self.ctx))
+
+    def reset(self) -> bool:
+        """
+        Resets the model.
+
+        :return: True if successful, False otherwise.
+        """
+        fn = self.lib.llama_reset_model
+        fn.argtypes = [c_llama_model_context_ptr]
+        fn.restype = ctypes.c_bool
+        return bool(fn(self.ctx))
+    
     def __del__(self):
         """
         Destructor for the Model class.
