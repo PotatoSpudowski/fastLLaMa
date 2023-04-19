@@ -1208,21 +1208,7 @@ namespace fastllama {
             return false;
         }
 
-        int32_t r{1};
-        int32_t alpha{};
-
         ggml_context* lora_ctx{nullptr};
-
-        reader.read(&r);
-        reader.read(&alpha);
-        if (r == 0) {
-            logger.log_err(__func__, "bad LoRa model: found 'r' to be 0\n");
-            return false;
-        }
-        auto const scaling = static_cast<float>(alpha) / static_cast<float>(r);
-        char format_buff[1024];
-
-        logger.log(__func__, "LoRa model: r = ", r, ", alpha = ", alpha, format_str(format_buff, sizeof(format_buff), ", scaling = %.2f", scaling), "\n");
 
         std::vector<unsigned char> buff(1_GiB);
         ggml_init_params params = {};
@@ -1305,6 +1291,7 @@ namespace fastllama {
 
             reader.read(lora_tensor->data, sizeof(char), ggml_nbytes(lora_tensor));
 
+            // BA matrix with scaled values
             lora_tensors[name] = lora_tensor;
 
             ggml_tensor* base_t = model_tensors[base_name];
@@ -1321,15 +1308,9 @@ namespace fastllama {
                 return false;
             }
 
-            // ggml_tensor * BA = ggml_mul_mat(lora_ctx, loraA, loraB);
-
-            // if (scaling != 1.0f) {
-            //     ggml_tensor* scale_tensor = ggml_new_f32(lora_ctx, scaling);
-            //     BA = ggml_scale(lora_ctx, BA, scale_tensor);
-            // }
-
             ggml_tensor * r;
             // if (base_t == dest_t) {
+                // W = W + BAs
                 r = ggml_add_inplace(lora_ctx, base_t, lora_tensor);
             // }
             // else {
@@ -1351,6 +1332,7 @@ namespace fastllama {
 
         }
         ggml_free(lora_ctx);
+        fprintf(stderr, "\n");
 
         attached_lora_path = filepath;
         return true;

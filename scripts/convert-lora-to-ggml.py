@@ -41,16 +41,16 @@ def translate_tensor_name(t: str) -> Tuple[str, str]:
         output_string = (
             f"layers.{nn}.{HF_SUBLAYER_TO_GGML[sub_layer]}.weight.lora"
         )
-        return [output_string, lora_type]
+        return (output_string, lora_type)
     else:
         print(f"Error: unrecognized tensor {t}")
         sys.exit(1)
 
 
-def write_file_header(fout: BufferedWriter, params: Mapping[str, Any]) -> None:
+def write_file_header(fout: BufferedWriter, _params: Mapping[str, Any]) -> None:
     fout.write(b"ggla"[::-1])  # magic (ggml lora)
     fout.write(struct.pack("i", 1))  # file version
-    fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
+    # fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
 
 
 def write_tensor_header(
@@ -114,7 +114,6 @@ def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tup
         if k.endswith("lora_A.weight"):
             if v.dtype != torch.float16 and v.dtype != torch.float32:
                 v = v.float()
-            # v = v.T
         else:
             v = v.float()
         (tensor_name, type) = translate_tensor_name(k)
@@ -129,8 +128,9 @@ def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tup
     return tensor_map
 
 def main(output_path: str) -> None:
-
+    print("Normalizing tensors...")
     tensor_map = normalize_tensors(model, params)
+    print("Normalization completed.\nWriting output...")
     
     with open(output_path, "wb") as fout:
         fout.truncate()
