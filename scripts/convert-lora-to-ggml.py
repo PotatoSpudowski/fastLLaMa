@@ -137,7 +137,8 @@ def main(output_path: str) -> None:
 
         write_file_header(fout, params)
         for tname, (v, ltype) in tensor_map.items():
-            assert ltype == ""
+            if ltype != "":
+                continue
 
             t = v.numpy()
             print(f"{tname} {t.shape} {t.dtype} {t.nbytes/1024/1024:.2f}MB")
