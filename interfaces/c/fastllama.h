@@ -208,6 +208,15 @@ bool llama_attach_lora(struct llama_model_context* model_context, char const* fi
 bool llama_detach_lora(struct llama_model_context* model_context);
 
 /**
+ * @brief Resets the model context. It will reset the model state and the memory.
+ * 
+ * @param model_context is the context that is constructed using `llama_create_context`.
+ * @return true if it successfully resets the model context.
+ * @return false if it fails to reset the model context.
+ */
+bool llama_reset_model(struct llama_model_context* model_context);
+
+/**
  * @brief Frees the model context.
  * 
  */
