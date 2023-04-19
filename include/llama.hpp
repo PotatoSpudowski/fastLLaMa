@@ -170,6 +170,8 @@ namespace fastllama {
         bool save_state(BinaryFileWriter& writer) const noexcept;
         bool load_state(BinaryFileReader& reader) noexcept;
 
+        bool reset() noexcept;
+
         Logger logger{};
 
         ModelId model_id{};

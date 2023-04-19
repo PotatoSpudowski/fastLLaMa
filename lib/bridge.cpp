@@ -513,4 +513,17 @@ namespace fastllama {
         return m_model.load_state(reader);
     }
 
+    bool FastLlama::reset() noexcept {
+        get_logger().log(__func__, "resetting the model...\n");
+        n_past = 0;
+        m_last_n_tokens.clear();
+        m_logits.clear();
+        m_system_prompt.clear();
+        m_embd.clear();
+        m_rng = std::mt19937(static_cast<std::size_t>(m_seed));
+        auto const res = m_model.reset();
+        get_logger().log(__func__, "reset completed.\n");
+        return res;
+    }
+
 } // namespace fastllama

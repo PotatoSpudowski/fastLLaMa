@@ -1364,4 +1364,9 @@ namespace fastllama {
         return true;
     }
 
+    bool Model::reset() noexcept {
+        embeddings.clear();
+        return true;
+    }
+
 } // namespace fastllama
