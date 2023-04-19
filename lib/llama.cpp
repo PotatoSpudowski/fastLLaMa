@@ -1307,57 +1307,47 @@ namespace fastllama {
 
             lora_tensors[name] = lora_tensor;
 
-            auto loraA_str = base_name + ".loraA";
-            auto loraB_str = base_name + ".loraB";
-
-            if ((lora_tensors.find(loraA_str) != lora_tensors.end())
-                && lora_tensors.find(loraB_str) != lora_tensors.end())
-            {
-                ggml_tensor* base_t = model_tensors[base_name];
-                if (!warned) {
-                    if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
-                        logger.log_warn(__func__, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
-                        warned = true;
-                    }
+            ggml_tensor* base_t = model_tensors[base_name];
+            if (!warned) {
+                if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
+                    logger.log_warn(__func__, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+                    warned = true;
                 }
-
-                ggml_tensor * loraA = lora_tensors[loraA_str];
-                ggml_tensor * loraB = lora_tensors[loraB_str];
-
-                if (base_t->ne[0] != loraA->ne[1] || base_t->ne[1] != loraB->ne[1]) {
-                    logger.log_err(__func__, "incompatible tensor dimensions (", base_t->ne[0], " and ", loraA->ne[1], ");"
-                                , " are you sure that this adapter is for this model?\n");
-                    return false;
-                }
-
-                ggml_tensor * BA = ggml_mul_mat(lora_ctx, loraA, loraB);
-
-                if (scaling != 1.0f) {
-                    ggml_tensor* scale_tensor = ggml_new_f32(lora_ctx, scaling);
-                    BA = ggml_scale(lora_ctx, BA, scale_tensor);
-                }
-
-                ggml_tensor * r;
-                // if (base_t == dest_t) {
-                    r = ggml_add_inplace(lora_ctx, base_t, BA);
-                // }
-                // else {
-                //     r = ggml_add(lora_ctx, base_t, BA);
-                //     r = ggml_cpy(lora_ctx, r, dest_t);
-                // }
-
-                ggml_cgraph gf = ggml_build_forward(r);
-                gf.n_threads = threads;
-                ggml_graph_compute(lora_ctx, &gf);
-
-                // we won't need these tensors again, reset the context to save memory
-                ggml_free(lora_ctx);
-                lora_ctx = ggml_init(params);
-                lora_tensors.clear();
-
-                n_tensors++;
-                if (n_tensors % 4 == 0) fprintf(stderr, ".");
             }
+
+            if (base_t->ne[0] != lora_tensor->ne[0] || base_t->ne[1] != lora_tensor->ne[1]) {
+                logger.log_err(__func__, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ");"
+                            , " are you sure that this adapter is for this model?\n");
+                return false;
+            }
+
+            // ggml_tensor * BA = ggml_mul_mat(lora_ctx, loraA, loraB);
+
+            // if (scaling != 1.0f) {
+            //     ggml_tensor* scale_tensor = ggml_new_f32(lora_ctx, scaling);
+            //     BA = ggml_scale(lora_ctx, BA, scale_tensor);
+            // }
+
+            ggml_tensor * r;
+            // if (base_t == dest_t) {
+                r = ggml_add_inplace(lora_ctx, base_t, lora_tensor);
+            // }
+            // else {
+            //     r = ggml_add(lora_ctx, base_t, BA);
+            //     r = ggml_cpy(lora_ctx, r, dest_t);
+            // }
+
+            ggml_cgraph gf = ggml_build_forward(r);
+            gf.n_threads = threads;
+            ggml_graph_compute(lora_ctx, &gf);
+
+            // we won't need these tensors again, reset the context to save memory
+            ggml_free(lora_ctx);
+            lora_ctx = ggml_init(params);
+            lora_tensors.clear();
+
+            n_tensors++;
+            if (n_tensors % 4 == 0) fprintf(stderr, ".");
 
         }
         ggml_free(lora_ctx);
