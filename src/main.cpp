@@ -11,7 +11,7 @@ int main() {
         .set_number_of_batches(64)
         .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
-        .build(fastllama::ModelKind::ALPACA_LORA_7B, "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin");
+        .build(fastllama::ModelKind::ALPACA_LORA_7B, "./models/alpaca-lora-7B/alpaca-model");
     
     if (!maybe_bridge) {
         return 1;
@@ -45,6 +45,14 @@ int main() {
             exit(0);
         } else if (prompt == "load") {
             bridge.load_state("./models/fast_llama.bin");
+            std::cout<<"User: ";
+            continue;
+        } else if (prompt == "load_lora") {
+            bridge.attach_lora("./models/lora/ggml-adapter-model.bin");
+            std::cout<<"User: ";
+            continue;
+        } else if (prompt == "unload_lora") {
+            bridge.detach_lora();
             std::cout<<"User: ";
             continue;
         }

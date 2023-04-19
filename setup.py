@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import os
 import sys
 import subprocess
-from typing import Callable, List, Mapping, MutableMapping, Optional, Tuple, Union, cast
+from typing import Callable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union, cast
 from cpuinfo import get_cpu_info
 from scripts.utils.paths import get_file_name_to_file_path_mapping
 from scripts.utils.shell import get_python_info, run_shell, select_language
@@ -202,7 +202,7 @@ def generate_compiler_flags(global_compiler_flags: List[str]) -> None:
     fix_flags(cmake_vars, global_compiler_flags)
     save_cmake_vars(cmake_vars)
 
-def run_cmd_on_build_dirs(cmd: List[Union[List[str], str]]) -> None:
+def run_cmd_on_build_dirs(cmd: Sequence[Union[List[str], str]]) -> None:
     example_paths = [os.path.join('.', 'examples', l) for l in ALL_LANGUAGES_IN_INTERFACES.keys()]
     current_path = os.getcwd()
     if os.path.exists(os.path.join('.', 'build')):
@@ -328,11 +328,15 @@ def parse_args(project_name: str, global_compiler_flags: List[str]) -> Tuple[boo
     # parser.add_argument('-cc', '--cross-compile', choices=['android'], help="Cross compile for specific operating system", default=None)
 
     args = parser.parse_args(sys.argv[1:])
+
+    threads = args.threads if args is not None else None
+    make_cmd: List[str] = ['make', '-j', f'{threads}'] if threads is not None and threads > 1 else ['make']
+
     if args.clean:
-        run_cmd_on_build_dirs([['make', 'clean']])
+        run_cmd_on_build_dirs([make_cmd + ['clean']])
         return (False, None)
     if args.make:
-        run_cmd_on_build_dirs(['make'])
+        run_cmd_on_build_dirs([make_cmd])
         return (False, None)
     
     cmake_global_vars: CmakeVarType = {

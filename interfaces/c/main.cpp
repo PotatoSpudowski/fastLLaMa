@@ -234,6 +234,21 @@ extern "C" {
         return model_context->inner->load_state(filepath);
     }
 
+    bool llama_attach_lora(struct llama_model_context* model_context, char const* filepath) {
+        if (!is_model_valid(model_context)) return false;
+        return model_context->inner->attach_lora(filepath);
+    }
+
+    bool llama_detach_lora(struct llama_model_context* model_context) {
+        if (!is_model_valid(model_context)) return false;
+        return model_context->inner->detach_lora();
+    }
+
+    bool llama_reset_model(struct llama_model_context* model_context) {
+        if (!is_model_valid(model_context)) return false;
+        return model_context->inner->reset();
+    }
+
     void llama_handle_signal(int) {
         printf("Quitting the app...");
         exit(0);

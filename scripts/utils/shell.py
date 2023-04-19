@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 import subprocess
 import sys
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 import inquirer
 from scripts.utils.paths import get_file_name_to_file_path_mapping
 from scripts.utils.python_version import get_python_exec_paths
 
-def run_shell(commands: List[Union[List[str], str]]) -> None:
+def run_shell(commands: Sequence[Union[List[str], str]]) -> None:
     for cmd in commands:
         normalized_command = subprocess.list2cmdline([cmd] if type(cmd) == str else cmd)
         print(f"Setup executing command: {normalized_command}")
