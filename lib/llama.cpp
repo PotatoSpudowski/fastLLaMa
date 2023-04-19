@@ -1251,7 +1251,7 @@ namespace fastllama {
             std::string_view lora_suffix = ".lora";
             auto lora_pos = name.rfind(lora_suffix);
             if (lora_pos == std::string::npos) {
-                logger.log_err(func_name, '\'', name, "' is not a lora tensor", "\n");
+                logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
                 return false;
             }
 
@@ -1307,8 +1307,7 @@ namespace fastllama {
             }
 
             if (base_t->ne[0] != lora_tensor->ne[0] || base_t->ne[1] != lora_tensor->ne[1]) {
-                logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ");"
-                            , " are you sure that this adapter is for this model?\n");
+                logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                 return false;
             }
 
