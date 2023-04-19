@@ -78,6 +78,7 @@ namespace fastllama {
         bool load_state(std::string_view filepath) noexcept;
 
         bool attach_lora(std::string_view filepath) noexcept { return m_model.attach_lora(filepath); }
+        bool detach_lora() noexcept { return m_model.detach_lora(); }
     private:
         auto recycle_embed_if_exceeds_context() -> bool;
 
