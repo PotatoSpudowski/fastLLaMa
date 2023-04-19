@@ -189,6 +189,25 @@ bool llama_save_state(struct llama_model_context* model_context, char const* fil
 bool llama_load_state(struct llama_model_context* model_context, char const* filepath);
 
 /**
+ * @brief Allows to add lora adapter to the model context.
+ * 
+ * @param model_context is the context that is constructed using `llama_create_context`.
+ * @param filepath is the path to the lora adapter.
+ * @return true if it successfully loads the lora adapter.
+ * @return false if it fails to load the lora adapter.
+ */
+bool llama_attach_lora(struct llama_model_context* model_context, char const* filepath);
+
+/**
+ * @brief Removes the lora adapter from the model context.
+ * 
+ * @param model_context is the context that is constructed using `llama_create_context`.
+ * @return true if it successfully removes the lora adapter.
+ * @return false if it fails to remove the lora adapter.
+ */
+bool llama_detach_lora(struct llama_model_context* model_context);
+
+/**
  * @brief Frees the model context.
  * 
  */
