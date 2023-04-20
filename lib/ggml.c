@@ -6343,7 +6343,7 @@ static void ggml_compute_forward_add_q_f16(
         // add src1
         #pragma omp simd
         for(int i = 0; i < ne00; ++i) {
-            wdata[i] += src1_row[i];
+            wdata[i] += GGML_FP16_TO_FP32(src1_row[i]);
         }
         // quantize row to dst
         quantize_row_q(wdata, dst_row, ne00);
