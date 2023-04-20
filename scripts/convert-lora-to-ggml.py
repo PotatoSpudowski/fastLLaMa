@@ -140,7 +140,7 @@ def main(output_path: str) -> None:
             if ltype != "":
                 continue
 
-            t = v.numpy()
+            t = v.half().numpy()
             print(f"{tname} {t.shape} {t.dtype} {t.nbytes/1024/1024:.2f}MB")
             write_tensor_header(fout, tname, t.shape, t.dtype)
             t.tofile(fout)

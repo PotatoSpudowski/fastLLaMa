@@ -8,6 +8,7 @@
 #include <vector>
 #include <thread>
 #include <unordered_map>
+#include <algorithm>
 #include "logger.hpp"
 #include "span.hpp"
 #include "file_writer.hpp"
@@ -15,7 +16,13 @@
 
 namespace fastllama {
 
-    inline static constexpr std::uint8_t magic_number_v[] = { 'g', 'g', 'm', '\0' };
+    enum class MagicKind : std::uint32_t {
+        Unknown = 0,
+        GGML = 0x67676d6c,
+        GGMF = 0x67676d66,
+        GGLA = 0x67676c61,
+    };
+
 
     enum class FileVersion : std::uint8_t {
         NoVersion = 0,
