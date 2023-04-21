@@ -12,30 +12,24 @@
 
 namespace fastllama {
 
-    static auto verify_magic_number(BinaryFileReader& reader) noexcept -> bool {
-        std::uint8_t magic[4] = {};
-        reader.read(magic, sizeof(magic));
-        auto const is_rev = magic[0] == magic_number_v[0] ? false : true;
+    static auto verify_magic_number(BinaryFileReader& reader, MagicKind* kind = nullptr) noexcept -> bool {
+        std::uint32_t magic{};
+        reader.read(&magic);
 
-        auto const c0 = magic[is_rev ? 3 : 0];
-        auto const c1 = magic[is_rev ? 2 : 1];
-        auto const c2 = magic[is_rev ? 1 : 2];
-        auto const c3 = magic[is_rev ? 0 : 3];
-
-
-        if ( c0 != magic_number_v[0] || c1 != magic_number_v[1] ) {
-            return false;
+        switch(magic) {
+            case static_cast<std::uint32_t>(MagicKind::GGML):
+                if (kind) *kind = MagicKind::GGML;
+                return true;
+            case static_cast<std::uint32_t>(MagicKind::GGMF):
+                if (kind) *kind = MagicKind::GGMF;
+                return true;
+            case static_cast<std::uint32_t>(MagicKind::GGLA):
+                if (kind) *kind = MagicKind::GGLA;
+                return true;
+            default:
+                return false;
         }
-
-        switch(c2) {
-            case 'm': case 'l':break;
-            default:return false;
-        }
-
-        switch(c3) {
-            case 'a': case 'l': case 'f':return true;
-            default:return false;
-        }
+       
     }
     
     static auto verify_file_version(BinaryFileReader& reader, std::uint32_t* format_version = nullptr) noexcept -> bool {
@@ -962,12 +956,14 @@ namespace fastllama {
             return false;
         }
 
-        if (!verify_magic_number(pipe.get_reader())) {
+        auto magic = MagicKind::Unknown;
+
+        if (!verify_magic_number(pipe.get_reader(), &magic)) {
             fprintf(stderr, "%s: invalid model file '%.*s' (bad magic)\n", __func__, static_cast<int>(in_filepath.size()), in_filepath.data());
             return false;
         }
 
-        pipe.get_writer().write(&magic_number_v);
+        pipe.get_writer().write(&magic);
         
         std::uint32_t format_version{};
         if (!verify_file_version(pipe.get_reader(), &format_version)) {
@@ -987,37 +983,40 @@ namespace fastllama {
             };
         };
 
-        auto params = HyperParams{};
-        pipe.read_and_write(&params.n_vocab, 1, param_print_fn("n_vocab"));
-        pipe.read_and_write(&params.n_embd, 1, param_print_fn("n_embd"));
-        pipe.read_and_write(&params.n_mult, 1, param_print_fn("n_mult"));
-        pipe.read_and_write(&params.n_head, 1, param_print_fn("n_head"));
-        pipe.read_and_write(&params.n_layer, 1, param_print_fn("n_layer"));
-        pipe.read_and_write(&params.n_rot, 1, param_print_fn("n_rot"));
-        pipe.read_and_write(&params.f16, 1, [parent_fn_name, itype](auto* v) {
-            *v = itype;
-            printf("%.*s: %s = %d\n", static_cast<int>(parent_fn_name.size()), parent_fn_name.data(), "f16", *v);
-            return v;
-        });
+        if (magic != MagicKind::GGLA) {
+            auto params = HyperParams{};
+            pipe.read_and_write(&params.n_vocab, 1, param_print_fn("n_vocab"));
+            pipe.read_and_write(&params.n_embd, 1, param_print_fn("n_embd"));
+            pipe.read_and_write(&params.n_mult, 1, param_print_fn("n_mult"));
+            pipe.read_and_write(&params.n_head, 1, param_print_fn("n_head"));
+            pipe.read_and_write(&params.n_layer, 1, param_print_fn("n_layer"));
+            pipe.read_and_write(&params.n_rot, 1, param_print_fn("n_rot"));
+            pipe.read_and_write(&params.f16, 1, [parent_fn_name, itype](auto* v) {
+                *v = itype;
+                printf("%.*s: %s = %d\n", static_cast<int>(parent_fn_name.size()), parent_fn_name.data(), "f16", *v);
+                return v;
+            });
 
-        printf("%s: vocabulary processing started\n", __func__);
-        // load and save vocab
-        {
-            std::string word(64, ' ');
+            printf("%s: vocabulary processing started\n", __func__);
+            // load and save vocab
+            {
+                std::string word(64, ' ');
 
-            for(auto i = 0l; i < params.n_vocab; ++i) {
-                std::uint32_t len;
+                for(auto i = 0l; i < params.n_vocab; ++i) {
+                    std::uint32_t len;
 
-                pipe.read_and_write(&len);
-                word.resize(len);
-                pipe.read_and_write(word.data(), len);
+                    pipe.read_and_write(&len);
+                    word.resize(len);
+                    pipe.read_and_write(word.data(), len);
 
-                float score{};
-                pipe.read_and_write(&score);
+                    float score{};
+                    pipe.read_and_write(&score);
+                }
             }
+
+            printf("%s: vocabulary processing completed\n", __func__);
         }
 
-        printf("%s: vocabulary processing completed\n", __func__);
 
         // load -> transform -> save weights
         {
@@ -1072,8 +1071,7 @@ namespace fastllama {
                 }
 
                 std::string_view temp_w_str = "weight";
-                auto pos = (name.size() > temp_w_str.size() ? name.size() - temp_w_str.size() : 0);
-                auto find_pos = name.find(temp_w_str, pos);
+                auto find_pos = name.rfind(temp_w_str);
                 bool quantize = (n_dims == 2) && (find_pos != std::string::npos);
                 
                 // printf("Quantize? %s, Size: %zu - %zu == %zu\n", quantize ? "Yes" : "No", name.size(), find_pos, temp_w_str.size());
@@ -1266,6 +1264,8 @@ namespace fastllama {
             switch (ftype) {
                 case 0: wtype = GGML_TYPE_F32;  break;
                 case 1: wtype = GGML_TYPE_F16;  break;
+                case 2: wtype = GGML_TYPE_Q4_0; break;
+                case 3: wtype = GGML_TYPE_Q4_1; break;
                 default:{
                     logger.log_err(func_name, "unsupported lora tensor type ", ftype, "\n");
                     return false;

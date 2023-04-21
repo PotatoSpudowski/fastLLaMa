@@ -4,7 +4,8 @@ import os
 import re
 import struct
 import sys
-from typing import Any, Dict, Mapping, MutableMapping, Sequence, Tuple
+from typing import Any, Mapping, MutableMapping, Sequence, Tuple
+import argparse
 
 import torch
 
@@ -69,40 +70,47 @@ def write_tensor_header(
     fout.write(sname)
     fout.seek((fout.tell() + 31) & -32)
 
-
-if len(sys.argv) != 2:
-    print(f"Usage: python {sys.argv[0]} <path>")
-    print(
-        "Path must contain HuggingFace PEFT LoRA files 'adapter_config.json' and 'adapter_model.bin'"
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "path",
+        type=str,
+        help="Path must contain HuggingFace PEFT LoRA files 'adapter_config.json' and 'adapter_model.bin'",
     )
-    sys.exit(1)
+    parser.add_argument(
+        '-t',
+        '--dtype',
+        choices=['fp16', 'fp32'],
+        default='fp32',
+        help='Data type to use for the converted model. Default: %(default)s',
+        dest='dtype',
+    )
+    return parser.parse_args(sys.argv[1:])
 
-input_json = os.path.join(sys.argv[1], "adapter_config.json")
-input_model = os.path.join(sys.argv[1], "adapter_model.bin")
-output_path = os.path.join(sys.argv[1], "ggml-adapter-model.bin")
+def read_params(input_json: str) -> Mapping[str, Any]:
+    params: MutableMapping[str, Any] = {}
 
-model = torch.load(input_model, map_location="cpu")
+    with open(input_json, "r") as f:
+        params = json.load(f)
 
-with open(input_json, "r") as f:
-    params = json.load(f)
+    if params["peft_type"] != "LORA":
+        print(f"Error: unsupported adapter type {params['peft_type']}, expected LORA")
+        sys.exit(1)
 
-if params["peft_type"] != "LORA":
-    print(f"Error: unsupported adapter type {params['peft_type']}, expected LORA")
-    sys.exit(1)
+    if params["fan_in_fan_out"] == True:
+        print("Error: param fan_in_fan_out is not supported")
+        sys.exit(1)
 
-if params["fan_in_fan_out"] == True:
-    print("Error: param fan_in_fan_out is not supported")
-    sys.exit(1)
+    if params["bias"] is not None and params["bias"] != "none":
+        print("Error: param bias is not supported")
+        sys.exit(1)
 
-if params["bias"] is not None and params["bias"] != "none":
-    print("Error: param bias is not supported")
-    sys.exit(1)
-
-# TODO: these seem to be layers that have been trained but without lora.
-# doesn't seem widely used but eventually should be supported
-if params["modules_to_save"] is not None and len(params["modules_to_save"]) > 0:
-    print("Error: param modules_to_save is not supported")
-    sys.exit(1)
+    # TODO: these seem to be layers that have been trained but without lora.
+    # doesn't seem widely used but eventually should be supported
+    if params["modules_to_save"] is not None and len(params["modules_to_save"]) > 0:
+        print("Error: param modules_to_save is not supported")
+        sys.exit(1)
+    return params
 
 
 def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tuple[torch.Tensor, str]]:
@@ -127,7 +135,17 @@ def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tup
             tensor_map[tensor_name] = (v, type)
     return tensor_map
 
-def main(output_path: str) -> None:
+def main() -> None:
+    args = parse_args()
+    input_json = os.path.join(args.path, "adapter_config.json")
+    input_model = os.path.join(args.path, "adapter_model.bin")
+
+    output_path = os.path.join(sys.argv[1], "ggml-adapter-model.bin")
+
+    params = read_params(input_json)
+
+    model = torch.load(input_model, map_location="cpu")
+
     print("Normalizing tensors...")
     tensor_map = normalize_tensors(model, params)
     print("Normalization completed.\nWriting output...")
@@ -139,8 +157,11 @@ def main(output_path: str) -> None:
         for tname, (v, ltype) in tensor_map.items():
             if ltype != "":
                 continue
-
-            t = v.numpy()
+            
+            if args.dtype == 'fp16':
+                t = v.half().numpy()
+            else:
+                t = v.numpy()
             print(f"{tname} {t.shape} {t.dtype} {t.nbytes/1024/1024:.2f}MB")
             write_tensor_header(fout, tname, t.shape, t.dtype)
             t.tofile(fout)
@@ -148,4 +169,4 @@ def main(output_path: str) -> None:
     print(f"Converted {input_json} and {input_model} to {output_path}")
 
 if __name__ == '__main__':
-    main(output_path)
+    main()
