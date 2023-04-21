@@ -1362,7 +1362,7 @@ namespace fastllama {
                     }
                 }
 
-                auto* r = adapter_fn(lora_ctx, base_t, lora_tensors, base_name, loraA_str, loraB_str, scale, use_cache);
+                auto* r = adapter_fn(lora_ctx, base_t, lora_tensors, name, loraA_str, loraB_str, scale, use_cache);
 
                 ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = model.threads;
@@ -1402,7 +1402,7 @@ namespace fastllama {
                 ggml_context* ctx,
                 ggml_tensor* base_t,
                 std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-                std::string const& base_name,
+                std::string const& lora_name,
                 std::string const& loraA_str,
                 std::string const& loraB_str,
                 float scale,
@@ -1410,7 +1410,7 @@ namespace fastllama {
             ) {
             ggml_tensor* lora_t = nullptr;
             if (use_cache) {
-                lora_t = lora_tensors[base_name];
+                lora_t = lora_tensors[lora_name];
             } else {
                 auto loraA = lora_tensors[loraA_str];
                 auto loraB = lora_tensors[loraB_str];
@@ -1421,7 +1421,7 @@ namespace fastllama {
                     lora_t = ggml_scale(ctx, lora_t, factor);
                 }
             }
-
+            
             // W = W + BA * scale
             return ggml_add_inplace(ctx, base_t, lora_t);
         }, __func__, false);
@@ -1442,7 +1442,7 @@ namespace fastllama {
                 ggml_context* ctx,
                 ggml_tensor* base_t,
                 std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-                std::string const& base_name,
+                std::string const& lora_name,
                 std::string const& loraA_str,
                 std::string const& loraB_str,
                 float scale,
@@ -1451,7 +1451,7 @@ namespace fastllama {
             ggml_tensor* lora_t = nullptr;
             ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
             if (use_cache) {
-                lora_t = lora_tensors[base_name];
+                lora_t = lora_tensors[lora_name];
             } else {
                 auto loraA = lora_tensors[loraA_str];
                 auto loraB = lora_tensors[loraB_str];
