@@ -1302,6 +1302,11 @@ namespace fastllama {
                 }
             }
 
+            if (!use_cache && wtype != GGML_TYPE_F32) {
+                logger.log_err(func_name, "currently, we support fp32 for uncached matrix.\n");
+                return false;
+            }
+
             ggml_tensor* lora_tensor;
 
             if (n_dims == 2) {
