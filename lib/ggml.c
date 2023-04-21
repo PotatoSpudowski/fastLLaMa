@@ -8063,6 +8063,47 @@ static void ggml_compute_forward_scale_f32(
     }
 }
 
+static void ggml_compute_forward_scale_f16(
+        const struct ggml_compute_params * params,
+        const struct ggml_tensor * src0,
+        const struct ggml_tensor * src1,
+        struct ggml_tensor * dst) {
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+    GGML_ASSERT(ggml_is_scalar(src1));
+
+    if (params->type == GGML_TASK_INIT || params->type == GGML_TASK_FINALIZE) {
+        return;
+    }
+
+    // scale factor
+    const float v = *(float *) src1->data;
+
+    const int ith = params->ith;
+    const int nth = params->nth;
+
+    const int nc = src0->ne[0];
+    const int nr = ggml_nrows(src0);
+
+    // rows per thread
+    const int dr = (nr + nth - 1)/nth;
+
+    // row range for this thread
+    const int ir0 = dr*ith;
+    const int ir1 = MIN(ir0 + dr, nr);
+
+    
+    for (int i1 = ir0; i1 < ir1; i1++) {
+        ggml_fp16_t* dest = (ggml_fp16_t *) ((char *) dst->data + i1*(dst->nb[1]));
+
+        for (int i = 0; i < nc; ++i) {
+            float temp = GGML_FP16_TO_FP32(dest[i]);
+            dest[i] = GGML_FP32_TO_FP16(temp * v) ;
+        }
+    }
+}
+
 static void ggml_compute_forward_scale(
         const struct ggml_compute_params * params,
         const struct ggml_tensor * src0,
@@ -8072,6 +8113,10 @@ static void ggml_compute_forward_scale(
         case GGML_TYPE_F32:
             {
                 ggml_compute_forward_scale_f32(params, src0, src1, dst);
+            } break;
+        case GGML_TYPE_F16:
+            {
+                ggml_compute_forward_scale_f16(params, src0, src1, dst);
             } break;
         default:
             {
