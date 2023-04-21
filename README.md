@@ -204,7 +204,7 @@ python examples/python/example-lora-adapter.py
 # Make sure to set paths correctly for the base model and adapter inside the example
 # Commands: 
 # load_lora: Attaches the adapter to the base model 
-# unload_lora: Deattaches the adapter (Deattach for fp16 is yet to be added!)
+# unload_lora: Deattaches the adapter
 # reset: Resets the model state
 ```
 
