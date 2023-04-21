@@ -196,8 +196,10 @@ python ./examples/python/example-alpaca.py
 # https://huggingface.co/tloen/alpaca-lora-7b
 
 
-python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32
+python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32 
 # Change -t to fp16 to use fp16 weights
+# Inorder to use LoRA adapters without caching, pass the --no-cache flag
+#   - Only supported for fp32 adapter weights
 
 python examples/python/example-lora-adapter.py
 
