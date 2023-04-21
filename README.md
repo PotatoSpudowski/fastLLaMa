@@ -196,14 +196,15 @@ python ./examples/python/example-alpaca.py
 # https://huggingface.co/tloen/alpaca-lora-7b
 
 
-python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/
+python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32
+# Change -t to fp16 to use fp16 weights
 
 python examples/python/example-lora-adapter.py
 
 # Make sure to set paths correctly for the base model and adapter inside the example
 # Commands: 
 # load_lora: Attaches the adapter to the base model 
-# unload_lora: Deattaches the adapter
+# unload_lora: Deattaches the adapter (Deattach for fp16 is yet to be added!)
 # reset: Resets the model state
 ```
 
