@@ -48,10 +48,12 @@ def translate_tensor_name(t: str) -> Tuple[str, str]:
         sys.exit(1)
 
 
-def write_file_header(fout: BufferedWriter, _params: Mapping[str, Any]) -> None:
+def write_file_header(fout: BufferedWriter, params: Mapping[str, Any], no_cache: bool = False) -> None:
     fout.write(b"ggla"[::-1])  # magic (ggml lora)
     fout.write(struct.pack("i", 1))  # file version
-    # fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
+    fout.write(struct.pack("?", 0 if no_cache else 1))  # cache is enabled or not
+    if no_cache:
+        fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
 
 
 def write_tensor_header(
@@ -85,6 +87,12 @@ def parse_args() -> argparse.Namespace:
         help='Data type to use for the converted model. Default: %(default)s',
         dest='dtype',
     )
+    parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Cache the matrix multiplication to disk. Default: %(default)s',
+        dest='no_cache'
+    )
     return parser.parse_args(sys.argv[1:])
 
 def read_params(input_json: str) -> Mapping[str, Any]:
@@ -113,7 +121,7 @@ def read_params(input_json: str) -> Mapping[str, Any]:
     return params
 
 
-def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tuple[torch.Tensor, str]]:
+def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = False) -> Mapping[str, Tuple[torch.Tensor, str]]:
     r = float(params["r"])
     lora_alpha = float(params["lora_alpha"])
     scale = lora_alpha / r
@@ -122,9 +130,16 @@ def normalize_tensors(model: Any, params: Mapping[str, Any]) -> Mapping[str, Tup
         if k.endswith("lora_A.weight"):
             if v.dtype != torch.float16 and v.dtype != torch.float32:
                 v = v.float()
+            if no_cache:
+                v = v.T
         else:
             v = v.float()
         (tensor_name, type) = translate_tensor_name(k)
+
+        if no_cache:
+            v = v * scale
+            tensor_map[f'{tensor_name}{type}'] = (v, type)
+            continue
 
         if tensor_name in tensor_map:
             (old_tensor, old_type) = tensor_map[tensor_name]
@@ -147,15 +162,15 @@ def main() -> None:
     model = torch.load(input_model, map_location="cpu")
 
     print("Normalizing tensors...")
-    tensor_map = normalize_tensors(model, params)
+    tensor_map = normalize_tensors(model, params, no_cache=args.no_cache)
     print("Normalization completed.\nWriting output...")
     
     with open(output_path, "wb") as fout:
         fout.truncate()
 
-        write_file_header(fout, params)
+        write_file_header(fout, params, args.no_cache)
         for tname, (v, ltype) in tensor_map.items():
-            if ltype != "":
+            if ltype != "" and not args.no_cache:
                 continue
             
             if args.dtype == 'fp16':
