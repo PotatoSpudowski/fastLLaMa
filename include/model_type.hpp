@@ -6,18 +6,18 @@
 #include <limits>
 #include <utility>
 #include "utils.hpp"
+#include "macro.hpp"
+#include <iostream>
 
 namespace fastllama {
 
     struct ModelIdConfig {
         using size_type = std::size_t;
 
-        size_type number_of_parts{};
         size_type mem_required_for_scratch_buff_0{};
         size_type mem_required_for_scratch_buff_1{};
         size_type mem_required_for_kv_self_buff{};
         size_type mem_required_for_eval{};
-        bool      has_vocab_padding{false};
     };
 
     namespace detail {
@@ -27,91 +27,39 @@ namespace fastllama {
         
         inline static constexpr model_lookup_table_t g_models[] = {
             model_lookup_table_t(
-                "LLAMA-7B",
+                "7B",
                 ModelIdConfig {
-                    /* number_of_parts =                    */ 1,
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1026_MiB,
                     /* mem_required_for_eval =              */ 768_MiB,
-                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
-                "LLAMA-13B",
+                "13B",
                 ModelIdConfig {
-                    /* number_of_parts =                    */ 2,
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 1608_MiB,
                     /* mem_required_for_eval =              */ 1024_MiB,
-                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
-                "LLAMA-30B",
+                "30B",
                 ModelIdConfig {
-                    /* number_of_parts =                    */ 4,
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 3124_MiB,
                     /* mem_required_for_eval =              */ 1280_MiB,
-                    /* has_vocab_padding =                  */ false
                 }
             ),
             model_lookup_table_t(
-                "LLAMA-65B",
+                "65B",
                 ModelIdConfig {
-                    /* number_of_parts =                    */ 8,
                     /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
                     /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
                     /* mem_required_for_kv_self_buff =      */ 5120_MiB,
                     /* mem_required_for_eval =              */ 1536_MiB,
-                    /* has_vocab_padding =                  */ false
-                }
-            ),
-            model_lookup_table_t(
-                "ALPACA-LORA-7B",
-                ModelIdConfig {
-                    /* number_of_parts =                    */ 1,
-                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
-                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
-                    /* mem_required_for_kv_self_buff =      */ 1026_MiB,
-                    /* mem_required_for_eval =              */ 768_MiB,
-                    /* has_vocab_padding =                  */ false
-                }
-            ),
-            model_lookup_table_t(
-                "ALPACA-LORA-13B",
-                ModelIdConfig {
-                    /* number_of_parts =                    */ 1,
-                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
-                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
-                    /* mem_required_for_kv_self_buff =      */ 1608_MiB,
-                    /* mem_required_for_eval =              */ 1024_MiB,
-                    /* has_vocab_padding =                  */ false
-                }
-            ),
-            model_lookup_table_t(
-                "ALPACA-LORA-30B",
-                ModelIdConfig {
-                    /* number_of_parts =                    */ 1,
-                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
-                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
-                    /* mem_required_for_kv_self_buff =      */ 3124_MiB,
-                    /* mem_required_for_eval =              */ 1280_MiB,
-                    /* has_vocab_padding =                  */ false
-                }
-            ),
-            model_lookup_table_t(
-                "ALPACA-LORA-65B",
-                ModelIdConfig {
-                    /* number_of_parts =                    */ 1,
-                    /* mem_required_for_scratch_buff_0 =    */ 512_MiB,
-                    /* mem_required_for_scratch_buff_1 =    */ 512_MiB,
-                    /* mem_required_for_kv_self_buff =      */ 5120_MiB,
-                    /* mem_required_for_eval =              */ 1536_MiB,
-                    /* has_vocab_padding =                  */ false
                 }
             ),
         };
@@ -147,15 +95,21 @@ namespace fastllama {
     #define GET_MODE_IDX(STR) ([]() { constexpr auto index = detail::get_model_index<sizeof(STR)>(STR);  static_assert(index < detail::g_models_size_v, "Model(='" STR "') does not exist."); return index; })()
 
     enum class ModelKind : std::size_t {
-        LLAMA_7B = GET_MODE_IDX("LLAMA-7B"),
-        LLAMA_13B = GET_MODE_IDX("LLAMA-13B"),
-        LLAMA_30B = GET_MODE_IDX("LLAMA-30B"),
-        LLAMA_65B = GET_MODE_IDX("LLAMA-65B"),
-        ALPACA_LORA_7B = GET_MODE_IDX("ALPACA-LORA-7B"),
-        ALPACA_LORA_13B = GET_MODE_IDX("ALPACA-LORA-13B"),
-        ALPACA_LORA_30B = GET_MODE_IDX("ALPACA-LORA-30B"),
-        ALPACA_LORA_65B = GET_MODE_IDX("ALPACA-LORA-65B"),
+        Model_7B = GET_MODE_IDX("7B"),
+        Model_13B = GET_MODE_IDX("13B"),
+        Model_30B = GET_MODE_IDX("30B"),
+        Model_65B = GET_MODE_IDX("65B")
     };
+
+    constexpr std::string_view to_string_view(ModelKind const model) noexcept {
+        switch(model) {
+            case ModelKind::Model_7B: return "7B";
+            case ModelKind::Model_13B: return "13B";
+            case ModelKind::Model_30B: return "30B";
+            case ModelKind::Model_65B: return "65B";
+        }
+        FAST_LLAMA_ASSERT(false, "Invalid model kind");
+    }
 
     #undef GET_MODE_IDX
 
@@ -206,6 +160,10 @@ namespace fastllama {
 
 } // namespace fastllama
 
+
+std::ostream& operator<<(std::ostream& os, fastllama::ModelKind const model) {
+    return os << fastllama::to_string_view(model);
+}
 
 #endif // FAST_LLAMA_MODEL_TYPE_HPP
 

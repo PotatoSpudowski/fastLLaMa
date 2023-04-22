@@ -12,21 +12,38 @@
 #include "logger.hpp"
 #include "span.hpp"
 #include "file_writer.hpp"
+#include "mmap.hpp"
 #include "file_reader.hpp"
+#include "uninitialized_buffer.hpp"
+#include "tensor/mem_context.hpp"
+#include "tensor/utils.hpp"
 
 namespace fastllama {
+
+    enum class FType {
+        ALL_F32     = 0,
+        MOSTLY_F16  = 1,  // except 1d tensors
+        MOSTLY_Q4_0 = 2,  // except 1d tensors
+        MOSTLY_Q4_1 = 3,  // except 1d tensors
+        MOSTLY_Q4_1_SOME_F16 = 4, // tok_embeddings.weight and output.weight are F16
+        MOSTLY_Q4_2 = 5,  // except 1d tensors
+        MOSTLY_Q4_3 = 6,  // except 1d tensors
+    };
 
     enum class MagicKind : std::uint32_t {
         Unknown = 0,
         GGML = 0x67676d6c,
         GGMF = 0x67676d66,
         GGLA = 0x67676c61,
+        GGJT = 0x67676a74,
     };
 
 
-    enum class FileVersion : std::uint8_t {
-        NoVersion = 0,
-        V1 = 1,
+    enum class FileVersion : std::uint32_t {
+        GGML,
+        GGMF_V1,   // added version field and scores in vocab
+        GGJT_V1,   // added padding
+        Size
     };
     
     struct Layer {
@@ -48,15 +65,39 @@ namespace fastllama {
         ggml_tensor * w3;
     };
 
+    struct LoraAdapterParams {
+        std::uint32_t r;
+        std::uint32_t alpha;
+        bool use_cache_matrix{false};
+
+        constexpr float get_scale() const noexcept {
+            return static_cast<float>(alpha) / static_cast<float>(r);
+        }
+    };
+
     struct HyperParams {
-        std::int32_t n_vocab { 32000 };
-        std::int32_t n_ctx   { 512 };
-        std::int32_t n_embd  { 4096 };
-        std::int32_t n_mult  { 256 };
-        std::int32_t n_head  { 32 };
-        std::int32_t n_layer { 32 };
-        std::int32_t n_rot   { 64 };
-        std::int32_t f16     { 1 };
+        std::uint32_t n_vocab { 32000 };
+        std::uint32_t n_ctx   { 512 };
+        std::uint32_t n_embd  { 4096 };
+        std::uint32_t n_mult  { 256 };
+        std::uint32_t n_head  { 32 };
+        std::uint32_t n_layer { 32 };
+        std::uint32_t n_rot   { 64 };
+        FType        ftype   { FType::MOSTLY_F16 };
+
+        constexpr bool operator==(HyperParams const& other) const noexcept {
+            return n_vocab == other.n_vocab &&
+                   n_ctx   == other.n_ctx   &&
+                   n_embd  == other.n_embd  &&
+                   n_mult  == other.n_mult  &&
+                   n_head  == other.n_head  &&
+                   n_layer == other.n_layer &&
+                   n_rot   == other.n_rot   &&
+                   ftype   == other.ftype;
+        }
+        constexpr bool operator!=(HyperParams const& other) const noexcept {
+            return !(*this == other);
+        }
     };
 
     struct KVCacheBuffer {
@@ -72,58 +113,15 @@ namespace fastllama {
         ggml_tensor * k;
         ggml_tensor * v;
 
-        ggml_context * ctx;
+        MemContext ctx;
 
-        std::vector<unsigned char> buffer;
+        UninitializedBuffer buffer;
 
         std::size_t number_of_tokens_in_cache{};
     };
 
-    struct TensorsMapping {
-        std::vector<ggml_tensor*> tensors;
-        std::unordered_map<std::string, std::size_t> tensor_names;
-
-        auto operator[](std::size_t k) const noexcept -> ggml_tensor* {
-            return tensors[k];
-        }
-
-        auto operator[](std::string_view k) const noexcept -> ggml_tensor* {
-            auto it = tensor_names.find(std::string(k));
-            if (it == tensor_names.end()) return nullptr;
-            return tensors[it->second];
-        }
-
-        auto operator[](std::string const& k) -> ggml_tensor*& {
-            auto it = tensor_names.find(k);
-            if (it == tensor_names.end()) {
-                tensors.emplace_back(nullptr);
-                tensor_names[k] = tensors.size() - 1;
-                return tensors.back();
-            };
-            return tensors[it->second];
-        }
-
-        auto contains(char const* data) const noexcept -> bool {
-            return tensor_names.find(data) != tensor_names.end();
-        }
-        
-        auto contains(std::string const& data) const noexcept -> bool {
-            return tensor_names.find(data) != tensor_names.end();
-        }
-
-        bool initializeTensors(ggml_context* ctx, HyperParams const& params, Logger const& logger = Logger{});
-
-        auto make_tensors_by_name() -> std::unordered_map<std::string, ggml_tensor*> {
-            std::unordered_map<std::string, ggml_tensor*> ret;
-            for (auto const& [k, v] : tensor_names) {
-                ret[k] = tensors[v];
-            }
-            return ret;
-        }
-    };
-
     struct Model {
-        using vocab_id = typename Vocab::id;
+        using vocab_id = typename Vocab::id_type;
 
         static constexpr std::size_t max_number_of_scratch_buffer = 16;
     #ifdef LLAMA_USE_SCRATCH
@@ -132,7 +130,7 @@ namespace fastllama {
         static constexpr bool use_scratch_buffer = false;
     #endif
 
-        bool load(std::string_view model_name, std::string_view filepath, bool disable_version_check = false);
+        bool load(std::string_view filepath);
         auto unload() -> void;
         auto eval(
             std::size_t                     n_past,
@@ -156,7 +154,7 @@ namespace fastllama {
                 if (i == -1) {
                     last_size = ggml_set_scratch(in_ctx, { 0, 0, nullptr });
                 } else {
-                    auto buff = buf_scratch[i];
+                    auto& buff = buf_scratch[i];
                     last_size = ggml_set_scratch(in_ctx, { 0, buff.size(), buff.data() });
                 }
 
@@ -194,33 +192,62 @@ namespace fastllama {
         std::vector<Layer> layers;
         std::vector<float> embeddings;
 
-        ggml_context * ctx;
-        std::vector<unsigned char> buffer;
+        MemContext ctx;
+        UninitializedBuffer buffer;
 
         KVCacheBuffer kv_self{};
 
-        std::vector<unsigned char> buf_compute;
-        std::vector<unsigned char> buf_scratch[max_number_of_scratch_buffer];
+        UninitializedBuffer buf_compute;
+        UninitializedBuffer buf_scratch[max_number_of_scratch_buffer];
 
         int    buf_last = 0;
         std::size_t buf_max_size[max_number_of_scratch_buffer] = { 0 };
         std::size_t allocate_extra_mem{};
 
+        MemoryLock mlock_buffer;
+        MemoryLock mlock_mmap;
+
         TensorsMapping tensors;
 
         std::string attached_lora_path{};
 
-        bool    is_valid{false};
-        bool    embeddings_eval_enable{false};
-        bool    should_put_all_logits{false};
-        int     threads{ static_cast<int>(std::thread::hardware_concurrency()) };
-        int     n_batch{64};
+        std::unordered_map<std::string, ggml_tensor*> tensor_by_name;
+
+        std::unique_ptr<MMappedFile> mapping;
+
+        bool        is_valid{false};
+        bool        embeddings_eval_enable{false};
+        bool        should_put_all_logits{false};
+        bool        use_mmap{false};
+        bool        use_mlock{false};
+        int         threads{ static_cast<int>(std::thread::hardware_concurrency()) };
+        int         n_batch{64};
+        FileVersion file_version{ FileVersion::GGML };
     };
 
     bool quantize(std::string_view in_filepath, std::string_view out_filepath, int itype);
 
+    constexpr std::string_view to_string_view(FType ftype) noexcept {
+        switch (ftype) {
+            case fastllama::FType::ALL_F32: return "all F32";
+            case fastllama::FType::MOSTLY_F16: return "mostly F16";
+            case fastllama::FType::MOSTLY_Q4_0: return "mostly Q4_0";
+            case fastllama::FType::MOSTLY_Q4_1: return "mostly Q4_1";
+            case fastllama::FType::MOSTLY_Q4_2: return "mostly Q4_2";
+            case fastllama::FType::MOSTLY_Q4_3: return "mostly Q4_3";
+            case fastllama::FType::MOSTLY_Q4_1_SOME_F16: return "mostly Q4_1, some F16";
+            default: return "unknown, may not work";
+        }
+    }
+
 } // namespace fastllama
 
+
+#include <ostream>
+
+std::ostream& operator<<(std::ostream& os, fastllama::FType const& ftype) {
+    return os << fastllama::to_string_view(ftype);
+}
 
 #endif // FAST_LLAMA_LLAMA_HPP
 

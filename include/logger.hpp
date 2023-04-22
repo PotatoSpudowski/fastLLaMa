@@ -12,6 +12,7 @@ namespace fastllama {
     struct DefaultLogger {
         using LoggerFunction = std::function<void(char const*, int, char const*, int)>;
         using LoggerResetFunction = std::function<void()>;
+        using ProgressCallback = std::function<void(std::size_t, std::size_t)>;
 
         DefaultLogger() noexcept = default;
         DefaultLogger(DefaultLogger const&) = delete;
@@ -34,15 +35,24 @@ namespace fastllama {
             printf("\x1b[93;1m[Warn]:\x1b[0m \x1b[93mFunc('%.*s') %.*s\x1b[0m", func_name_size, func_name, message_size, message);
             fflush(stdout);
         }
+
         static void log_reset_func() {
             printf("\x1b[0m");
             fflush(stdout);
+        }
+
+        static void progress_func(std::size_t done, std::size_t total) {
+            if (done % 4 == 0) {
+                printf(".");
+                fflush(stdout);
+            }
         }
 
         LoggerFunction log{&DefaultLogger::log_func};
         LoggerFunction log_err{&DefaultLogger::log_err_func};
         LoggerFunction log_warn{&DefaultLogger::log_warn_func};
         LoggerResetFunction reset{&DefaultLogger::log_reset_func};
+        ProgressCallback progress{&DefaultLogger::progress_func};
     };
     
     struct Logger {
@@ -89,6 +99,11 @@ namespace fastllama {
             ((ss << args), ...);
             auto message = ss.str();
             m_sink.log_warn(func_name.data(), static_cast<int>(func_name.size()), message.data(), static_cast<int>(message.size()));
+        }
+
+        void progress(std::size_t done, std::size_t total) const {
+            if (!m_sink.progress) return;
+            m_sink.progress(done, total);
         }
     private:
         DefaultLogger m_sink{};

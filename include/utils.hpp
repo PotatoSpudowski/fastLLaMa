@@ -33,6 +33,32 @@ namespace fastllama {
 
     } // namespace literals
     
+        namespace detail {
+        
+        #if defined(_WIN32)
+            inline static std::string llama_format_win_err(DWORD err) noexcept {
+                LPSTR buf;
+                size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                            NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, NULL);
+                if (!size) {
+                    return "FormatMessageA failed";
+                }
+                std::string ret(buf, size);
+                LocalFree(buf);
+                return ret;
+            }
+        #endif
+    } // namespace detail
+    
+    std::string error_message() {
+        #if defined(_WIN32)
+            return detail::llama_format_win_err(GetLastError());
+        #elif defined(__linux__)
+            return std::strerror(errno);
+        #else
+            return "unknown error";
+        #endif
+    }
 
 } // namespace fastllama
 
