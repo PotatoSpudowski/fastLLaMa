@@ -3,7 +3,6 @@ from build.fastllama import Model, ModelKind
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
 model = Model(
-        id=ModelKind.ALPACA_LORA_7B,
         path=MODEL_PATH, #path to model
         num_threads=16, #number of threads to use
         n_ctx=512, #context size of model

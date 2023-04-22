@@ -136,7 +136,6 @@ class Model:
     """
     def __init__(
         self,
-        id: Union[str, ModelKind], 
         path: str, 
         num_threads: int = multiprocessing.cpu_count(), 
         n_ctx: int = 512, 
@@ -153,7 +152,6 @@ class Model:
         """
         Initializes a new model instance.
 
-        :param id: Model identifier. Can be a string or a ModelKind enum value.
         :param path: Path to the model file.
         :param num_threads: Number of threads to use during model evaluation. Default is the number of CPU cores.
         :param n_ctx: Size of the memory context to use. Default is 512.
@@ -175,8 +173,6 @@ class Model:
 
         signal.signal(signal.SIGINT, lambda sig_num, _frame: signal_handler_fn(sig_num))
         signal.siginterrupt(signal.SIGINT, True)
-
-        normalized_id: str = cast(str, id.value if type(id) == ModelKind else id)
 
         ctx_args = self.__get_default_ctx_args__()
 
@@ -200,10 +196,10 @@ class Model:
 
         self.ctx = self.__create_model_ctx__(ctx_args)
 
-        load_fn = self.lib.llama_load_model_str
+        load_fn = self.lib.llama_load_model
         load_fn.restype = ctypes.c_bool
-        load_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p, ctypes.c_char_p]
-        res = bool(load_fn(self.ctx, bytes(normalized_id, 'utf-8'), bytes(path, 'utf-8')))
+        load_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        res = bool(load_fn(self.ctx, bytes(path, 'utf-8')))
         if not res:
             raise RuntimeError("Unable to load model")
 
