@@ -11,7 +11,7 @@ namespace fastllama {
     struct HyperParams;
     
     inline static constexpr std::optional<std::size_t> tensor_size(std::vector<std::uint32_t> const& shape, enum ggml_type type) noexcept {
-        std::size_t size = 1;
+        std::size_t size = ggml_type_size(type);
         for (auto s : shape) {
             auto new_size = checked_mul(size, static_cast<std::size_t>(s));
             if (!new_size) return {};

@@ -46,7 +46,7 @@ namespace fastllama {
         FileLoader(
             std::string_view filepath,
             std::size_t file_idx,
-            TensorsMapping& tensor_map,
+            TensorsMapping& tensors_map,
             Logger const* logger = nullptr
         ) noexcept
             : reader(filepath)
@@ -58,17 +58,12 @@ namespace fastllama {
                 return;
             }
 
-            std::cout << "Loading file: " << filepath << std::endl;
-
             if (!read_magic_number()) {
                 is_failed_to_read = true;
                 return;
             }
 
-            std::cout<< "Magic number: " << to_string_view(magic_kind) << std::endl;
-
             if (magic_kind != MagicKind::GGLA) {
-                std::cout<< "File version: " << to_string_view(version) << std::endl;
                 if (!read_hyperparams()) {
                     is_failed_to_read = true;
                     return;
@@ -78,6 +73,8 @@ namespace fastllama {
             } else {
                 read_lora_params();
             }
+
+            read_tensor_metadata(file_idx, tensors_map);
 
         }
 
@@ -133,7 +130,7 @@ namespace fastllama {
             } else if (magic_kind == MagicKind::GGMF && file_version == FileVersion::GGMF_V1) {
                 version = FileVersion::GGMF_V1;
                 return true;
-            } else if (magic_kind == MagicKind::GGJT && file_version == FileVersion::GGJT_V1) {
+            } else if (magic_kind == MagicKind::GGJT && file_version == FileVersion::GGMF_V1) {
                 version = FileVersion::GGJT_V1;
                 return true;
             }
@@ -198,17 +195,17 @@ namespace fastllama {
                 auto len = reader.read_u32();
                 auto word = reader.read_string(len);
 
-                float score = (static_cast<int>(version) >= static_cast<int>(FileVersion::GGMF_V1) ? reader.read_f32() : 0.0f);
+                float score = (version >= FileVersion::GGMF_V1 ? reader.read_f32() : 0.0f);
                 vocab.set_word(static_cast<typename Vocab::id_type>(i), std::move(word), score);
             }
         }
 
-        auto read_metadeta(size_t file_idx, TensorsMapping & tensors_map) -> bool {
-            while(!reader.eof()) {
+        auto read_tensor_metadata(size_t file_idx, TensorsMapping& tensors_map) -> bool {
+            while(!reader.eof() && reader.tell() < reader.size()) {
                 TensorShard shard;
                 auto n_dims = reader.read_u32();
                 auto name_len = reader.read_u32();
-                reader.read(&shard.type);
+                shard.type = static_cast<ggml_type>(reader.read_u32());
 
                 shard.extents.resize(n_dims);
 
@@ -231,6 +228,7 @@ namespace fastllama {
                 shard.file_off = reader.tell();
 
                 if (!shard.calc_size(*logger)) return false;
+                reader.seek(shard.size, BinaryFileReader::SeekReference::Current);
 
                 std::size_t idx{};
 
@@ -364,7 +362,7 @@ namespace fastllama {
 
             writer.seek(-writer.tell() & 31);
 
-            FAST_LLAMA_ASSERT(new_size == tensor.size, "tensor size mismatch");
+            FAST_LLAMA_ASSERT(new_size == tensor_size(tensor.extents, new_type), "tensor size mismatch");
             writer.write(new_data, new_size);
 
             return true;
@@ -411,7 +409,6 @@ namespace fastllama {
                     return;
                 }
             }
-            std::cout<<"first_loader.hyperparams.n_vocab: "<<first_loader.hyperparams.n_vocab<<std::endl;
 
             if (use_mmap && alignment_prevents_mmap()) {
                 logger->log_warn(__func__, "can't use mmap because tensors are not aligned; convert to new format to avoid this\n");
@@ -425,7 +422,6 @@ namespace fastllama {
                     return;
                 }
             }
-            std::cout<<"first_loader.hyperparams.n_vocab: "<<first_loader.hyperparams.n_vocab<<std::endl;
 
         }
 
@@ -442,9 +438,6 @@ namespace fastllama {
 
         auto guess_num_of_files() noexcept -> std::uint32_t {
             auto it = tensors_map.tensor_names.find("tok_embeddings.weight");
-            for(auto& [k, v] : tensors_map.tensor_names) {
-                std::cout<<k<<" : " << v<<std::endl;
-            }
             if (it == tensors_map.tensor_names.end()) {
                 logger->log_err(__func__, "tok_embeddings.weight not found\n");
                 is_load_failed = true;

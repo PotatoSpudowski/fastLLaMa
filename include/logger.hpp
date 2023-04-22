@@ -42,10 +42,10 @@ namespace fastllama {
         }
 
         static void progress_func(std::size_t done, std::size_t total) {
-            if (done % 4 == 0) {
-                printf(".");
-                fflush(stdout);
-            }
+            // if (done % 8 == 0) {
+            //     printf(".");
+            //     fflush(stdout);
+            // }
         }
 
         LoggerFunction log{&DefaultLogger::log_func};

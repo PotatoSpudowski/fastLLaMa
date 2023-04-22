@@ -62,11 +62,11 @@ namespace fastllama::detail {
             return m_path;
         }
 
-        auto seek(std::size_t offset, SeekReference ref = SeekReference::Current) noexcept -> void {
+        auto seek(std::size_t offset, SeekReference whence = SeekReference::Current) noexcept -> void {
             #ifdef _WIN32
                 auto res = _fseeki64(m_file, offset, static_cast<int>(ref));
             #else
-                auto res = std::fseek(m_file, offset, static_cast<int>(ref));
+                auto res = std::fseek(m_file, offset, static_cast<int>(whence));
             #endif
 
             FAST_LLAMA_ASSERT(res == 0, "seek failed");

@@ -100,41 +100,6 @@ namespace fastllama {
         return true;
     }
 
-    inline static bool prepare_model_weights(HyperParams params, ModelLoader& model_loader, MemContext& ctx, Logger const& logger, Tensor& tok_embeddings, Tensor& norm, Tensor& output, std::vector<Layer>& layers) {
-        auto const n_embd  = params.n_embd;
-        auto const n_layer = params.n_layer;
-        auto const n_vocab = params.n_vocab;
-
-        model_loader.mem_ctx = ctx;
-
-        model_loader.mem_ctx = ctx;
-
-        tok_embeddings = model_loader.get_tensor("tok_embeddings.weight", {n_embd, n_vocab});
-        norm           = model_loader.get_tensor("norm.weight",           {n_embd});
-        output         = model_loader.get_tensor("output.weight",         {n_embd, n_vocab});
-
-        layers.resize(n_layer);
-
-        char buff[256];
-
-        for (auto i = 0; i < static_cast<int>(n_layer); ++i) {
-            auto & layer = layers[i];
-
-            layer.attention_norm = model_loader.get_tensor(format_str(buff, "layers.%d.attention_norm.weight", i), {n_embd});
-
-            layer.wq = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wq.weight", i), {n_embd, n_embd});
-            layer.wk = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wk.weight", i), {n_embd, n_embd});
-            layer.wv = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wv.weight", i), {n_embd, n_embd});
-            layer.wo = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wo.weight", i), {n_embd, n_embd});
-
-            layer.ffn_norm = model_loader.get_tensor(format_str(buff, "layers.%d.ffn_norm.weight", i), {n_embd});
-
-            layer.w1 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w1.weight", i), {n_embd,   n_ff});
-            layer.w2 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w2.weight", i), {  n_ff,   n_embd});
-            layer.w3 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w3.weight", i), {n_embd,   n_ff});
-        }
-
-    }
 
     bool Model::load(std::string_view filepath) {
         using namespace ::fastllama::literals;
@@ -278,9 +243,7 @@ namespace fastllama {
 
         }
 
-        if (!model_loader.done_getting_tensors()) {
-            return false;
-        }
+        if (!model_loader.done_getting_tensors()) return false;
 
 
         // populate `tensors_by_name`
@@ -288,9 +251,7 @@ namespace fastllama {
 
         model_loader.load_all_data(use_mlock ? &mlock_mmap : nullptr);
 
-        if (!model_loader.is_load_failed) {
-            return false;
-        }
+        if (model_loader.is_load_failed) return false;
 
         mapping = std::move(model_loader.mmapped_file);
 
@@ -546,13 +507,13 @@ namespace fastllama {
 
         auto n_threads = std::min(std::max(1, threads), static_cast<int>(std::thread::hardware_concurrency()));
         
-        logger.log(__func__, "using ", n_threads, " threads\n");
+        fprintf(stderr, "%s: using %d threads\n", __func__, n_threads);
 
-        logger.log(__func__, "loading model from '", in_filepath, "'\n");
+        fprintf(stderr, "%s: loading model from '%s'", __func__, in_filepath.data());
 
         auto model_loader = ModelLoader(in_filepath, false, false, &logger);
 
-        if (!model_loader.is_load_failed) {
+        if (model_loader.is_load_failed) {
             logger.log_err(__func__, "failed to load model from '", in_filepath, "'\n");
             return false;
         }
@@ -581,8 +542,8 @@ namespace fastllama {
 
                 model_loader.load_data_for(tensor);
 
-                logger.log(__func__, format_str(str_buff, "[%4zu/%4zu] %36s - %16s, type = %6s, ", i, model_loader.tensors_map.tensors.size(),
-                    tensor.name.c_str(), format_tensor_shape(tensor.extents).c_str(), ggml_type_name(tensor.type)));
+                fprintf(stderr, "%s: [%4zu/%4zu] %36s - %16s, type = %6s, ", __func__, i, model_loader.tensors_map.tensors.size(),
+                    tensor.name.c_str(), format_tensor_shape(tensor.extents).c_str(), ggml_type_name(tensor.type));
 
                 bool quantize = (tensor.extents.size() == 2);
 
@@ -627,7 +588,7 @@ namespace fastllama {
                         return false;
                     }
                     
-                    logger.log(__func__, "quantizing...\n");
+                    fprintf(stderr, "%s: quantizing...\n", __func__);
                     fflush(stdout);
 
                     work.resize(n_elements * 4);
@@ -648,7 +609,7 @@ namespace fastllama {
                             std::vector<int64_t> local_hist;
                             size_t local_size = 0;
                             while (true) {
-                                // std::unique_lock<std::mutex> lock(mtx);
+                                std::unique_lock<std::mutex> lock(mtx);
                                 size_t first = counter; counter += chunk_size;
                                 if (first >= n_elements) {
                                     if (!local_hist.empty()) {
@@ -657,21 +618,20 @@ namespace fastllama {
                                     }
                                     break;
                                 }
-                                // lock.unlock();
-                                printf("\r%8.2f%%\n", 100.0 * first / n_elements);
+                                lock.unlock();
                                 size_t last = std::min(n_elements, first + chunk_size);
                                 if (local_hist.empty()) local_hist.resize(hist_cur.size(), 0);
                                 local_size += ggml_quantize_chunk(new_type, f32_data, new_data, first, last - first, local_hist.data());
                             }
                         };
                         
-                        // if (int(workers.size()) < nthread_use - 1) workers.resize(nthread_use - 1);
+                        if (int(workers.size()) < nthread_use - 1) workers.resize(nthread_use - 1);
                         
-                        // for (int it = 0; it < nthread_use - 1; ++it) workers[it] = std::thread(compute);
+                        for (int it = 0; it < nthread_use - 1; ++it) workers[it] = std::thread(compute);
                         
                         compute();
                         
-                        // for (int it = 0; it < nthread_use - 1; ++it) workers[it].join();
+                        for (int it = 0; it < nthread_use - 1; ++it) workers[it].join();
                     }
 
                     printf("size = %8.2f MB -> %8.2f MB | hist: ", tensor.size/1024.0/1024.0, new_size/1024.0/1024.0);
@@ -689,8 +649,8 @@ namespace fastllama {
                 total_size_new += new_size;
                 file_saver.write_tensor(tensor, new_type, new_data, new_size);
             }
-            logger.log(__func__, format_str(str_buff, "model size  = %8.2f MB\n", static_cast<float>(total_size_org / 1.0_MiB)));
-            logger.log(__func__, format_str(str_buff, "quant size  = %8.2f MB\n", static_cast<float>(total_size_new / 1.0_MiB)));
+            fprintf(stderr, "\n%s: model size  = %8.2f MB\n",__func__, static_cast<float>(total_size_org / 1.0_MiB));
+            fprintf(stderr, "%s: quant size  = %8.2f MB\n",__func__, static_cast<float>(total_size_new / 1.0_MiB));
 
             {
                 int64_t sum_all = 0;
