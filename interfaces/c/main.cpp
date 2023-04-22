@@ -78,12 +78,15 @@ extern "C" {
         builder.allocate_extra_mem = arg.allocate_extra_mem;
         builder.should_get_all_logits = arg.should_get_all_logits;
         builder.embedding_eval_enabled = arg.embedding_eval_enabled;
+        builder.use_mmap = arg.use_mmap;
+        builder.use_mlock = arg.use_mlock;
 
         auto def_logger = DefaultLogger{};
         def_logger.log = arg.logger.log;
         def_logger.log_err = arg.logger.log_err;
         def_logger.log_warn = arg.logger.log_warn;
         def_logger.reset = arg.logger.reset;
+        def_logger.progress = arg.logger.progress;
         
         builder.logger = Logger(std::move(def_logger));
 
