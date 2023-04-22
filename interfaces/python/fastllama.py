@@ -4,11 +4,20 @@ from enum import Enum
 import multiprocessing
 from typing import Any, Callable, List, Optional, Type, Union, cast
 import signal
+import sys
 
 LIBRARY_NAME='pyfastllama.so'
 
 def get_library_path(*args) -> str:
     return os.path.join(*args, LIBRARY_NAME)
+
+def progressBar(count_value, total, suffix=''):
+    bar_length = 100
+    filled_up_Length = int(round(bar_length* count_value / float(total)))
+    percentage = round(100.0 * count_value/float(total),1)
+    bar = '=' * filled_up_Length + '-' * (bar_length - filled_up_Length)
+    sys.stdout.write('[%s] %s%s ...%s\r' %(bar, percentage, '%', suffix))
+    sys.stdout.flush()
 
 class Logger:
     """
@@ -40,6 +49,15 @@ class Logger:
         :param message: The log message.
         """
         print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='')
+
+    def progress(self, done_size: int, total_size: int) -> None:
+        """
+        Logs progress messages.
+
+        :param done_size(int): size of the completed task
+        :param total_size(int): total size of the task
+        """
+        progressBar(done_size, total_size)
     
     def reset(self) -> None:
         """

@@ -10,26 +10,18 @@ extern "C" {
 
 typedef void(*LLAMA_LOGGER_FUNC)(char const* function_name, int function_name_size, char const* message, int message_size);
 typedef void(*LLAMA_LOGGER_RESET_FUNC)();
+typedef void(*LLAMA_LOGGER_PROGRESS_FUNC)(size_t done_size, size_t total_size);
 typedef void(*LLAMA_STREAM_FUNC)(char const* token_stream, int token_stream_size);
 
 struct llama_model_context;
 
-enum ModelKind {
-    LLAMA_7B = 0,   // "LLAMA-7B"
-    LLAMA_13B,      // "LLAMA-13B"
-    LLAMA_30B,      // "LLAMA-30B"
-    LLAMA_65B,      // "LLAMA-65B"
-    ALPACA_LORA_7B, // "ALPACA-LORA-7B"
-    ALPACA_LORA_13B,// "ALPACA-LORA-13B"
-    ALPACA_LORA_30B,// "ALPACA-LORA-30B"
-    ALPACA_LORA_65B,// "ALPACA-LORA-65B"
-};
 
 struct llama_logger {
-    LLAMA_LOGGER_FUNC log; // info log
-    LLAMA_LOGGER_FUNC log_err; // error log
-    LLAMA_LOGGER_FUNC log_warn; // error log
-    LLAMA_LOGGER_RESET_FUNC reset; // reset the log or anything else
+    LLAMA_LOGGER_FUNC           log; // info log
+    LLAMA_LOGGER_FUNC           log_err; // error log
+    LLAMA_LOGGER_FUNC           log_warn; // error log
+    LLAMA_LOGGER_RESET_FUNC     reset; // reset the log or anything else
+    LLAMA_LOGGER_PROGRESS_FUNC  progress; // progress of the model loading
 };
 
 // Provides a view of an array of floats.
@@ -43,6 +35,8 @@ struct llama_array_view_f {
 struct llama_model_context_args {
     bool embedding_eval_enabled;
     bool should_get_all_logits;
+    bool use_mmap;
+    bool use_mlock;
     int seed;
     int n_keep;
     int n_ctx;

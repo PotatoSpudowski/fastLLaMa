@@ -49,7 +49,12 @@ extern "C" {
         result.logger.log_err = make_def_err_logger_func();
         result.logger.log_warn = make_def_warn_logger_func();
         result.logger.reset = make_def_reset_logger_func();
+        result.logger.progress = +[](std::size_t progress, std::size_t total) {
+            fastllama::Logger::get_default_logger().progress(progress, total);
+        };
 
+        result.use_mmap = false;
+        result.use_mlock = false;
         result.n_batch = builder.n_batch;
         result.n_ctx = builder.n_ctx;
         result.n_keep = builder.n_keep;

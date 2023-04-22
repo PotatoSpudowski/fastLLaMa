@@ -119,6 +119,8 @@ namespace fastllama {
         temp.m_model.embeddings_eval_enable = embedding_eval_enabled;
         temp.m_model.should_put_all_logits = should_get_all_logits;
         temp.m_model.allocate_extra_mem = allocate_extra_mem;
+        temp.m_model.use_mmap = use_mmap;
+        temp.m_model.use_mlock = use_mlock;
 
         printf("\n\n\x1b[32m%s\x1b[0m\n\n", internal::watermark);
         fflush(stdout);

@@ -26,6 +26,8 @@ namespace fastllama {
             bool is_old_model{false};
             bool embedding_eval_enabled{false};
             bool should_get_all_logits{false};
+            bool use_mmap{false};
+            bool use_mlock{false};
             std::size_t last_n_tokens{64};
             std::size_t allocate_extra_mem{};
             Logger logger{};
@@ -39,6 +41,8 @@ namespace fastllama {
             constexpr Params& set_embedding_eval_enabled(bool flag) noexcept { this->embedding_eval_enabled = flag; return *this; }
             constexpr Params& set_should_get_all_logits(bool flag) noexcept { this->should_get_all_logits = flag; return *this; }
             constexpr Params& set_allocate_extra_mem(std::size_t allocate_extra_mem) noexcept { this->allocate_extra_mem = allocate_extra_mem; return *this; }
+            constexpr Params& set_use_mmap(bool flag) noexcept { this->use_mmap = flag; return *this; }
+            constexpr Params& set_use_mlock(bool flag) noexcept { this->use_mlock = flag; return *this; }
             Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view const& filepath);
