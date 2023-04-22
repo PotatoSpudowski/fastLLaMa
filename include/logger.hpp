@@ -42,10 +42,18 @@ namespace fastllama {
         }
 
         static void progress_func(std::size_t done, std::size_t total) {
-            // if (done % 8 == 0) {
-            //     printf(".");
-            //     fflush(stdout);
-            // }
+            auto perc = (static_cast<float>(done) / static_cast<float>(total)) * 100.0f;
+            auto perc_int = static_cast<int>(perc);
+
+            if (perc_int % 8 == 0) {
+                printf(".");
+                fflush(stdout);
+            }
+
+            if (perc_int == 100) {
+                printf("\n");
+                fflush(stdout);
+            }
         }
 
         LoggerFunction log{&DefaultLogger::log_func};
