@@ -10,7 +10,7 @@ namespace fastllama {
 
     struct HyperParams;
     
-    inline static constexpr std::optional<std::size_t> tensor_size(std::vector<std::uint32_t> const& shape, enum ggml_type type) noexcept {
+    inline static std::optional<std::size_t> tensor_size(std::vector<std::uint32_t> const& shape, enum ggml_type type) noexcept {
         std::size_t size = ggml_type_size(type);
         for (auto s : shape) {
             auto new_size = checked_mul(size, static_cast<std::size_t>(s));
@@ -36,7 +36,7 @@ namespace fastllama {
         std::size_t                 file_idx;
         std::size_t                 file_off;
 
-        constexpr bool calc_size(Logger const& logger) noexcept {
+        bool calc_size(Logger const& logger) noexcept {
             auto size = tensor_size(extents, type);
             if (!size) {
                 logger.log_err(__func__, "Failed to calculate tensor size. Overflow detected while multiplying extents.\n");

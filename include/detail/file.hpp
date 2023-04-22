@@ -58,7 +58,7 @@ namespace fastllama::detail {
             return *this;
         }
 
-        constexpr auto path() const noexcept -> std::string_view const {
+        auto path() const noexcept -> std::string_view const {
             return m_path;
         }
 
