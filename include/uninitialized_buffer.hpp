@@ -31,7 +31,7 @@ namespace fastllama {
         std::uint8_t const* data() const noexcept { return m_data.get(); }
         constexpr std::size_t size() const noexcept { return m_size; }
 
-        constexpr operator bool() const noexcept { return m_data != nullptr; }
+        operator bool() const noexcept { return m_data != nullptr; }
 
         std::uint8_t& operator[](std::size_t index) noexcept { return m_data[index]; }
         std::uint8_t const& operator[](std::size_t index) const noexcept { return m_data[index]; }

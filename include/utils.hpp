@@ -2,6 +2,7 @@
 #define FAST_LLAMA_UTILS_HPP
 
 #include <cstddef>
+#include <cstring>
 
 namespace fastllama {
     
