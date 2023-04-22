@@ -160,10 +160,5 @@ namespace fastllama {
 
 } // namespace fastllama
 
-
-std::ostream& operator<<(std::ostream& os, fastllama::ModelKind const model) {
-    return os << fastllama::to_string_view(model);
-}
-
 #endif // FAST_LLAMA_MODEL_TYPE_HPP
 

@@ -104,7 +104,7 @@ extern "C" {
         return true;
     }
 
-    bool llama_load_model_str(struct llama_model_context* model_context, char const* model_id, char const* filepath) {
+    bool llama_load_model(struct llama_model_context* model_context, char const* filepath) {
         if (model_context == nullptr) {
             fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
             return false;
@@ -115,42 +115,7 @@ extern "C" {
             return false;
         }
 
-        auto maybe_model = model_context->builder.build(model_id, filepath);
-        if (!maybe_model) return false;
-        model_context->inner = std::move(maybe_model);
-
-        return true;
-    }
-
-    bool llama_load_model(struct llama_model_context* model_context, enum ModelKind model_id, char const* filepath) {
-        if (model_context == nullptr) {
-            fprintf(stderr, "model context is not initalized. Please use `llama_create_context` to create a context.\n");
-            return false;
-        }
-
-        if (model_context->inner != std::nullopt) {
-            fprintf(stderr, "model is already loaded.\n");
-            return false;
-        }
-
-        fastllama::ModelKind id{};
-
-        switch (model_id) {
-            case LLAMA_7B: id = fastllama::ModelKind::LLAMA_7B; break;
-            case LLAMA_13B: id = fastllama::ModelKind::LLAMA_13B; break;
-            case LLAMA_30B: id = fastllama::ModelKind::LLAMA_30B; break;
-            case LLAMA_65B: id = fastllama::ModelKind::LLAMA_65B; break;
-            case ALPACA_LORA_7B: id = fastllama::ModelKind::ALPACA_LORA_7B; break;
-            case ALPACA_LORA_13B: id = fastllama::ModelKind::ALPACA_LORA_13B; break;
-            case ALPACA_LORA_30B: id = fastllama::ModelKind::ALPACA_LORA_30B; break;
-            case ALPACA_LORA_65B: id = fastllama::ModelKind::ALPACA_LORA_65B; break;
-            default: {
-                fprintf(stderr, "invalid model id.\n");
-                return false;
-            }
-        }
-
-        auto maybe_model = model_context->builder.build(id, filepath);
+        auto maybe_model = model_context->builder.build(filepath);
         if (!maybe_model) return false;
         model_context->inner = std::move(maybe_model);
 

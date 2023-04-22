@@ -54,7 +54,18 @@ namespace fastllama {
         LoggerResetFunction reset{&DefaultLogger::log_reset_func};
         ProgressCallback progress{&DefaultLogger::progress_func};
     };
-    
+
+    struct NullLogger : DefaultLogger {
+
+        NullLogger() noexcept {
+            DefaultLogger::log = [](char const*, int, char const*, int) {};
+            DefaultLogger::log_err = [](char const*, int, char const*, int) {};
+            DefaultLogger::log_warn = [](char const*, int, char const*, int) {};
+            DefaultLogger::reset = []() {};
+            DefaultLogger::progress = [](std::size_t, std::size_t) {};
+        }
+    };
+
     struct Logger {
         using LoggerFunction = typename DefaultLogger::LoggerFunction;
 
@@ -68,6 +79,16 @@ namespace fastllama {
         Logger(DefaultLogger sink) noexcept
             : m_sink(std::move(sink))
         {}
+
+        static Logger& get_null_logger() noexcept {
+            static Logger logger = Logger{ NullLogger{} };
+            return logger;
+        }
+
+        static Logger& get_default_logger() noexcept {
+            static Logger logger = Logger{ DefaultLogger{} };
+            return logger;
+        }
 
         void reset() const {
             if (!m_sink.reset) return;

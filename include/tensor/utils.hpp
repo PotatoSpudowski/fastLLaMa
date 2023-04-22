@@ -7,8 +7,10 @@
 #include "ggml.h"
 
 namespace fastllama {
+
+    struct HyperParams;
     
-    constexpr std::optional<std::size_t> tensor_size(std::vector<std::uint32_t> const& shape, enum ggml_type type) noexcept {
+    inline static constexpr std::optional<std::size_t> tensor_size(std::vector<std::uint32_t> const& shape, enum ggml_type type) noexcept {
         std::size_t size = 1;
         for (auto s : shape) {
             auto new_size = checked_mul(size, static_cast<std::size_t>(s));
@@ -18,7 +20,7 @@ namespace fastllama {
         return size / ggml_blck_size(type);
     }
 
-    std::string format_tensor_shape(std::vector<std::uint32_t> const& shape) {
+    inline static std::string format_tensor_shape(std::vector<std::uint32_t> const& shape) {
         char buffer[256];
         auto offset = format_str(buffer, "%5u", shape[0]).size();
         for(auto i = 1ul; i < shape.size(); ++i) {

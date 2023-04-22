@@ -12,7 +12,7 @@ int main() {
 
     struct llama_model_context* model_ctx = llama_create_context(args);
     
-    if (!llama_load_model(model_ctx, LLAMA_7B, "./models/7B/ggml-model-q4_0.bin")) {
+    if (!llama_load_model(model_ctx, "./models/7B/ggml-model-q4_0.bin")) {
         return 1;
     }
 

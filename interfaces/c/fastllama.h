@@ -68,23 +68,11 @@ struct llama_model_context* llama_create_context(struct llama_model_context_args
  * @brief Loads the model into memory
  * 
  * @param model_context is the context that is constructed using `llama_create_context`.
- * @param kind is the model id as `enum`.
  * @param filepath is the path to the model.
  * @return true if load is successful.
  * @return false if load is unsuccessful.
  */
-bool llama_load_model(struct llama_model_context* model_context, enum ModelKind kind, char const* filepath);
-
-/**
- * @brief Loads the model into memory
- * 
- * @param model_context is the context that is constructed using `llama_create_context`.
- * @param model_id is the model id as `c string`.
- * @param filepath is the path to the model.
- * @return true if load is successful.
- * @return false if load is unsuccessful.
- */
-bool llama_load_model_str(struct llama_model_context* model_context, char const* model_id, char const* filepath);
+bool llama_load_model(struct llama_model_context* model_context, char const* filepath);
 
 /**
  * @brief Sets the stop words. It will overwrite the stop words with every call.

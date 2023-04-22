@@ -40,7 +40,7 @@ namespace fastllama::detail {
         
         File(File&& other) noexcept
             : m_path(std::move(other.m_path))
-            , m_file(std::move(m_file))
+            , m_file(std::move(other.m_file))
             , m_size(std::move(other.m_size))
         {}
         
@@ -58,7 +58,7 @@ namespace fastllama::detail {
             return *this;
         }
 
-        constexpr auto path() const noexcept -> std::string_view const& {
+        constexpr auto path() const noexcept -> std::string_view const {
             return m_path;
         }
 

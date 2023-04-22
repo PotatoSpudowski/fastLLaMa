@@ -10,7 +10,7 @@
 
 namespace fastllama {
 
-    void sample_top_k(std::vector<std::pair<double, typename Vocab::id>> & logits_id, int top_k) {
+    void sample_top_k(std::vector<std::pair<double, typename Vocab::id_type>> & logits_id, int top_k) {
         // find the top K tokens
         std::partial_sort(
                 logits_id.begin(),
@@ -24,13 +24,13 @@ namespace fastllama {
     auto sample_top_p_top_k(
         Model const& model,
         Span<float> logits,
-        RingBuffer<typename Vocab::id> const & last_n_tokens,
+        RingBuffer<typename Vocab::id_type> const & last_n_tokens,
         double repeat_penalty,
         int top_k,
         double top_p,
         double temp,
         std::mt19937 & rng
-    ) -> typename Vocab::id {
+    ) -> typename Vocab::id_type {
 
 
         std::size_t n_logits = static_cast<std::size_t>(model.params.n_vocab);
@@ -38,12 +38,12 @@ namespace fastllama {
 
         if (temp <= 0.) {
             auto max_el  = std::max_element(plogits, logits.end());
-            return static_cast<typename Vocab::id>(std::distance(logits.begin(), max_el));
+            return static_cast<typename Vocab::id_type>(std::distance(logits.begin(), max_el));
         }
 
-        std::vector<std::pair<double, typename Vocab::id>> logits_id;
+        std::vector<std::pair<double, typename Vocab::id_type>> logits_id;
         logits_id.resize(n_logits);
-        std::unordered_set<typename Vocab::id> temp_toks( last_n_tokens.begin(), last_n_tokens.end() );
+        std::unordered_set<typename Vocab::id_type> temp_toks( last_n_tokens.begin(), last_n_tokens.end() );
 
         {
             const double scale = 1.0 / temp;
@@ -107,7 +107,7 @@ namespace fastllama {
         return logits_id[idx].second;
     }
 
-    std::optional<FastLlama> FastLlama::Params::build(std::string_view model_id, std::string_view const& filepath) {
+    std::optional<FastLlama> FastLlama::Params::build(std::string_view const& filepath) {
         auto temp = FastLlama();
         temp.m_model.params.n_ctx = n_ctx;
         temp.m_last_n_tokens = last_n_tokens;
@@ -123,7 +123,7 @@ namespace fastllama {
         printf("\n\n\x1b[32m%s\x1b[0m\n\n", internal::watermark);
         fflush(stdout);
 
-        if (!temp.m_model.load(model_id, filepath, is_old_model)) {
+        if (!temp.m_model.load(filepath)) {
             temp.get_logger().log_err("FastLlama::Params::build", "Unable to load model\n");
             return std::nullopt;
         }
@@ -152,10 +152,6 @@ namespace fastllama {
 
     Span<float> FastLlama::get_logits() const noexcept {
         return m_logits;
-    }
-
-    std::optional<FastLlama> FastLlama::Params::build(ModelKind model_id, std::string_view const& filepath) {
-        return build(detail::g_models[static_cast<std::size_t>(model_id)].first, filepath);
     }
 
     auto FastLlama::recycle_embed_if_exceeds_context() -> bool {

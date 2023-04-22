@@ -13,13 +13,13 @@ namespace fastllama {
             params.mem_size = size;
             params.mem_buffer = buff;
             params.no_alloc = no_alloc;
-            ctx = ggml_init(&params);
+            ctx = ggml_init(params);
         }
         
         MemContext(size_type size) noexcept {
             ggml_init_params params{};
             params.mem_size = size;
-            ctx = ggml_init(&params);
+            ctx = ggml_init(params);
         }
 
         MemContext() = default;

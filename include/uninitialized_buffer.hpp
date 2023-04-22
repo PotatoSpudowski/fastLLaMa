@@ -17,6 +17,11 @@ namespace fastllama {
         UninitializedBuffer& operator=(UninitializedBuffer&& other) noexcept = default;
         ~UninitializedBuffer() noexcept = default;
 
+        UninitializedBuffer(std::size_t size) noexcept
+            : m_data(std::make_unique<std::uint8_t[]>(size))
+            , m_size(size)
+        {}
+
         void resize(std::size_t size) {
             m_data = std::make_unique<std::uint8_t[]>(size);
             m_size = size;

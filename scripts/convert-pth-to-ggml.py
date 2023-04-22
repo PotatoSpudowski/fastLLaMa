@@ -108,9 +108,10 @@ def load_hparams_and_tokenizer(dir_model):
 
 def write_header(fout, hparams, ftype):
     keys = ["vocab_size", "dim", "multiple_of", "n_heads", "n_layers"]
+    fout.write(b'ggjt'[::-1])  # magic: ggml in hex
     values = [
-        0x67676d6c,  # magic: ggml in hex
-        1, # file version
+        # 0x67676d6c,  # magic: ggml in hex
+        2, # file version
         *[hparams[key] for key in keys],
         hparams["dim"] // hparams["n_heads"],  # rot (obsolete)
         ftype

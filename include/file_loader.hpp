@@ -40,30 +40,35 @@ namespace fastllama {
         HyperParams         hyperparams;
         LoraAdapterParams   lora_adapter_params;
         Vocab               vocab;
-        Logger const&       logger;
+        Logger const*       logger;
         bool                is_failed_to_read{false};
 
         FileLoader(
             std::string_view filepath,
             std::size_t file_idx,
             TensorsMapping& tensor_map,
-            Logger const& logger
+            Logger const* logger = nullptr
         ) noexcept
             : reader(filepath)
-            , logger(logger)
+            , logger(logger ? logger : &Logger::get_null_logger())
         {
             if (!reader) {
-                logger.log_err(__func__, "Failed to open file: '", filepath, "'\n");
+                logger->log_err(__func__, "Failed to open file: '", filepath, "'\n");
                 is_failed_to_read = true;
                 return;
             }
+
+            std::cout << "Loading file: " << filepath << std::endl;
 
             if (!read_magic_number()) {
                 is_failed_to_read = true;
                 return;
             }
 
+            std::cout<< "Magic number: " << to_string_view(magic_kind) << std::endl;
+
             if (magic_kind != MagicKind::GGLA) {
+                std::cout<< "File version: " << to_string_view(version) << std::endl;
                 if (!read_hyperparams()) {
                     is_failed_to_read = true;
                     return;
@@ -90,7 +95,7 @@ namespace fastllama {
 
             if (static_cast<std::uint32_t>(MagicKind::GGML) != magic) {
                 if (!read_file_version(&file_version)) {
-                    logger.log_err(__func__,
+                    logger->log_err(__func__,
                         "invalid  model file ",
                         reader.path(),
                         "(unsupported format version '", static_cast<int>(version), "', but expected it to between 0 and ",
@@ -115,7 +120,7 @@ namespace fastllama {
                 case static_cast<std::uint32_t>(MagicKind::GGLA):
                     magic_kind = MagicKind::GGLA;
                 default: {
-                    logger.log_err(__func__, "invalid model file ", reader.path(), " (bad magic)\n");
+                    logger->log_err(__func__, "invalid model file ", reader.path(), " (bad magic)\n");
                     return false;
                 }
             }
@@ -124,17 +129,19 @@ namespace fastllama {
 
             if (magic_kind == MagicKind::GGML && file_version == FileVersion::GGML) {
                 version = FileVersion::GGML;
+                return true;
             } else if (magic_kind == MagicKind::GGMF && file_version == FileVersion::GGMF_V1) {
                 version = FileVersion::GGMF_V1;
+                return true;
             } else if (magic_kind == MagicKind::GGJT && file_version == FileVersion::GGJT_V1) {
                 version = FileVersion::GGJT_V1;
-            } else {
-                char buff[256];
-                logger.log_err(__func__, format_str(buff, "unknown (magic, version) combination: %08x, %08x; is this really a GGML file?",
-                         magic, static_cast<std::uint32_t>(file_version)));
-                return false;
+                return true;
             }
-        
+
+            char buff[256];
+            logger->log_err(__func__, format_str(buff, "unknown (magic, version) combination: %08x, %08x; is this really a GGML file?",
+                        magic, static_cast<std::uint32_t>(file_version)));
+            return false;
         }
 
         auto read_file_version(FileVersion* file_version) noexcept -> bool {
@@ -164,7 +171,7 @@ namespace fastllama {
                     reader.read(&hyperparams.n_rot)     && 
                     reader.read(&hyperparams.ftype);
             if (!res) {
-                logger.log_err(__func__, "Failed to read hyper parameters from file: ", reader.path(), "\n");
+                logger->log_err(__func__, "Failed to read hyper parameters from file: ", reader.path(), "\n");
                 return false;
             }
             return true;
@@ -182,18 +189,17 @@ namespace fastllama {
         auto read_vocab() -> void {
             auto size = static_cast<std::size_t>(hyperparams.n_vocab);
             vocab.id_to_token.resize(size);
-            std::string word(64, ' ');
 
             for (auto i = 0ul; i < size; ++i) {
-                std::uint32_t len;
-                reader.read(&len);
+                if (reader.eof()) {
+                    logger->log_err(__func__, "Failed to read vocab from file: ", reader.path(), "\n");
+                    return;
+                }
+                auto len = reader.read_u32();
+                auto word = reader.read_string(len);
 
-                word.resize(len);
-                reader.read(word.data(), len);
-
-                float score{};
-                if (version == FileVersion::GGMF_V1) reader.read(&score);
-                vocab.set_word(static_cast<typename Vocab::id_type>(i), word, score);
+                float score = (static_cast<int>(version) >= static_cast<int>(FileVersion::GGMF_V1) ? reader.read_f32() : 0.0f);
+                vocab.set_word(static_cast<typename Vocab::id_type>(i), std::move(word), score);
             }
         }
 
@@ -211,12 +217,12 @@ namespace fastllama {
                 std::string name = reader.read_string(name_len);
 
                 if (n_dims < 1 || n_dims > 2) {
-                    logger.log_err(__func__, "tensor '", name,"' should not be ", n_dims, "-dimensional\n");
+                    logger->log_err(__func__, "tensor '", name,"' should not be ", n_dims, "-dimensional\n");
                     return false;
                 }
 
                 if (!(shard.type >= GGML_TYPE_F32 && shard.type <= GGML_TYPE_Q4_3)) {
-                    logger.log_err(__func__, "unrecognized tensor type '", shard.type, "'\n");
+                    logger->log_err(__func__, "unrecognized tensor type '", shard.type, "'\n");
                     return false;
                 }
                 
@@ -224,7 +230,7 @@ namespace fastllama {
                 shard.file_idx = file_idx;
                 shard.file_off = reader.tell();
 
-                if (!shard.calc_size(logger)) return false;
+                if (!shard.calc_size(*logger)) return false;
 
                 std::size_t idx{};
 
@@ -239,22 +245,23 @@ namespace fastllama {
 
                 tensors_map.tensors[idx].shards.push_back(shard);
             }
+            return true;
         }
     };
 
     struct FileSaver {
         BinaryFileWriter    writer;
         FileLoader*         loader;
-        Logger const&       logger;
+        Logger const*       logger;
         bool                is_write_failed{false};
 
-        FileSaver(std::string_view path, FileLoader* loader, FType new_ftype, Logger const& logger) noexcept
+        FileSaver(std::string_view path, FileLoader* loader, FType new_ftype, Logger const* logger = nullptr) noexcept
             : writer(path)
             , loader(loader)
-            , logger(logger)
+            , logger(logger ? logger : &Logger::get_null_logger())
         {
             if (!writer) {
-                logger.log_err(__func__, "Failed to open file: '", path, "'\n");
+                logger->log_err(__func__, "Failed to open file: '", path, "'\n");
                 is_write_failed = true;
                 return;
             }
@@ -264,15 +271,23 @@ namespace fastllama {
                 return;
             }
 
-            if (!write_hyperparams()) {
-                is_write_failed = true;
-                return;
+            if (loader->magic_kind != MagicKind::GGLA) {
+                if (!write_hyperparams()) {
+                    is_write_failed = true;
+                    return;
+                }
+
+                if (!write_vocab()) {
+                    is_write_failed = true;
+                    return;
+                }
+            } else {
+                if (!write_lora_adapter()) {
+                    is_write_failed = true;
+                    return;
+                }
             }
 
-            if (!write_vocab()) {
-                is_write_failed = true;
-                return;
-            }
         }
 
         FileSaver(FileSaver const&) = delete;
@@ -286,8 +301,24 @@ namespace fastllama {
             auto version = 1ul;
             auto const res = writer.write(&magic) && writer.write_u32(version);
             if (!res) {
-                logger.log_err(__func__, "Failed to write magic('", magic,"') and version('", version,"') to file: ", writer.path(), "\n");
+                logger->log_err(__func__, "Failed to write magic('", magic,"') and version('", version,"') to file: ", writer.path(), "\n");
                 return false;
+            }
+            return true;
+        }
+
+        auto write_lora_adapter() noexcept -> bool {
+            auto const res = writer.write_u8(loader->lora_adapter_params.use_cache_matrix);
+            if (!res) {
+                logger->log_err(__func__, "Failed to write lora adapter params to file: '", writer.path(), "'\n");
+                return false;
+            }
+            if (!loader->lora_adapter_params.use_cache_matrix) {
+                auto const res = writer.write_u32(loader->lora_adapter_params.r) && writer.write_f32(loader->lora_adapter_params.alpha);
+                if (!res) {
+                    logger->log_err(__func__, "Failed to write lora adapter params to file: '", writer.path(), "'\n");
+                    return false;
+                }
             }
             return true;
         }
@@ -301,7 +332,7 @@ namespace fastllama {
                     writer.write(&loader->hyperparams.n_rot)     && 
                     writer.write(&loader->hyperparams.ftype);
             if (!res) {
-                logger.log_err(__func__, "Failed to write hyper parameters to file: '", writer.path(), "'\n");
+                logger->log_err(__func__, "Failed to write hyper parameters to file: '", writer.path(), "'\n");
                 return false;
             }
             return true;
@@ -314,7 +345,7 @@ namespace fastllama {
                 auto const& word = loader->vocab.id_to_token[i];
                 auto res = writer.write_string(word.tok) && writer.write(&word.score);
                 if (!res) {
-                    logger.log_err(__func__, "Failed to write vocab to file: '", writer.path(), "'\n");
+                    logger->log_err(__func__, "Failed to write vocab to file: '", writer.path(), "'\n");
                     return false;
                 }
             }
@@ -349,18 +380,20 @@ namespace fastllama {
         std::size_t                     num_of_ggml_tensors_created{};
         MemContext                      mem_ctx;
         std::unique_ptr<MMappedFile>    mmapped_file{nullptr};
-        Logger const&                   logger;
+        Logger const*                   logger;
 
-        ModelLoader(std::string_view fname_base, bool use_mmap, bool vocab_only, Logger const& logger) noexcept
+        ModelLoader(std::string_view fname_base, bool use_mmap, bool vocab_only, Logger const* logger) noexcept
             : use_mmap(use_mmap && MMappedFile::SUPPORTED)
-            , logger(logger)
+            , logger(logger ? logger : &Logger::get_null_logger())
         {
             file_loaders.emplace_back(fname_base, 0ul, tensors_map, logger);
             auto& first_loader = file_loaders.back();
+
             if (first_loader.is_failed_to_read) {
                 is_load_failed = true;
                 return;
             }
+
             std::uint32_t num_of_files = vocab_only ? 1ul : guess_num_of_files();
 
             if (is_load_failed) return;
@@ -373,24 +406,26 @@ namespace fastllama {
                     return;
                 }
                 if (file_loaders.back().hyperparams != first_loader.hyperparams) {
-                    logger.log_err(__func__, "Hyper parameters mismatch between '", filename, "' and '", fname_base, "'\n");
+                    logger->log_err(__func__, "Hyper parameters mismatch between '", filename, "' and '", fname_base, "'\n");
                     is_load_failed = true;
                     return;
                 }
             }
+            std::cout<<"first_loader.hyperparams.n_vocab: "<<first_loader.hyperparams.n_vocab<<std::endl;
 
             if (use_mmap && alignment_prevents_mmap()) {
-                logger.log_warn(__func__, "can't use mmap because tensors are not aligned; convert to new format to avoid this\n");
+                logger->log_warn(__func__, "can't use mmap because tensors are not aligned; convert to new format to avoid this\n");
                 use_mmap = false;
             }
 
             this->use_mmap = use_mmap;
             for(auto& tensor : tensors_map.tensors) {
-                if (!tensor.calc_all(logger)) {
+                if (!tensor.calc_all(*logger)) {
                     is_load_failed = true;
                     return;
                 }
             }
+            std::cout<<"first_loader.hyperparams.n_vocab: "<<first_loader.hyperparams.n_vocab<<std::endl;
 
         }
 
@@ -407,8 +442,11 @@ namespace fastllama {
 
         auto guess_num_of_files() noexcept -> std::uint32_t {
             auto it = tensors_map.tensor_names.find("tok_embeddings.weight");
+            for(auto& [k, v] : tensors_map.tensor_names) {
+                std::cout<<k<<" : " << v<<std::endl;
+            }
             if (it == tensors_map.tensor_names.end()) {
-                logger.log_err(__func__, "tok_embeddings.weight not found\n");
+                logger->log_err(__func__, "tok_embeddings.weight not found\n");
                 is_load_failed = true;
                 return 0;
             }
@@ -431,13 +469,13 @@ namespace fastllama {
             auto it = tensors_map.tensor_names.find(name.data());
 
             if (it == tensors_map.tensor_names.end()) {
-                logger.log_err(__func__, "tensor '", name, "' not found\n");
+                logger->log_err(__func__, "tensor '", name, "' not found\n");
                 return nullptr;
             }
 
             auto& tensor_loader = tensors_map.tensors[it->second];
             if (tensor_loader.extents != es) {
-                logger.log_err(__func__, "tensor '", name, "' extents mismatch; expected ", format_tensor_shape(es),", got ", format_tensor_shape(tensor_loader.extents), "\n");
+                logger->log_err(__func__, "tensor '", name, "' extents mismatch; expected ", format_tensor_shape(es),", got ", format_tensor_shape(tensor_loader.extents), "\n");
                 return nullptr;
             }
 
@@ -461,7 +499,7 @@ namespace fastllama {
 
         auto done_getting_tensors() const -> bool {
             if (num_of_ggml_tensors_created > tensors_map.tensors.size()) {
-                logger.log_err(__func__, "file contained more tensors than expected\n");
+                logger->log_err(__func__, "file contained more tensors than expected\n");
                 return false;
             }
             return num_of_ggml_tensors_created == tensors_map.tensors.size();
@@ -486,7 +524,7 @@ namespace fastllama {
             std::size_t done_size{};
             for(auto& tl : tensors_map.tensors) {
                 if (call_progress_callback) {
-                    logger.progress(done_size, data_size);
+                    logger->progress(done_size, data_size);
                 }
 
                 FAST_LLAMA_ASSERT(tl.ggml_tensor, "tensor not created");
@@ -501,7 +539,7 @@ namespace fastllama {
             }
 
             if (call_progress_callback) {
-                logger.progress(data_size, data_size);
+                logger->progress(data_size, data_size);
             }
         }
 

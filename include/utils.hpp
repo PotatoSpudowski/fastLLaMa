@@ -50,7 +50,7 @@ namespace fastllama {
         #endif
     } // namespace detail
     
-    std::string error_message() {
+    inline static std::string error_message() {
         #if defined(_WIN32)
             return detail::llama_format_win_err(GetLastError());
         #elif defined(__linux__)

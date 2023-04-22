@@ -23,7 +23,7 @@ int main(int argc, char ** argv) {
     std::string_view fname_inp = argv[1];
     std::string_view fname_out = argv[2];
 
-    auto const itype = atoi(argv[3]);
+    auto const itype = static_cast<fastllama::FType>(atoi(argv[3]));
 
     auto const t_main_start_us = ggml_time_us();
 
@@ -33,7 +33,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!fastllama::quantize(fname_inp, fname_out, itype)) {
+        if (!fastllama::quantize(fname_inp, fname_out, itype, 8)) {
             fprintf(stderr, "%s: failed to quantize model from '%.*s'\n", __func__, static_cast<int>(fname_inp.size()), fname_inp.data());
             return 1;
         }

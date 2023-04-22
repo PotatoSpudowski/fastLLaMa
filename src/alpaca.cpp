@@ -11,7 +11,7 @@ int main() {
         .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
         .set_is_old_model(true)
-        .build(fastllama::ModelKind::ALPACA_LORA_7B, "./models/7B/ggml-alpaca-7b-q4.bin");
+        .build("./models/7B/ggml-alpaca-7b-q4.bin");
     
     if (!maybe_bridge) {
         return 1;

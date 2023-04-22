@@ -11,7 +11,7 @@ namespace fastllama {
     
     template<typename Fn>
     struct TokenBuffer {
-        using id_t = typename Vocab::id;
+        using id_t = typename Vocab::id_type;
         static constexpr std::size_t str_buffer_size = 512;
         static constexpr std::size_t unicode_backlog_buffer_size = 8;
 

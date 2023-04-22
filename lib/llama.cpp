@@ -1,6 +1,5 @@
 #include "llama.hpp"
 #include "file_reader.hpp"
-#include "file_pipe.hpp"
 #include <cassert>
 #include "macro.hpp"
 #include <fstream>
@@ -9,6 +8,7 @@
 #include "span.hpp"
 #include <cstring>
 #include <cmath>
+#include <thread>
 #include "file_loader.hpp"
 
 namespace fastllama {
@@ -100,6 +100,42 @@ namespace fastllama {
         return true;
     }
 
+    inline static bool prepare_model_weights(HyperParams params, ModelLoader& model_loader, MemContext& ctx, Logger const& logger, Tensor& tok_embeddings, Tensor& norm, Tensor& output, std::vector<Layer>& layers) {
+        auto const n_embd  = params.n_embd;
+        auto const n_layer = params.n_layer;
+        auto const n_vocab = params.n_vocab;
+
+        model_loader.mem_ctx = ctx;
+
+        model_loader.mem_ctx = ctx;
+
+        tok_embeddings = model_loader.get_tensor("tok_embeddings.weight", {n_embd, n_vocab});
+        norm           = model_loader.get_tensor("norm.weight",           {n_embd});
+        output         = model_loader.get_tensor("output.weight",         {n_embd, n_vocab});
+
+        layers.resize(n_layer);
+
+        char buff[256];
+
+        for (auto i = 0; i < static_cast<int>(n_layer); ++i) {
+            auto & layer = layers[i];
+
+            layer.attention_norm = model_loader.get_tensor(format_str(buff, "layers.%d.attention_norm.weight", i), {n_embd});
+
+            layer.wq = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wq.weight", i), {n_embd, n_embd});
+            layer.wk = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wk.weight", i), {n_embd, n_embd});
+            layer.wv = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wv.weight", i), {n_embd, n_embd});
+            layer.wo = model_loader.get_tensor(format_str(buff, "layers.%d.attention.wo.weight", i), {n_embd, n_embd});
+
+            layer.ffn_norm = model_loader.get_tensor(format_str(buff, "layers.%d.ffn_norm.weight", i), {n_embd});
+
+            layer.w1 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w1.weight", i), {n_embd,   n_ff});
+            layer.w2 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w2.weight", i), {  n_ff,   n_embd});
+            layer.w3 = model_loader.get_tensor(format_str(buff, "layers.%d.feed_forward.w3.weight", i), {n_embd,   n_ff});
+        }
+
+    }
+
     bool Model::load(std::string_view filepath) {
         using namespace ::fastllama::literals;
 
@@ -109,7 +145,7 @@ namespace fastllama {
 
         // Create model loader
 
-        auto model_loader = ModelLoader(filepath, use_mmap, false, logger);
+        auto model_loader = ModelLoader(filepath, use_mmap, false, &logger);
 
         if (model_loader.is_load_failed) {
             return false;
@@ -141,7 +177,7 @@ namespace fastllama {
             logger.log("Model", "n_head     = ", params.n_head, '\n');
             logger.log("Model", "n_layer    = ", params.n_layer, '\n');
             logger.log("Model", "n_rot      = ", params.n_rot, '\n');
-            logger.log("Model", "ftype      = ", static_cast<std::uint32_t>(params.ftype), " (", params.ftype, ")\n");
+            logger.log("Model", "ftype      = ", static_cast<std::uint32_t>(params.ftype), " (", to_string_view(params.ftype), ")\n");
             logger.log("Model", "n_ff       = ", n_ff, '\n');
             logger.log("Model", "n_parts    = ", model_loader.file_loaders.size(), '\n');
             logger.log("Model", "model_id   = ", model_id, '\n');
@@ -503,54 +539,25 @@ namespace fastllama {
             case FType::MOSTLY_Q4_2: quantized_type = GGML_TYPE_Q4_2; break;
             case FType::MOSTLY_Q4_3: quantized_type = GGML_TYPE_Q4_3; break;
             default: {
-                logger.log_err(__func__, "invalid quantization type ", static_cast<int>(ftype), ftype);
+                logger.log_err(__func__, "invalid quantization type ", static_cast<int>(ftype), to_string_view(ftype), '\n');
                 return false;
             }
         };
 
         auto n_threads = std::min(std::max(1, threads), static_cast<int>(std::thread::hardware_concurrency()));
         
-        logger.log(__func__, "using ", n_threads, " threads");
+        logger.log(__func__, "using ", n_threads, " threads\n");
 
-        logger.log(__func__, "loading model from '", in_filepath, "'");
+        logger.log(__func__, "loading model from '", in_filepath, "'\n");
 
-        auto model_loader = ModelLoader(in_filepath, false, false, logger);
+        auto model_loader = ModelLoader(in_filepath, false, false, &logger);
 
-        auto file_saver = FileSaver(out_filepath, logger);
-
-        if (magic != MagicKind::GGLA) {
-            auto params = HyperParams{};
-            pipe.read_and_write(&params.n_vocab, 1, param_print_fn("n_vocab"));
-            pipe.read_and_write(&params.n_embd, 1, param_print_fn("n_embd"));
-            pipe.read_and_write(&params.n_mult, 1, param_print_fn("n_mult"));
-            pipe.read_and_write(&params.n_head, 1, param_print_fn("n_head"));
-            pipe.read_and_write(&params.n_layer, 1, param_print_fn("n_layer"));
-            pipe.read_and_write(&params.n_rot, 1, param_print_fn("n_rot"));
-            pipe.read_and_write(&params.f16, 1, [parent_fn_name, itype](auto* v) {
-                *v = itype;
-                printf("%.*s: %s = %d\n", static_cast<int>(parent_fn_name.size()), parent_fn_name.data(), "f16", *v);
-                return v;
-            });
-
-            printf("%s: vocabulary processing started\n", __func__);
-            // load and save vocab
-            {
-                std::string word(64, ' ');
-
-                for(auto i = 0l; i < params.n_vocab; ++i) {
-                    std::uint32_t len;
-
-                    pipe.read_and_write(&len);
-                    word.resize(len);
-                    pipe.read_and_write(word.data(), len);
-
-                    float score{};
-                    pipe.read_and_write(&score);
-                }
-            }
-
-            printf("%s: vocabulary processing completed\n", __func__);
+        if (!model_loader.is_load_failed) {
+            logger.log_err(__func__, "failed to load model from '", in_filepath, "'\n");
+            return false;
         }
+
+        auto file_saver = FileSaver(out_filepath, &model_loader.file_loaders[0], ftype, &logger);
 
 
         // load -> transform -> save weights
@@ -558,370 +565,350 @@ namespace fastllama {
             std::size_t total_size_org = 0;
             std::size_t total_size_new = 0;
 
-            std::vector<float> work;
-
-            std::vector<std::uint8_t>   data_u8;
-            std::vector<ggml_fp16_t>    data_f16;
-            std::vector<float>          data_f32;
+            std::vector<std::thread> workers;
+            std::mutex mtx;
 
             std::vector<std::int64_t> hist_all(1 << 4, 0);
 
-            std::string name(64, ' ');
 
-            while(!pipe.get_reader().eof()) {
-                std::int32_t n_dims;
-                std::int32_t length;
-                std::int32_t ftype;
+            char str_buff[256];
 
-                pipe.read_and_write(&n_dims);
-                pipe.read_and_write(&length);
-                pipe.get_reader().read(&ftype);
+            for(auto i = 0ul; i < model_loader.tensors_map.tensors.size(); ++i) {
+                auto& tensor = model_loader.tensors_map.tensors[i];
 
-                if (pipe.get_reader().eof()) break;
+                UninitializedBuffer buff(tensor.size);
+                tensor.data = buff.data();
 
-                std::size_t total_number_of_elements{1};
-                std::int32_t extents[2] = { 1, 1 };
+                model_loader.load_data_for(tensor);
 
-                for(std::int32_t i {}; i < n_dims; ++i) {
-                    pipe.get_reader().read(extents + i);
-                    total_number_of_elements *= static_cast<std::size_t>(extents[i]);
-                }
-                
-                auto const str_len = static_cast<std::size_t>(length);
-                name.resize(str_len);
-                pipe.get_reader().read(name.data(), str_len);
+                logger.log(__func__, format_str(str_buff, "[%4zu/%4zu] %36s - %16s, type = %6s, ", i, model_loader.tensors_map.tensors.size(),
+                    tensor.name.c_str(), format_tensor_shape(tensor.extents).c_str(), ggml_type_name(tensor.type)));
 
-                {
-                    // ensure tensor data is aligned
-                    auto maybe_offset = pipe.get_reader().tell();
-                    if (!maybe_offset) return false;
-                    auto offset = *maybe_offset;
-                    offset = (offset + static_cast<std::size_t>(31)) & static_cast<std::size_t>(-32);
-                    pipe.get_reader().seek(offset);
+                bool quantize = (tensor.extents.size() == 2);
+
+                static std::string_view const suffixes[] = {
+                    "weight",
+                    "weight.lora",
+                    "weight.loraA",
+                    "weight.loraB",
+                };
+
+                for(auto const& suffix : suffixes) {
+                    if (tensor.name.rfind(suffix) == (tensor.name.size() - suffix.size())) {
+                        quantize &= true;
+                        break;
+                    }
                 }
 
-                {
-                    static const char * ftype_str[] = { "f32", "f16", "q4_0", "q4_1", };
-                    printf("%48s - [%5d, %5d], type = %6s ", name.data(), extents[0], extents[1], ftype_str[ftype]);
-                }
+                enum ggml_type new_type;
+                void * new_data;
+                size_t new_size;
+                UninitializedBuffer work;
 
-                std::string_view temp_w_str = "weight";
-                auto find_pos = name.rfind(temp_w_str);
-                bool quantize = (n_dims == 2) && (find_pos != std::string::npos);
-                
-                // printf("Quantize? %s, Size: %zu - %zu == %zu\n", quantize ? "Yes" : "No", name.size(), find_pos, temp_w_str.size());
+                if (!quantize) {
+                    new_type = tensor.type;
+                    new_data = tensor.data;
+                    new_size = tensor.size;
+                } else {
+                    new_type = quantized_type;
+                    float * f32_data;
+                    std::size_t n_elements = tensor.extents[0] * tensor.extents[1];
+                    UninitializedBuffer f32_conv_buf;
 
-                if (quantize) {
-                    if (ftype != 0 && ftype != 1) {
-                        fprintf(stderr, "%s: unsupported ftype %d for integer quantization\n", __func__, ftype);
+                    if (tensor.type == GGML_TYPE_F32) {
+                        f32_data = reinterpret_cast<float*>(tensor.data);
+                    } else if (tensor.type == GGML_TYPE_F16) {
+                        f32_conv_buf.resize(n_elements * sizeof(float));
+                        f32_data = reinterpret_cast<float*>(f32_conv_buf.data());
+                        auto f16_data = reinterpret_cast<ggml_fp16_t*>(tensor.data);
+                        for (std::size_t i = 0ul; i < n_elements; ++i) f32_data[i] = ggml_fp16_to_fp32(f16_data[i]);
+                    } else {
+                        logger.log_err(__func__, "unsupported for integer quantization ", ggml_type_name(tensor.type), '\n');
                         return false;
                     }
+                    
+                    logger.log(__func__, "quantizing...\n");
+                    fflush(stdout);
 
-                    if (ftype == 1) {
-                        data_f16.resize(total_number_of_elements);
-                        pipe.get_reader().read(data_f16.data(), total_number_of_elements);
-
-                        data_f32.resize(total_number_of_elements);
-                        auto const n = static_cast<std::ptrdiff_t>(total_number_of_elements);
-                        #pragma omp parallel for if (n > 512)
-                        for (auto i = 0l; i < n; ++i) {
-                            data_f32[i] = ggml_fp16_to_fp32(data_f16[i]);
-                        }
-                    } else {
-                        data_f32.resize(total_number_of_elements);
-                        pipe.get_reader().read(data_f32.data(), total_number_of_elements);
-                    }
-
-                    ftype = itype;
-                } else {
-                    auto const bpe = (ftype == 0) ? sizeof(float) : sizeof(uint16_t);
-
-                    data_u8.resize(total_number_of_elements * bpe);
-                    pipe.get_reader().read(reinterpret_cast<void*>(data_u8.data()), bpe, total_number_of_elements);
-                }
-
-                pipe.get_writer().write(&ftype);
-
-                for(auto i = 0ul; i < static_cast<std::size_t>(n_dims); ++i) {
-                    pipe.get_writer().write(extents + i);
-                }
-
-                pipe.get_writer().write(name.data(), str_len);
-
-                {
-                    // ensure tensor data is aligned
-                    auto maybe_offset = pipe.get_writer().tell();
-                    if (!maybe_offset) return false;
-                    auto offset = *maybe_offset;
-                    offset = (offset + static_cast<std::size_t>(31)) & static_cast<std::size_t>(-32);
-                    pipe.get_writer().seek(offset);
-                }
-
-                if (quantize) {
-                    printf("quantizing .. ");
-                    work.resize(total_number_of_elements); // for quantization
-
-                    size_t cur_size = 0;
+                    work.resize(n_elements * 4);
+                    new_data = work.data();
                     std::vector<int64_t> hist_cur(1 << 4, 0);
 
-                    switch (type) {
-                        case GGML_TYPE_Q4_0:
-                            {
-                                cur_size = ggml_quantize_q4_0(data_f32.data(), work.data(), static_cast<int>(total_number_of_elements), extents[0], hist_cur.data());
-                            } break;
-                        case GGML_TYPE_Q4_1:
-                            {
-                                cur_size = ggml_quantize_q4_1(data_f32.data(), work.data(), static_cast<int>(total_number_of_elements), extents[0], hist_cur.data());
-                            } break;
-                        default:
-                            {
-                                fprintf(stderr, "%s: unsupported quantization type %d\n", __func__, type);
-                                return false;
+                    int chunk_size = 32 * 512;
+
+                    int const nchunk = (n_elements + chunk_size - 1)/chunk_size;
+                    int const nthread_use = n_threads > 1 ? std::max(1, std::min(n_threads, nchunk)) : 1;
+
+                    if (nthread_use < 2) {
+                        new_size = ggml_quantize_chunk(new_type, f32_data, new_data, 0, n_elements, hist_cur.data());
+                    } {
+                        size_t counter = 0;
+                        new_size = 0;
+                        auto compute = [&mtx, &counter, &hist_cur, &new_size, new_type, f32_data, new_data, n_elements, chunk_size] () {
+                            std::vector<int64_t> local_hist;
+                            size_t local_size = 0;
+                            while (true) {
+                                // std::unique_lock<std::mutex> lock(mtx);
+                                size_t first = counter; counter += chunk_size;
+                                if (first >= n_elements) {
+                                    if (!local_hist.empty()) {
+                                        for (int j=0; j<int(local_hist.size()); ++j) hist_cur[j] += local_hist[j];
+                                        new_size += local_size;
+                                    }
+                                    break;
+                                }
+                                // lock.unlock();
+                                printf("\r%8.2f%%\n", 100.0 * first / n_elements);
+                                size_t last = std::min(n_elements, first + chunk_size);
+                                if (local_hist.empty()) local_hist.resize(hist_cur.size(), 0);
+                                local_size += ggml_quantize_chunk(new_type, f32_data, new_data, first, last - first, local_hist.data());
                             }
+                        };
+                        
+                        // if (int(workers.size()) < nthread_use - 1) workers.resize(nthread_use - 1);
+                        
+                        // for (int it = 0; it < nthread_use - 1; ++it) workers[it] = std::thread(compute);
+                        
+                        compute();
+                        
+                        // for (int it = 0; it < nthread_use - 1; ++it) workers[it].join();
                     }
 
-                    pipe.get_writer().write(reinterpret_cast<char*>(work.data()), cur_size);
+                    printf("size = %8.2f MB -> %8.2f MB | hist: ", tensor.size/1024.0/1024.0, new_size/1024.0/1024.0);
+                    for (size_t i = 0; i < hist_cur.size(); i++) {
+                        hist_all[i] += hist_cur[i];
+                    }
 
-                    total_size_new += cur_size;
-
-                    printf("size = %8.2Lf MB -> %8.2Lf MB | hist: ", total_number_of_elements * sizeof(float)/1.0_MiB, cur_size/1.0_MiB);
-                    std::copy(hist_cur.begin(), hist_cur.end(), hist_all.begin());
-
-                    for (auto i = 0ul; i < hist_cur.size(); ++i) {
-                        printf("%5.3f ", static_cast<double>(hist_cur[i]) / static_cast<double>(total_number_of_elements));
+                    for (size_t i = 0; i < hist_cur.size(); i++) {
+                        printf("%5.3f ", hist_cur[i] / float(n_elements));
                     }
                     printf("\n");
-
-                } else {
-                    printf("size = %8.3Lf MB\n", data_u8.size()/1.0_MiB);
-                    pipe.get_writer().write(data_u8.data(), data_u8.size());
-
-                    total_size_new += data_u8.size();
                 }
 
-                total_size_org += total_number_of_elements * sizeof(float);
+                total_size_org += tensor.size;
+                total_size_new += new_size;
+                file_saver.write_tensor(tensor, new_type, new_data, new_size);
             }
-
-            printf("%s: model size  = %8.2Lf MB\n", __func__, total_size_org / 1.0_MiB);
-            printf("%s: quant size  = %8.2Lf MB\n", __func__, total_size_new / 1.0_MiB);
+            logger.log(__func__, format_str(str_buff, "model size  = %8.2f MB\n", static_cast<float>(total_size_org / 1.0_MiB)));
+            logger.log(__func__, format_str(str_buff, "quant size  = %8.2f MB\n", static_cast<float>(total_size_new / 1.0_MiB)));
 
             {
-                double sum_all = std::accumulate(hist_all.begin(), hist_all.end(), double{}, std::plus<>{});
+                int64_t sum_all = 0;
+                for (size_t i = 0; i < hist_all.size(); i++) {
+                    sum_all += hist_all[i];
+                }
 
                 printf("%s: hist: ", __func__);
-                for (auto i = 0ul; i < hist_all.size(); ++i) {
-                    printf("%5.3f ", static_cast<double>(hist_all[i]) / sum_all);
+                for (size_t i = 0; i < hist_all.size(); i++) {
+                    printf("%5.3f ", hist_all[i] / float(sum_all));
                 }
                 printf("\n");
             }
-
         }
-
-        pipe.close();
 
         return true;
     }
 
-    template<typename Fn>
-    inline static bool attach_or_detach_lora_helper(std::string_view filepath, Model& model, Fn&& adapter_fn, const char* func_name, bool is_detach = false) {
-        using tensor_map_t = std::unordered_map<std::string, ggml_tensor*>;
-        static_assert(std::is_invocable_r_v<
-            ggml_tensor*,
-            Fn,
-            ggml_context*,
-            ggml_tensor*,
-            tensor_map_t&,
-            std::string const&,
-            std::string const&,
-            std::string const&,
-            float,
-            bool
-        >);
+    // template<typename Fn>
+    // inline static bool attach_or_detach_lora_helper(std::string_view filepath, Model& model, Fn&& adapter_fn, const char* func_name, bool is_detach = false) {
+    //     using tensor_map_t = std::unordered_map<std::string, ggml_tensor*>;
+    //     static_assert(std::is_invocable_r_v<
+    //         ggml_tensor*,
+    //         Fn,
+    //         ggml_context*,
+    //         ggml_tensor*,
+    //         tensor_map_t&,
+    //         std::string const&,
+    //         std::string const&,
+    //         std::string const&,
+    //         float,
+    //         bool
+    //     >);
 
-        using namespace literals;
-        auto const& logger = model.logger;
+    //     using namespace literals;
+    //     auto const& logger = model.logger;
 
-        auto reader = BinaryFileReader(filepath);
-        if (!reader) {
-            logger.log_err(func_name, "failed to open file ", filepath, "\n");
-            return false;
-        }
+    //     auto reader = BinaryFileReader(filepath);
+    //     if (!reader) {
+    //         logger.log_err(func_name, "failed to open file ", filepath, "\n");
+    //         return false;
+    //     }
 
-        if (!verify_magic_number(reader)) {
-            logger.log_err(func_name, "bad file magic\n");
-            return false;
-        }
+    //     if (!verify_magic_number(reader)) {
+    //         logger.log_err(func_name, "bad file magic\n");
+    //         return false;
+    //     }
 
-        if (!verify_file_version(reader)) {
-            logger.log_err(func_name, "unsupported file version\n");
-            return false;
-        }
+    //     if (!verify_file_version(reader)) {
+    //         logger.log_err(func_name, "unsupported file version\n");
+    //         return false;
+    //     }
 
-        bool use_cache = false;
-        reader.read(&use_cache);
+    //     bool use_cache = false;
+    //     reader.read(&use_cache);
 
-        std::uint32_t r{1};
-        std::uint32_t alpha{1};
-        float scale{1.0f};
+    //     std::uint32_t r{1};
+    //     std::uint32_t alpha{1};
+    //     float scale{1.0f};
 
-        if (use_cache) {
-            logger.log(func_name, "cached adapter found\n");
-        } else {
-            logger.log(func_name, "uncached adapter found\n");
-            reader.read(&r);
-            reader.read(&alpha);
-            scale = static_cast<float>(alpha) / static_cast<float>(r);
-            char format_buffer[64];
-            logger.log(func_name, "r = ", r, ", alpha = ", alpha, format_str(format_buffer, ", scale = %.2f", scale), "\n");
-        }
+    //     if (use_cache) {
+    //         logger.log(func_name, "cached adapter found\n");
+    //     } else {
+    //         logger.log(func_name, "uncached adapter found\n");
+    //         reader.read(&r);
+    //         reader.read(&alpha);
+    //         scale = static_cast<float>(alpha) / static_cast<float>(r);
+    //         char format_buffer[64];
+    //         logger.log(func_name, "r = ", r, ", alpha = ", alpha, format_str(format_buffer, ", scale = %.2f", scale), "\n");
+    //     }
 
-        ggml_context* lora_ctx{nullptr};
+    //     ggml_context* lora_ctx{nullptr};
 
-        std::vector<unsigned char> buff(1_GiB);
-        ggml_init_params params = {};
-        params.mem_buffer = buff.data();
-        params.mem_size = buff.size();
-        params.no_alloc = false;
+    //     std::vector<unsigned char> buff(1_GiB);
+    //     ggml_init_params params = {};
+    //     params.mem_buffer = buff.data();
+    //     params.mem_size = buff.size();
+    //     params.no_alloc = false;
 
-        lora_ctx = ggml_init(params);
+    //     lora_ctx = ggml_init(params);
 
-        tensor_map_t lora_tensors;
-        tensor_map_t model_tensors = model.tensors.make_tensors_by_name();
+    //     tensor_map_t lora_tensors;
+    //     tensor_map_t model_tensors = model.tensors.make_tensors_by_name();
 
-        auto n_tensors = std::size_t{};
+    //     auto n_tensors = std::size_t{};
 
-        bool warned{false};
+    //     bool warned{false};
 
-        while(!reader.eof()) {
-            int32_t n_dims;
-            int32_t length;
-            int32_t ftype;
+    //     while(!reader.eof()) {
+    //         int32_t n_dims;
+    //         int32_t length;
+    //         int32_t ftype;
 
-            reader.read(&n_dims);
-            reader.read(&length);
-            reader.read(&ftype);
+    //         reader.read(&n_dims);
+    //         reader.read(&length);
+    //         reader.read(&ftype);
 
-            if (reader.eof()) break;
+    //         if (reader.eof()) break;
 
-            int32_t ne[2] = { 1, 1 };
-            for(auto i = 0; i < n_dims; ++i) {
-                reader.read(ne + i);
-            }
+    //         int32_t ne[2] = { 1, 1 };
+    //         for(auto i = 0; i < n_dims; ++i) {
+    //             reader.read(ne + i);
+    //         }
 
-            std::string name(length, '\0');
-            reader.read(name.data(), length);
+    //         std::string name(length, '\0');
+    //         reader.read(name.data(), length);
 
-            std::string_view lora_suffix = ".lora";
-            auto lora_pos = name.rfind(lora_suffix);
-            if (lora_pos == std::string::npos) {
-                logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
-                return false;
-            }
+    //         std::string_view lora_suffix = ".lora";
+    //         auto lora_pos = name.rfind(lora_suffix);
+    //         if (lora_pos == std::string::npos) {
+    //             logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
+    //             return false;
+    //         }
 
-            auto base_name = name.substr(0, lora_pos);
+    //         auto base_name = name.substr(0, lora_pos);
 
-            if (!model.tensors.contains(base_name)) {
-                logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
-                return false;
-            }
+    //         if (!model.tensors.contains(base_name)) {
+    //             logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
+    //             return false;
+    //         }
 
-            ggml_type wtype;
-            switch (ftype) {
-                case 0: wtype = GGML_TYPE_F32;  break;
-                case 1: wtype = GGML_TYPE_F16;  break;
-                case 2: wtype = GGML_TYPE_Q4_0; break;
-                case 3: wtype = GGML_TYPE_Q4_1; break;
-                default:{
-                    logger.log_err(func_name, "unsupported lora tensor type ", ftype, "\n");
-                    return false;
-                }
-            }
+    //         ggml_type wtype;
+    //         switch (ftype) {
+    //             case 0: wtype = GGML_TYPE_F32;  break;
+    //             case 1: wtype = GGML_TYPE_F16;  break;
+    //             case 2: wtype = GGML_TYPE_Q4_0; break;
+    //             case 3: wtype = GGML_TYPE_Q4_1; break;
+    //             default:{
+    //                 logger.log_err(func_name, "unsupported lora tensor type ", ftype, "\n");
+    //                 return false;
+    //             }
+    //         }
 
-            if (!use_cache && wtype != GGML_TYPE_F32) {
-                logger.log_err(func_name, "currently, we support fp32 for uncached matrix.\n");
-                return false;
-            }
+    //         if (!use_cache && wtype != GGML_TYPE_F32) {
+    //             logger.log_err(func_name, "currently, we support fp32 for uncached matrix.\n");
+    //             return false;
+    //         }
 
-            ggml_tensor* lora_tensor;
+    //         ggml_tensor* lora_tensor;
 
-            if (n_dims == 2) {
-                lora_tensor = ggml_new_tensor_2d(lora_ctx, wtype, ne[0], ne[1]);
-            } else {
-                logger.log_err(func_name, "unsupported tensor dimension ", n_dims, "\n");
-                return false;
-            }
+    //         if (n_dims == 2) {
+    //             lora_tensor = ggml_new_tensor_2d(lora_ctx, wtype, ne[0], ne[1]);
+    //         } else {
+    //             logger.log_err(func_name, "unsupported tensor dimension ", n_dims, "\n");
+    //             return false;
+    //         }
             
-            {
-                auto maybe_offset = reader.tell();
-                if (!maybe_offset) {
-                    logger.log_err(func_name, "failed to get file offset\n");
-                    return false;
-                }
-                auto offset = *maybe_offset;
-                size_t tensor_data_size = ggml_nbytes(lora_tensor);
-                offset = (offset + 31) & -32;
-                reader.seek(offset);
-            }
+    //         {
+    //             auto maybe_offset = reader.tell();
+    //             if (!maybe_offset) {
+    //                 logger.log_err(func_name, "failed to get file offset\n");
+    //                 return false;
+    //             }
+    //             auto offset = *maybe_offset;
+    //             size_t tensor_data_size = ggml_nbytes(lora_tensor);
+    //             offset = (offset + 31) & -32;
+    //             reader.seek(offset);
+    //         }
 
-            reader.read(lora_tensor->data, sizeof(char), ggml_nbytes(lora_tensor));
+    //         reader.read(lora_tensor->data, sizeof(char), ggml_nbytes(lora_tensor));
 
-            // BA matrix with scaled values in case of cached adapter
-            lora_tensors[name] = lora_tensor;
+    //         // BA matrix with scaled values in case of cached adapter
+    //         lora_tensors[name] = lora_tensor;
 
-            auto loraA_str = base_name + ".loraA";
-            auto loraB_str = base_name + ".loraB";
+    //         auto loraA_str = base_name + ".loraA";
+    //         auto loraB_str = base_name + ".loraB";
 
-            auto has_loraA = lora_tensors.find(loraA_str) != lora_tensors.end();
-            auto has_loraB = lora_tensors.find(loraB_str) != lora_tensors.end();
+    //         auto has_loraA = lora_tensors.find(loraA_str) != lora_tensors.end();
+    //         auto has_loraB = lora_tensors.find(loraB_str) != lora_tensors.end();
 
-            if (use_cache || (has_loraA && has_loraB)) {
-                ggml_tensor* base_t = model_tensors[base_name];
-                if (!warned) {
-                    if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
-                        logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
-                        warned = true;
-                    }
-                }
+    //         if (use_cache || (has_loraA && has_loraB)) {
+    //             ggml_tensor* base_t = model_tensors[base_name];
+    //             if (!warned) {
+    //                 if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
+    //                     logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+    //                     warned = true;
+    //                 }
+    //             }
                 
-                if (use_cache) {
-                    if (base_t->ne[0] != lora_tensor->ne[0] || base_t->ne[1] != lora_tensor->ne[1]) {
-                        logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
-                        return false;
-                    }
-                } else {
-                    auto* loraA_t = lora_tensors[loraA_str];
-                    auto* loraB_t = lora_tensors[loraB_str];
-                    if (base_t->ne[0] != loraA_t->ne[1] || base_t->ne[1] != loraB_t->ne[1]) {
-                        logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", loraA_t->ne[1], ")", " are you sure that this adapter is for this model?\n");
-                        return false;
-                    }
-                }
+    //             if (use_cache) {
+    //                 if (base_t->ne[0] != lora_tensor->ne[0] || base_t->ne[1] != lora_tensor->ne[1]) {
+    //                     logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
+    //                     return false;
+    //                 }
+    //             } else {
+    //                 auto* loraA_t = lora_tensors[loraA_str];
+    //                 auto* loraB_t = lora_tensors[loraB_str];
+    //                 if (base_t->ne[0] != loraA_t->ne[1] || base_t->ne[1] != loraB_t->ne[1]) {
+    //                     logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", loraA_t->ne[1], ")", " are you sure that this adapter is for this model?\n");
+    //                     return false;
+    //                 }
+    //             }
 
-                auto* r = adapter_fn(lora_ctx, base_t, lora_tensors, name, loraA_str, loraB_str, scale, use_cache);
+    //             auto* r = adapter_fn(lora_ctx, base_t, lora_tensors, name, loraA_str, loraB_str, scale, use_cache);
 
-                ggml_cgraph gf = ggml_build_forward(r);
-                gf.n_threads = model.threads;
-                ggml_graph_compute(lora_ctx, &gf);
+    //             ggml_cgraph gf = ggml_build_forward(r);
+    //             gf.n_threads = model.threads;
+    //             ggml_graph_compute(lora_ctx, &gf);
                 
-                // we won't need these tensors again, reset the context to save memory
-                ggml_free(lora_ctx);
-                lora_ctx = ggml_init(params);
-                lora_tensors.clear();
+    //             // we won't need these tensors again, reset the context to save memory
+    //             ggml_free(lora_ctx);
+    //             lora_ctx = ggml_init(params);
+    //             lora_tensors.clear();
 
-                n_tensors++;
-                if (n_tensors % 4 == 0) fprintf(stderr, ".");
-            }
+    //             n_tensors++;
+    //             if (n_tensors % 4 == 0) fprintf(stderr, ".");
+    //         }
 
 
 
-        }
-        ggml_free(lora_ctx);
-        fprintf(stderr, "\n");
+    //     }
+    //     ggml_free(lora_ctx);
+    //     fprintf(stderr, "\n");
 
-        if (is_detach) model.attached_lora_path = "";
-        else model.attached_lora_path = filepath;
-        return true;
-    }
+    //     if (is_detach) model.attached_lora_path = "";
+    //     else model.attached_lora_path = filepath;
+    //     return true;
+    // }
 
     bool Model::attach_lora(std::string_view filepath) {
         using namespace literals;
@@ -930,36 +917,37 @@ namespace fastllama {
             return false;
         }
         logger.log(__func__, "attaching LoRa model from ", filepath, ". Please wait ...\n");
-        return attach_or_detach_lora_helper(
-            filepath,
-            *this,
-            [](
-                ggml_context* ctx,
-                ggml_tensor* base_t,
-                std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-                std::string const& lora_name,
-                std::string const& loraA_str,
-                std::string const& loraB_str,
-                float scale,
-                bool use_cache
-            ) {
-            ggml_tensor* lora_t = nullptr;
-            if (use_cache) {
-                lora_t = lora_tensors[lora_name];
-            } else {
-                auto loraA = lora_tensors[loraA_str];
-                auto loraB = lora_tensors[loraB_str];
-                // BA matrix
-                lora_t = ggml_mul_mat(ctx, loraA, loraB);
-                if (scale != 1.f) {
-                    ggml_tensor* factor = ggml_new_f32(ctx, scale);
-                    lora_t = ggml_scale(ctx, lora_t, factor);
-                }
-            }
+        return false;
+        // return attach_or_detach_lora_helper(
+        //     filepath,
+        //     *this,
+        //     [](
+        //         ggml_context* ctx,
+        //         ggml_tensor* base_t,
+        //         std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
+        //         std::string const& lora_name,
+        //         std::string const& loraA_str,
+        //         std::string const& loraB_str,
+        //         float scale,
+        //         bool use_cache
+        //     ) {
+        //     ggml_tensor* lora_t = nullptr;
+        //     if (use_cache) {
+        //         lora_t = lora_tensors[lora_name];
+        //     } else {
+        //         auto loraA = lora_tensors[loraA_str];
+        //         auto loraB = lora_tensors[loraB_str];
+        //         // BA matrix
+        //         lora_t = ggml_mul_mat(ctx, loraA, loraB);
+        //         if (scale != 1.f) {
+        //             ggml_tensor* factor = ggml_new_f32(ctx, scale);
+        //             lora_t = ggml_scale(ctx, lora_t, factor);
+        //         }
+        //     }
             
-            // W = W + BA * scale
-            return ggml_add_inplace(ctx, base_t, lora_t);
-        }, __func__, false);
+        //     // W = W + BA * scale
+        //     return ggml_add_inplace(ctx, base_t, lora_t);
+        // }, __func__, false);
     }
 
     bool Model::detach_lora() {
@@ -970,38 +958,38 @@ namespace fastllama {
 
         logger.log(__func__, "detaching LoRa model from ", attached_lora_path, ". Please wait ...\n");
         
-        return attach_or_detach_lora_helper(
-            attached_lora_path,
-            *this,
-            [](
-                ggml_context* ctx,
-                ggml_tensor* base_t,
-                std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-                std::string const& lora_name,
-                std::string const& loraA_str,
-                std::string const& loraB_str,
-                float scale,
-                bool use_cache
-            ) {
-            ggml_tensor* lora_t = nullptr;
-            ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
-            if (use_cache) {
-                lora_t = lora_tensors[lora_name];
-            } else {
-                auto loraA = lora_tensors[loraA_str];
-                auto loraB = lora_tensors[loraB_str];
-                // BA matrix
-                lora_t = ggml_mul_mat(ctx, loraA, loraB);
-            }
+        // return attach_or_detach_lora_helper(
+        //     attached_lora_path,
+        //     *this,
+        //     [](
+        //         ggml_context* ctx,
+        //         ggml_tensor* base_t,
+        //         std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
+        //         std::string const& lora_name,
+        //         std::string const& loraA_str,
+        //         std::string const& loraB_str,
+        //         float scale,
+        //         bool use_cache
+        //     ) {
+        //     ggml_tensor* lora_t = nullptr;
+        //     ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
+        //     if (use_cache) {
+        //         lora_t = lora_tensors[lora_name];
+        //     } else {
+        //         auto loraA = lora_tensors[loraA_str];
+        //         auto loraB = lora_tensors[loraB_str];
+        //         // BA matrix
+        //         lora_t = ggml_mul_mat(ctx, loraA, loraB);
+        //     }
 
-            ggml_tensor* inv_add = ggml_scale(ctx, lora_t, factor);
-            // W = W - BA * scale
-            return ggml_add_inplace(ctx, base_t, inv_add);
-        }, __func__, true);
+        //     ggml_tensor* inv_add = ggml_scale(ctx, lora_t, factor);
+        //     // W = W - BA * scale
+        //     return ggml_add_inplace(ctx, base_t, inv_add);
+        // }, __func__, true);
 
-        // Why is the sun flat?
 
-        return true;
+
+        return false;
     }
 
     bool Model::reset() noexcept {

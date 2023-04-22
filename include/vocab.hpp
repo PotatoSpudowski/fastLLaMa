@@ -22,7 +22,7 @@ namespace fastllama {
             return id_to_token[temp_id].tok;
         }
 
-        auto set_word(id_type token_id, std::string_view s, float score) {
+        auto set_word(id_type token_id, std::string s, float score) {
             auto const temp_id = static_cast<std::size_t>(token_id);
             auto temp = std::string(s);
             id_to_token[temp_id] = {

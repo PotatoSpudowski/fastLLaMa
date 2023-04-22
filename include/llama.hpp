@@ -28,6 +28,7 @@ namespace fastllama {
         MOSTLY_Q4_1_SOME_F16 = 4, // tok_embeddings.weight and output.weight are F16
         MOSTLY_Q4_2 = 5,  // except 1d tensors
         MOSTLY_Q4_3 = 6,  // except 1d tensors
+        SIZE
     };
 
     enum class MagicKind : std::uint32_t {
@@ -225,7 +226,7 @@ namespace fastllama {
         FileVersion file_version{ FileVersion::GGML };
     };
 
-    bool quantize(std::string_view in_filepath, std::string_view out_filepath, int itype);
+    bool quantize(std::string_view in_filepath, std::string_view out_filepath, FType ftype, int threads);
 
     constexpr std::string_view to_string_view(FType ftype) noexcept {
         switch (ftype) {
@@ -241,13 +242,6 @@ namespace fastllama {
     }
 
 } // namespace fastllama
-
-
-#include <ostream>
-
-std::ostream& operator<<(std::ostream& os, fastllama::FType const& ftype) {
-    return os << fastllama::to_string_view(ftype);
-}
 
 #endif // FAST_LLAMA_LLAMA_HPP
 
