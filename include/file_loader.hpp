@@ -485,7 +485,7 @@ namespace fastllama {
             }
 
             FAST_LLAMA_ASSERT(tensor, "failed to create tensor");
-            tl.ggml_tensor = tensor;
+            tl.tensor = tensor;
             ++num_of_ggml_tensors_created;
             return tensor;
         }
@@ -520,10 +520,10 @@ namespace fastllama {
                     logger->progress(done_size, data_size);
                 }
 
-                FAST_LLAMA_ASSERT(tl.ggml_tensor, "tensor not created");
-                tl.data = static_cast<std::uint8_t*>(tl.ggml_tensor->data);
+                FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
+                tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
                 load_data_for(tl);
-                tl.ggml_tensor->data = reinterpret_cast<void*>(tl.data);
+                tl.tensor->data = reinterpret_cast<void*>(tl.data);
                 done_size += tl.size;
 
                 if (use_mmap && lmlock) {

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cmath>
 #include <thread>
+#include <mutex>
 #include "file_loader.hpp"
 
 namespace fastllama {

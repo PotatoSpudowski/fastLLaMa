@@ -60,7 +60,7 @@ namespace fastllama {
         SplitType                   split_type{SplitType::None};
         std::vector<std::uint32_t>  extents;
         std::size_t                 size{0};
-        ggml_tensor*                ggml_tensor{nullptr};
+        ggml_tensor*                tensor{nullptr};
         std::uint8_t*               data{nullptr};
 
         TensorLoader(std::string_view name)
@@ -169,13 +169,13 @@ namespace fastllama {
         std::unordered_map<std::string, std::size_t> tensor_names;
 
         auto operator[](std::size_t k) const noexcept -> ggml_tensor* {
-            return tensors[k].ggml_tensor;
+            return tensors[k].tensor;
         }
 
         auto operator[](std::string_view k) const noexcept -> ggml_tensor* {
             auto it = tensor_names.find(std::string(k));
             if (it == tensor_names.end()) return nullptr;
-            return tensors[it->second].ggml_tensor;
+            return tensors[it->second].tensor;
         }
 
         auto operator[](std::string const& k) -> ggml_tensor*& {
@@ -183,9 +183,9 @@ namespace fastllama {
             if (it == tensor_names.end()) {
                 tensors.emplace_back(nullptr);
                 tensor_names[k] = tensors.size() - 1;
-                return tensors.back().ggml_tensor;
+                return tensors.back().tensor;
             };
-            return tensors[it->second].ggml_tensor;
+            return tensors[it->second].tensor;
         }
 
         auto contains(char const* data) const noexcept -> bool {
@@ -201,7 +201,7 @@ namespace fastllama {
         auto make_tensors_by_name() -> std::unordered_map<std::string, ggml_tensor*> {
             std::unordered_map<std::string, ggml_tensor*> ret;
             for (auto const& [k, v] : tensor_names) {
-                ret[k] = tensors[v].ggml_tensor;
+                ret[k] = tensors[v].tensor;
             }
             return ret;
         }
