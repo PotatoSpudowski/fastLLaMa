@@ -13,7 +13,6 @@ def stream_token(x: str) -> None:
     print(x, end='', flush=True)
 
 model = Model(
-        id=ModelKind.LLAMA_7B,
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model

@@ -29,7 +29,6 @@ class MyLogger(Logger):
         
 
 model = Model(
-        id=ModelKind.ALPACA_LORA_7B,
         path=MODEL_PATH, #path to model
         num_threads=16, #number of threads to use
         n_ctx=512, #context size of model

@@ -3,6 +3,9 @@
 
 import os
 import json
+import threading
+import time
+import argparse
 
 import torch
 from peft import PeftModel, LoraConfig
@@ -14,10 +17,56 @@ assert (
 ), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
 from transformers import LlamaTokenizer, LlamaForCausalLM
 
-tokenizer = LlamaTokenizer.from_pretrained("PATH TO THE MODEL HERE")
+parser = argparse.ArgumentParser(description="Load and save the ALPACA-LORA model.")
+parser.add_argument("--weights", type=str, choices=["7B", "13B", "30B"], required=True, help="Select the weights for the model (7B, 13B, or 30B).")
+parser.add_argument("--base", type=str, required=True)
+parser.add_argument("--lora", type=str, required=True)
+args = parser.parse_args()
+
+params_map = {
+    "7B": {
+        "dim": 4096,
+        "multiple_of": 256,
+        "n_heads": 32,
+        "n_layers": 32,
+        "norm_eps": 1e-06,
+        "vocab_size": -1,
+    },
+    "13B": {
+        "dim": 5120,
+        "multiple_of": 256,
+        "n_heads": 40,
+        "n_layers": 40,
+        "norm_eps": 1e-06,
+        "vocab_size": -1,
+    },
+    "30B": {
+        "dim": 6656,
+        "multiple_of": 256,
+        "n_heads": 52,
+        "n_layers": 60,
+        "norm_eps": 1e-06,
+        "vocab_size": -1,
+    },
+}
+
+def monitor_file_size(file_path, stop_event):
+    while not stop_event.is_set():
+        file_size = os.path.getsize(file_path)
+        file_size_gb = file_size / (1024 ** 3)
+        print(f"File size: {file_size_gb:.2f} GB")
+        time.sleep(5)  # Check the file size every 5 seconds
+
+stop_event = threading.Event()
+
+params = params_map[args.weights]
+base_model = args.base
+lora_adapter = args.lora
+
+tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
 base_model = LlamaForCausalLM.from_pretrained(
-    "PATH TO THE MODEL HERE",
+    base_model,
     load_in_8bit=False,
     torch_dtype=torch.float16,
     device_map={"": "cpu"},
@@ -25,7 +74,7 @@ base_model = LlamaForCausalLM.from_pretrained(
 
 lora_model = PeftModel.from_pretrained(
     base_model,
-    "PATH TO THE LORA MODEL HERE",
+    lora_adapter,
     device_map={"": "cpu"},
     torch_dtype=torch.float16,
 )
@@ -38,36 +87,6 @@ for layer in lora_model.base_model.model.model.layers:
 lora_model.train(False)
 
 lora_model_sd = lora_model.state_dict()
-
-# 7B
-# params = {
-#     "dim": 4096,
-#     "multiple_of": 256,
-#     "n_heads": 32,
-#     "n_layers": 32,
-#     "norm_eps": 1e-06,
-#     "vocab_size": -1,
-# }
-
-# 13B
-# params = {
-#     "dim": 5120,
-#     "multiple_of": 256,
-#     "n_heads": 40,
-#     "n_layers": 40,
-#     "norm_eps": 1e-06,
-#     "vocab_size": -1,
-# }
-
-# # 30B
-params = {
-    "dim": 6656,
-    "multiple_of": 256,
-    "n_heads": 52,
-    "n_layers": 60,
-    "norm_eps": 1e-06,
-    "vocab_size": -1,
-}
 
 n_layers = params["n_layers"]
 n_heads = params["n_heads"]
@@ -135,9 +154,22 @@ for k, v in lora_model_sd.items():
         else:
             new_state_dict[new_k] = v
 
-os.makedirs("models/ALPACA-LORA-30B", exist_ok=True)
+def save_model(new_state_dict, params, save_path):
+    os.makedirs(save_path, exist_ok=True)
+    torch.save(new_state_dict, f"{save_path}/consolidated.00.pth")
 
-torch.save(new_state_dict, "models/ALPACA-LORA-30B/consolidated.00.pth")
+    with open(f"{save_path}/params.json", "w") as f:
+        json.dump(params, f)
 
-with open("models/ALPACA-LORA-30B/params.json", "w") as f:
+save_path = f"models/ALPACA-LORA-{args.weights}"
+os.makedirs(f"models/ALPACA-LORA-{args.weights}", exist_ok=True)
+
+print("Saving model...")
+monitor_thread = threading.Thread(target=monitor_file_size, args=(f"{save_path}/consolidated.00.pth", stop_event))
+monitor_thread.start()
+
+torch.save(new_state_dict, f"models/ALPACA-LORA-{args.weights}/consolidated.00.pth")
+stop_event.set()
+monitor_thread.join()
+with open(f"models/ALPACA-LORA-{args.weights}/params.json", "w") as f:
     json.dump(params, f)
