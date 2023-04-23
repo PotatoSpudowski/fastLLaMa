@@ -717,7 +717,6 @@ namespace fastllama {
         struct LoraTensor{
             ggml_tensor* a{nullptr};
             ggml_tensor* b{nullptr};
-            ggml_tensor* cached_tensor{nullptr};
         };
 
         std::unordered_map<std::string, LoraTensor> lora_tensors;
@@ -748,7 +747,7 @@ namespace fastllama {
 
             auto const base_name = name.substr(0, pos);
 
-            if (!model.tensor_by_name.count(base_name)) {
+            if (model.tensor_by_name.count(base_name) == 0) {
                 logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
                 return false;
             }
@@ -759,17 +758,16 @@ namespace fastllama {
             }
             
             // Construct the lora tensor
-            auto* lora_tensor = model_loader.get_tensor_for(lora_tl);
+            auto* current_lora_tensor = model_loader.get_tensor_for(lora_tl);
             // Loads the tensor into the memory
             model_loader.load_lora_adapter_for(lora_tl);
             
             auto& temp_lora_tensor = lora_tensors[base_name];
-            temp_lora_tensor.cached_tensor = use_cache ? lora_tensor : nullptr;
-            temp_lora_tensor.a = name.back() == 'A' ? lora_tensor : temp_lora_tensor.a;
-            temp_lora_tensor.b = name.back() == 'B' ? lora_tensor : temp_lora_tensor.b;
+            temp_lora_tensor.a = name.back() == 'A' ? current_lora_tensor : temp_lora_tensor.a;
+            temp_lora_tensor.b = name.back() == 'B' ? current_lora_tensor : temp_lora_tensor.b;
 
-            auto loraA_tensor = use_cache ? temp_lora_tensor.cached_tensor : temp_lora_tensor.a;
-            auto loraB_tensor = use_cache ? temp_lora_tensor.cached_tensor : temp_lora_tensor.b;
+            auto loraA_tensor = use_cache ? current_lora_tensor : temp_lora_tensor.a;
+            auto loraB_tensor = use_cache ? current_lora_tensor : temp_lora_tensor.b;
 
             auto has_loraA = use_cache ? true : loraA_tensor != nullptr;
             auto has_loraB = use_cache ? true : loraB_tensor != nullptr;
@@ -785,11 +783,11 @@ namespace fastllama {
                 }
 
                 if (use_cache) {
-                    if (base_tensor->ne[0] != lora_tensor->ne[0] || base_tensor->ne[1] != lora_tensor->ne[1]) {
-                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
+                    if (base_tensor->ne[0] != current_lora_tensor->ne[0] || base_tensor->ne[1] != current_lora_tensor->ne[1]) {
+                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", current_lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
-                    data_loaded += ggml_nelements(lora_tensor);
+                    data_loaded += ggml_nelements(current_lora_tensor);
                 } else {
                     if (base_tensor->ne[0] != loraA_tensor->ne[1] || base_tensor->ne[1] != loraB_tensor->ne[1]) {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
@@ -798,7 +796,7 @@ namespace fastllama {
                     data_loaded += ggml_nelements(loraA_tensor) + ggml_nelements(loraB_tensor);
                 }
 
-                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor, loraB_tensor));
+                ggml_tensor* BA = (use_cache ? current_lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor, loraB_tensor));
 
                 auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BA, scale, use_cache);
 
