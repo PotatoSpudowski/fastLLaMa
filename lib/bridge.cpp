@@ -162,19 +162,17 @@ namespace fastllama {
 
         if (len + n_past <= m_model.params.n_ctx) return false;
 
-        auto const remaining = static_cast<std::size_t>(n_past - std::min(m_keep, n_past));
-
-        n_past = m_keep;
-        auto const system_prompt_size = static_cast<std::ptrdiff_t>(m_system_prompt.size());
         auto last_tokens_len = m_last_n_tokens.size();
-        auto n_ctx = static_cast<std::size_t>(m_model.params.n_ctx);
-        auto last_tokens_begin_pos = std::max(
-            n_ctx + (remaining >> 1) - std::min(len, n_ctx),
-            last_tokens_len
-        );
-        auto insert_text_size = len + system_prompt_size;
-        auto insert_len = (last_tokens_len < len ?  last_tokens_len : last_tokens_len - len);
-        m_embd.insert(m_embd.begin(), m_last_n_tokens.begin() + last_tokens_begin_pos, m_last_n_tokens.begin() + insert_len);
+        auto const remaining = static_cast<std::size_t>(n_past - std::min(m_keep, n_past));
+        auto const last_token_begin_pos_for_remaining = (last_tokens_len - std::min(remaining >> 1, last_tokens_len));
+        n_past = m_keep;
+
+        if (last_token_begin_pos_for_remaining < m_system_prompt.size()) {
+            m_embd.insert(m_embd.begin(), m_system_prompt.begin(), m_system_prompt.end());
+            return true;
+        }
+
+        m_embd.insert(m_embd.begin(), m_last_n_tokens.end() - last_token_begin_pos_for_remaining, m_last_n_tokens.end());
         m_embd.insert(m_embd.begin(), m_system_prompt.begin(), m_system_prompt.end());
         return true;
     }
