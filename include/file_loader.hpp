@@ -126,7 +126,7 @@ namespace fastllama {
                 }
             }
 
-            if (magic_kind == MagicKind::GGLA && file_version == FileVersion::GGJT_V1) {
+            if (magic_kind == MagicKind::GGLA && file_version == FileVersion::GGMF_V1) {
                 version = FileVersion::GGJT_V1;
                 return true;
             } else if (magic_kind == MagicKind::GGML && file_version == FileVersion::GGML) {
@@ -141,7 +141,7 @@ namespace fastllama {
             }
 
             char buff[256];
-            logger->log_err(__func__, format_str(buff, "unknown (magic, version) combination: %08x, %08x; is this really a GGML file?",
+            logger->log_err(__func__, format_str(buff, "unknown (magic, version) combination: %08x, %08x; is this really a GGML file?\n",
                         magic, static_cast<std::uint32_t>(file_version)));
             return false;
         }
