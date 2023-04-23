@@ -724,15 +724,15 @@ namespace fastllama {
 
         bool warned{false};
 
-        for(auto const& [name, tid] : model_loader.tensors_map.tensor_names) {
-
-            model_loader.mem_ctx = MemContext(buffer);
-            
-            auto& lora_tl = model_loader.tensors_map.tensors[tid];
+        for(auto& lora_tl : model_loader.tensors_map.tensors) {
+            if (!model_loader.mem_ctx) {
+                model_loader.mem_ctx = MemContext(buffer);
+            }
             
             static std::string_view lora_suffixes[] = { ".lora" };
 
             auto has_lora_suffix = false;
+            auto name = lora_tl.name;
             auto pos = name.rfind(lora_suffixes[0]);
             // cached matrix has no type marker
             auto suffix_start_pos = name.size() - lora_suffixes[0].size() - (use_cache ? 0 : 1);
@@ -757,6 +757,7 @@ namespace fastllama {
             
             // Construct the lora tensor
             auto* current_lora_tensor = model_loader.get_tensor_for(lora_tl);
+            
             // Loads the tensor into the memory
             model_loader.load_lora_adapter_for(lora_tl);
             
@@ -779,9 +780,9 @@ namespace fastllama {
                     warned = true;
                 }
             }
-
+            
             if (has_loraA && has_loraB) {
-                auto* base_tensor = model.tensor_by_name[base_name];
+                auto* base_tensor = model.tensor_by_name[base_name];;
                 
                 if (use_cache) {
                     if (base_tensor->ne[0] != current_lora_tensor->ne[0] || base_tensor->ne[1] != current_lora_tensor->ne[1]) {
@@ -803,6 +804,9 @@ namespace fastllama {
                 gf.n_threads = model.threads;
                 ggml_graph_compute(model_loader.mem_ctx, &gf);
                 
+                // why is the sun flat?
+
+                model_loader.mem_ctx.free();
             }
 
             data_loaded += ggml_nelements(current_lora_tensor);

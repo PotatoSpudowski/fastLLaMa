@@ -235,13 +235,11 @@ namespace fastllama {
 
                 std::size_t idx{};
 
-                auto it = tensors_map.tensor_names.find(name);
-                if (it == tensors_map.tensor_names.end()) {
-                    tensors_map.tensors.emplace_back(name);
-                    idx = tensors_map.tensors.size() - 1;
-                    tensors_map.tensor_names[name] = idx;
+                auto [possible_id, query_result] = tensors_map.find_map_entry(name);
+                if (!query_result) {
+                    idx = tensors_map.insert(std::move(name));
                 } else {
-                    idx = it->second;
+                    idx = possible_id;
                 }
 
                 tensors_map.tensors[idx].shards.push_back(shard);
@@ -380,7 +378,7 @@ namespace fastllama {
         std::vector<FileLoader>         file_loaders;
         TensorsMapping                  tensors_map;
         std::size_t                     num_of_ggml_tensors_created{};
-        MemContext                      mem_ctx;
+        MemContext                      mem_ctx{};
         std::unique_ptr<MMappedFile>    mmapped_file{nullptr};
         Logger const*                   logger;
 
@@ -441,14 +439,14 @@ namespace fastllama {
         }
 
         auto guess_num_of_files() noexcept -> std::uint32_t {
-            auto it = tensors_map.tensor_names.find("tok_embeddings.weight");
-            if (it == tensors_map.tensor_names.end()) {
+            auto [idx, query_result] = tensors_map.find_map_entry("tok_embeddings.weight");
+            if (!query_result) {
                 logger->log_err(__func__, "tok_embeddings.weight not found\n");
                 is_load_failed = true;
                 return 0;
             }
 
-            auto& tensor_loader = tensors_map.tensors[it->second];
+            auto& tensor_loader = tensors_map.tensors[idx];
             return file_loaders[0].hyperparams.n_embd / tensor_loader.shards[0].extents[0];
         }
 

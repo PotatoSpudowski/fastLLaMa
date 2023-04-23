@@ -168,6 +168,19 @@ namespace fastllama {
         std::vector<TensorLoader> tensors;
         std::unordered_map<std::string, std::size_t> tensor_names;
 
+        auto insert(std::string name) -> std::size_t {
+            auto id = tensors.size();
+            tensors.emplace_back(name);
+            tensor_names[std::move(name)] = id;
+            return id;
+        }
+
+        auto find_map_entry(std::string_view name) noexcept -> std::pair<std::size_t, bool> {
+            auto it = tensor_names.find(name.data());
+            if (it == tensor_names.end()) return { 0, false };
+            return { it->second, true };
+        }
+
         auto operator[](std::size_t k) const noexcept -> ggml_tensor* {
             return tensors[k].tensor;
         }
@@ -201,7 +214,7 @@ namespace fastllama {
         auto make_tensors_by_name() -> std::unordered_map<std::string, ggml_tensor*> {
             std::unordered_map<std::string, ggml_tensor*> ret;
             for (auto const& [k, v] : tensor_names) {
-                ret[k] = tensors[v].tensor;
+                ret[std::string(k)] = tensors[v].tensor;
             }
             return ret;
         }

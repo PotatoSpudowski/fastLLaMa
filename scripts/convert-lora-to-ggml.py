@@ -136,12 +136,11 @@ def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = Fa
         (tensor_name, type) = translate_tensor_name(k)
 
         if no_cache:
-            v = v * scale
             if type == 'A':
-                """Scale the A matrix to cut runtime cost of scaling"""
-                tensor_map[f'{tensor_name}{type}'] = (v * scale, type)
+                """Pre-compute the matrix and scale product to save time later"""
+                tensor_map[f'{tensor_name}A'] = (v * scale, type)
             else:
-                tensor_map[f'{tensor_name}{type}'] = (v, type)
+                tensor_map[f'{tensor_name}B'] = (v, type)
         else:
             if tensor_name in tensor_map:
                 (old_tensor, old_type) = tensor_map[tensor_name]
