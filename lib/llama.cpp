@@ -252,6 +252,7 @@ namespace fastllama {
         if (model_loader.is_load_failed) return false;
 
         mapping = std::move(model_loader.mmapped_file);
+        use_mmap = model_loader.use_mmap;
 
         this->is_valid = true;
         return true;
@@ -680,6 +681,11 @@ namespace fastllama {
             float,
             bool
         >);
+
+        if (model.use_mmap) {
+            model.logger.log_err(func_name, "cannot attach/detach lora to mmaped model\n");
+            return false;
+        }
 
         auto const& logger = model.logger;
 
