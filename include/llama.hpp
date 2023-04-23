@@ -67,8 +67,8 @@ namespace fastllama {
     };
 
     struct LoraAdapterParams {
-        std::uint32_t r;
-        std::uint32_t alpha;
+        std::uint32_t r{1};
+        std::uint32_t alpha{1};
         bool use_cache_matrix{false};
 
         constexpr float get_scale() const noexcept {

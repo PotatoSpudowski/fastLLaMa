@@ -63,7 +63,7 @@ namespace fastllama {
                 return;
             }
 
-            if (magic_kind != MagicKind::GGLA) {
+            if (!is_lora_adapter()) {
                 if (!read_hyperparams()) {
                     is_failed_to_read = true;
                     return;
@@ -84,6 +84,10 @@ namespace fastllama {
         FileLoader& operator=(FileLoader&&) noexcept = default;
         ~FileLoader() = default;
 
+        constexpr auto is_lora_adapter() const noexcept -> bool {
+            return MagicKind::GGLA == magic_kind;
+        }
+
     private:
 
         auto read_magic_number() noexcept -> bool {
@@ -103,7 +107,6 @@ namespace fastllama {
                 }
             }
 
-
             switch(magic) {
                 case static_cast<std::uint32_t>(MagicKind::GGML):
                     magic_kind = MagicKind::GGML;
@@ -116,15 +119,17 @@ namespace fastllama {
                     break;
                 case static_cast<std::uint32_t>(MagicKind::GGLA):
                     magic_kind = MagicKind::GGLA;
+                    break;
                 default: {
                     logger->log_err(__func__, "invalid model file ", reader.path(), " (bad magic)\n");
                     return false;
                 }
             }
 
-            if (magic_kind == MagicKind::GGLA) return true;
-
-            if (magic_kind == MagicKind::GGML && file_version == FileVersion::GGML) {
+            if (magic_kind == MagicKind::GGLA && file_version == FileVersion::GGJT_V1) {
+                version = FileVersion::GGJT_V1;
+                return true;
+            } else if (magic_kind == MagicKind::GGML && file_version == FileVersion::GGML) {
                 version = FileVersion::GGML;
                 return true;
             } else if (magic_kind == MagicKind::GGMF && file_version == FileVersion::GGMF_V1) {
@@ -175,11 +180,9 @@ namespace fastllama {
         }
 
         auto read_lora_params() noexcept -> bool {
-            lora_adapter_params.use_cache_matrix = reader.read_u8();
-            if (!lora_adapter_params.use_cache_matrix) {
-                lora_adapter_params.r = reader.read_u32();
-                lora_adapter_params.alpha = reader.read_f32();
-            }
+            lora_adapter_params.use_cache_matrix = reader.read_bool();
+            lora_adapter_params.r = reader.read_u32();
+            lora_adapter_params.alpha = reader.read_u32();
             return true;
         }
 
@@ -211,7 +214,7 @@ namespace fastllama {
 
                 reader.read(shard.extents.data(), n_dims);
 
-                std::string name = reader.read_string(name_len);
+                auto name = reader.read_string(name_len);
 
                 if (n_dims < 1 || n_dims > 2) {
                     logger->log_err(__func__, "tensor '", name,"' should not be ", n_dims, "-dimensional\n");
@@ -245,6 +248,7 @@ namespace fastllama {
             }
             return true;
         }
+
     };
 
     struct FileSaver {
@@ -269,7 +273,7 @@ namespace fastllama {
                 return;
             }
 
-            if (loader->magic_kind != MagicKind::GGLA) {
+            if (!loader->is_lora_adapter()) {
                 if (!write_hyperparams()) {
                     is_write_failed = true;
                     return;
@@ -392,7 +396,7 @@ namespace fastllama {
                 return;
             }
 
-            std::uint32_t num_of_files = vocab_only ? 1ul : guess_num_of_files();
+            std::uint32_t num_of_files = (vocab_only || file_loaders[0].is_lora_adapter() ? 1ul : guess_num_of_files());
 
             if (is_load_failed) return;
 
@@ -477,6 +481,7 @@ namespace fastllama {
 
         auto get_tensor_for(TensorLoader& tl) noexcept -> ggml_tensor* {
             ggml_tensor* tensor{nullptr};
+
             if (tl.extents.size() == 2) {
                 tensor = ggml_new_tensor_2d(mem_ctx.get(), tl.type, tl.extents[0], tl.extents[1]);
             } else {
@@ -535,6 +540,15 @@ namespace fastllama {
                 logger->progress(data_size, data_size);
             }
         }
+
+        void load_lora_adapter_for(TensorLoader& tl) {
+            FAST_LLAMA_ASSERT(tl.split_type == SplitType::None, "lora adapter only supports non-split tensors");
+            FAST_LLAMA_ASSERT(tl.extents.size() == 2, "lora adapter only supports matrices");
+            auto& reader = file_loaders[tl.shards[0].file_idx].reader;
+            reader.seek(tl.shards[0].file_off, BinaryFileReader::SeekReference::Begin);
+            reader.read(tl.tensor->data, sizeof(char), tl.size);
+        }
+
 
         void load_data_for(TensorLoader& tl) {
             if (use_mmap) {
