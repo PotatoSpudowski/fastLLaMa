@@ -168,7 +168,10 @@ namespace fastllama {
         n_past = m_keep;
         auto const system_prompt_size = static_cast<std::ptrdiff_t>(m_system_prompt.size());
         auto last_tokens_begin = m_last_n_tokens.begin() + m_model.params.n_ctx + (remaining >> 1) - len;
-        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.end() - len - system_prompt_size);
+        auto last_tokens_len = m_last_n_tokens.size();
+        auto insert_text_size = len + system_prompt_size;
+        auto insert_len =  last_tokens_len < len ?  0 : last_tokens_len - len; 
+        m_embd.insert(m_embd.begin(), last_tokens_begin, m_last_n_tokens.begin() + insert_len);
         m_embd.insert(m_embd.begin(), m_system_prompt.begin(), m_system_prompt.end());
         return true;
     }
