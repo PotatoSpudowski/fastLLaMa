@@ -772,28 +772,27 @@ namespace fastllama {
             auto has_loraA = use_cache ? true : loraAs_tensor != nullptr;
             auto has_loraB = use_cache ? true : loraB_tensor != nullptr;
 
+            if (!warned) {
+                auto* base_tensor = model.tensor_by_name[base_name];
+                if (ggml_is_quantized(base_tensor->type)) {
+                    logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+                    warned = true;
+                }
+            }
+
             if (has_loraA && has_loraB) {
                 auto* base_tensor = model.tensor_by_name[base_name];
                 
-                if (!warned) {
-                    if (ggml_is_quantized(base_tensor->type)) {
-                        logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
-                        warned = true;
-                    }
-                }
-
                 if (use_cache) {
                     if (base_tensor->ne[0] != current_lora_tensor->ne[0] || base_tensor->ne[1] != current_lora_tensor->ne[1]) {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", current_lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
-                    data_loaded += ggml_nelements(current_lora_tensor);
                 } else {
                     if (base_tensor->ne[0] != loraAs_tensor->ne[1] || base_tensor->ne[1] != loraB_tensor->ne[1]) {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraAs_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
-                    data_loaded += ggml_nelements(loraAs_tensor) + ggml_nelements(loraB_tensor);
                 }
 
                 ggml_tensor* BAs = (use_cache ? current_lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraAs_tensor, loraB_tensor));
@@ -804,8 +803,10 @@ namespace fastllama {
                 gf.n_threads = model.threads;
                 ggml_graph_compute(model_loader.mem_ctx, &gf);
                 
-                logger.progress(data_loaded, total_size);
             }
+
+            data_loaded += ggml_nelements(current_lora_tensor);
+            logger.progress(data_loaded, total_size);
             
         }
 
