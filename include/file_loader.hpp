@@ -542,13 +542,11 @@ namespace fastllama {
         }
 
         void load_lora_adapter_for(TensorLoader& tl) {
-            FAST_LLAMA_ASSERT(tl.split_type == SplitType::None, "lora adapter only supports non-split tensors");
             FAST_LLAMA_ASSERT(tl.extents.size() == 2, "lora adapter only supports matrices");
-            auto& reader = file_loaders[tl.shards[0].file_idx].reader;
-            reader.seek(tl.shards[0].file_off, BinaryFileReader::SeekReference::Begin);
-            reader.read(tl.tensor->data, sizeof(char), tl.size);
+            tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
+            load_data_for(tl);
+            tl.tensor->data = reinterpret_cast<void*>(tl.data);
         }
-
 
         void load_data_for(TensorLoader& tl) {
             if (use_mmap) {
