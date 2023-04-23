@@ -675,7 +675,7 @@ namespace fastllama {
         static_assert(std::is_invocable_r_v<
             ggml_tensor*,
             Fn,
-            ggml_context*,
+            MemContext&,
             ggml_tensor*,
             ggml_tensor*,
             float,
@@ -709,7 +709,6 @@ namespace fastllama {
         }
 
         bool use_cache = lora_params.use_cache_matrix;
-        // reader.read(&use_cache);
 
         float scale{lora_params.get_scale()};
         
@@ -759,8 +758,8 @@ namespace fastllama {
                 return false;
             }
 
-            if (use_cache && lora_tl.type != GGML_TYPE_F32) {
-                logger.log_err(func_name, "currently, we support fp16 for cached matrix.\n");
+            if (!use_cache && lora_tl.type != GGML_TYPE_F32) {
+                logger.log_err(func_name, "currently, we support fp16 for uncached matrix.\n");
                 return false;
             }
 
@@ -837,7 +836,7 @@ namespace fastllama {
             filepath,
             *this,
             [](
-                ggml_context* ctx,
+                MemContext& ctx,
                 ggml_tensor* base_t,
                 ggml_tensor* lora_tensor,
                 float scale,
@@ -866,7 +865,7 @@ namespace fastllama {
             attached_lora_path,
             *this,
             [](
-                ggml_context* ctx,
+                MemContext& ctx,
                 ggml_tensor* base_t,
                 ggml_tensor* lora_tensor,
                 float scale,
