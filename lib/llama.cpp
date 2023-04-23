@@ -699,12 +699,12 @@ namespace fastllama {
         
         // Log the lora parameters
         if (!is_detach) {
-            char buff[64];
+            char buff[16];
             logger.log(func_name, "lora_params: \n");
             logger.log(func_name, "   Use cached matrix= ", lora_params.use_cache_matrix ? "Yes" : "No", '\n');
             logger.log(func_name, "   Alpha            = ", lora_params.alpha, '\n');
             logger.log(func_name, "   Rank             = ", lora_params.r, '\n');
-            logger.log(func_name, format_str(buff, "   Scale            = %.2f", lora_params.get_scale()), '\n');
+            logger.log(func_name, "   Scale            = ", format_str(buff, "%.2f", lora_params.get_scale()), '\n');
 
         }
 
@@ -714,13 +714,18 @@ namespace fastllama {
         
         UninitializedBuffer buffer(1_GiB);
 
-        tensor_map_t lora_tensors;
+        struct LoraTensor{
+            ggml_tensor* a{nullptr};
+            ggml_tensor* b{nullptr};
+            ggml_tensor* cached_tensor{nullptr};
+        };
+
+        std::unordered_map<std::string, LoraTensor> lora_tensors;
 
         auto data_loaded = std::size_t{};
         auto total_size = model_loader.total_size_needed_for_the_tensors();
 
         bool warned{false};
-
 
         for(auto const& [name, tid] : model_loader.tensors_map.tensor_names) {
 
@@ -758,16 +763,16 @@ namespace fastllama {
             // Loads the tensor into the memory
             model_loader.load_lora_adapter_for(lora_tl);
             
-            lora_tensors[name] = lora_tensor;
+            auto& temp_lora_tensor = lora_tensors[base_name];
+            temp_lora_tensor.cached_tensor = use_cache ? lora_tensor : nullptr;
+            temp_lora_tensor.a = name.back() == 'A' ? lora_tensor : temp_lora_tensor.a;
+            temp_lora_tensor.b = name.back() == 'B' ? lora_tensor : temp_lora_tensor.b;
 
-            auto loraA_str = base_name + ".loraA";
-            auto loraB_str = base_name + ".loraB";
+            auto loraA_tensor = use_cache ? temp_lora_tensor.cached_tensor : temp_lora_tensor.a;
+            auto loraB_tensor = use_cache ? temp_lora_tensor.cached_tensor : temp_lora_tensor.b;
 
-            auto loraA_tensor = lora_tensors.find(loraA_str);
-            auto loraB_tensor = lora_tensors.find(loraB_str);
-
-            auto has_loraA = use_cache ? true : loraA_tensor != lora_tensors.end();
-            auto has_loraB = use_cache ? true : loraB_tensor != lora_tensors.end();
+            auto has_loraA = use_cache ? true : loraA_tensor != nullptr;
+            auto has_loraB = use_cache ? true : loraB_tensor != nullptr;
 
             if (has_loraA && has_loraB) {
                 auto* base_tensor = model.tensor_by_name[base_name];
@@ -786,14 +791,14 @@ namespace fastllama {
                     }
                     data_loaded += ggml_nelements(lora_tensor);
                 } else {
-                    if (base_tensor->ne[0] != loraA_tensor->second->ne[1] || base_tensor->ne[1] != loraB_tensor->second->ne[1]) {
-                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->second->ne[1], ")", " are you sure that this adapter is for this model?\n");
+                    if (base_tensor->ne[0] != loraA_tensor->ne[1] || base_tensor->ne[1] != loraB_tensor->ne[1]) {
+                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
-                    data_loaded += ggml_nelements(loraA_tensor->second) + ggml_nelements(loraB_tensor->second);
+                    data_loaded += ggml_nelements(loraA_tensor) + ggml_nelements(loraB_tensor);
                 }
 
-                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor->second, loraB_tensor->second));
+                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor, loraB_tensor));
 
                 auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BA, scale, use_cache);
 
@@ -803,8 +808,6 @@ namespace fastllama {
                 
                 logger.progress(data_loaded, total_size);
             }
-
-            // why is the sun flat?
             
         }
 
