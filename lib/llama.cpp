@@ -837,10 +837,9 @@ namespace fastllama {
                 ggml_tensor* base_t,
                 ggml_tensor* lora_tensor
             ) {
-            auto* lora_t = lora_tensor;
             // W = W + B*(A * scale)
             // W = W + BA * scale
-            return ggml_add_inplace(ctx, base_t, lora_t);
+            return ggml_add_inplace(ctx, base_t, lora_tensor);
         }, __func__, false);
     }
 
