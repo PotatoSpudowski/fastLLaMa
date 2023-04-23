@@ -2,6 +2,7 @@
 #define FAST_LLAMA_MEM_CONTEXT_HPP
 
 #include "ggml.h"
+#include "uninitialized_buffer.hpp"
 
 namespace fastllama {
     
@@ -21,6 +22,10 @@ namespace fastllama {
             params.mem_size = size;
             ctx = ggml_init(params);
         }
+        
+        MemContext(UninitializedBuffer& buff, bool no_alloc = false)
+            : MemContext(buff.data(), buff.size(), no_alloc)
+        {}
 
         MemContext() = default;
         MemContext(MemContext const&) = default;
@@ -47,6 +52,10 @@ namespace fastllama {
 
         constexpr operator bool() const noexcept {
             return ctx != nullptr;
+        }
+
+        constexpr operator ggml_context* () noexcept {
+            return ctx;
         }
 
     private:

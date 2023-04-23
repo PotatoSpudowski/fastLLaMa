@@ -11,6 +11,7 @@
 #include <thread>
 #include <mutex>
 #include "file_loader.hpp"
+#include "utils.hpp"
 
 namespace fastllama {
 
@@ -43,9 +44,7 @@ namespace fastllama {
 
         auto const total_kv_size = ggml_nbytes(this->k) + ggml_nbytes(this->v);
 
-        char buff[20] = {0};
-
-        logger.log("KVCacheBuffer::init", "kv self size  = ", format_str(buff, "%7.2f", static_cast<float>(total_kv_size / 1.0_MiB)), " MB\n");
+        logger.log("KVCacheBuffer::init", "kv self size  = ", dyn_humanize_size(total_kv_size), "\n");
         
         return true;
     }
@@ -161,7 +160,7 @@ namespace fastllama {
 
         char buff[32];
 
-        logger.log("Model", "ggml ctx size = ", format_str(buff, "%6.2f KB", static_cast<float>(ctx_size / 1.0_KiB)), '\n');
+        logger.log("Model", "ggml ctx size = ", humanize_size(buff, ctx_size), '\n');
 
         // Initialize compute buffers
         {
@@ -185,9 +184,7 @@ namespace fastllama {
 
             auto const mem_required_state = scale * model_id.config.mem_required_for_kv_self_buff;
 
-            char buff[256];
-            auto str = format_str(buff, "mem required  = %7.2f MB (+ %7.2f MB per state)\n", static_cast<float>(mem_required / 1.0_MiB), static_cast<float>(mem_required_state / 1.0_MiB));
-            logger.log("Model", str);
+            logger.log("Model", "mem required  = ", dyn_humanize_size(mem_required)," (+ ", dyn_humanize_size(mem_required_state) ," per state)\n");
         }
         
         // Set the ggml context
@@ -287,7 +284,7 @@ namespace fastllama {
 
         ggml_context * ctx0 = ggml_init(mem_params);
         ggml_cgraph gf{};
-        gf.n_threads = (N >= 32 && ggml_cpu_has_blas() ? 1 : threads);
+        gf.n_threads = (N >= 32 && (ggml_cpu_has_blas() || ggml_cpu_has_cublas()) ? 1 : threads);
 
         ggml_tensor* embd = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, N);
         std::copy_n(embd_inp.begin(), N, static_cast<vocab_id*>(embd->data));
@@ -696,12 +693,12 @@ namespace fastllama {
         
         // Log the lora parameters
         if (!is_detach) {
-            
+            char buff[256];
             logger.log(func_name, "lora_params: \n");
-            logger.log(func_name, "   use_cache_matrix = ", lora_params.use_cache_matrix ? "Yes" : "No", '\n');
-            logger.log(func_name, "   alpha            = ", lora_params.alpha, '\n');
-            logger.log(func_name, "   r                = ", lora_params.r, '\n');
-            logger.log(func_name, "   scale            = ", lora_params.get_scale(), '\n');
+            logger.log(func_name, "   Use cached matrix= ", lora_params.use_cache_matrix ? "Yes" : "No", '\n');
+            logger.log(func_name, "   Alpha            = ", lora_params.alpha, '\n');
+            logger.log(func_name, "   Rank             = ", lora_params.r, '\n');
+            logger.log(func_name, format_str(buff, "   Scale            = %.2f", lora_params.get_scale()), '\n');
 
         }
 
@@ -711,13 +708,12 @@ namespace fastllama {
         float scale{lora_params.get_scale()};
         
         UninitializedBuffer buffer(1_GiB);
-        UninitializedBuffer buffer2(1_GiB);
 
         tensor_map_t lora_tensors;
         tensor_map_t model_tensors = model.tensor_by_name;
 
         auto n_tensors = std::size_t{};
-        auto total_size = model_loader.tensors_map.tensors.size();
+        auto total_size = model_loader.tensors_map.tensors.size() / (use_cache ? 1 : 2);
 
         bool warned{false};
 
@@ -725,7 +721,7 @@ namespace fastllama {
 
         for(auto const& [name, tid] : model_loader.tensors_map.tensor_names) {
 
-            model_loader.mem_ctx = MemContext(buffer.data(), buffer.size(), false);
+            model_loader.mem_ctx = MemContext(buffer);
             
             auto& lora_tl = model_loader.tensors_map.tensors[tid];
             
@@ -764,7 +760,6 @@ namespace fastllama {
 
             auto* lora_tensor = model_loader.get_tensor_for(lora_tl);
             model_loader.load_lora_adapter_for(lora_tl);
-
             
             lora_tensors[name] = lora_tensor;
 
@@ -799,18 +794,23 @@ namespace fastllama {
                     }
                 }
 
-                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx.get(), loraA_tensor->second, loraB_tensor->second));
+                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor->second, loraB_tensor->second));
 
-                auto* r = adapter_fn(model_loader.mem_ctx.get(), base_tensor, BA, scale, use_cache);
+                auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BA, scale, use_cache);
 
                 ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = model.threads;
-                ggml_graph_compute(model_loader.mem_ctx.get(), &gf);
+                ggml_graph_compute(model_loader.mem_ctx, &gf);
 
+                n_tensors++;
+                logger.progress(n_tensors, total_size);
             }
             
-            n_tensors++;
-            logger.progress(n_tensors, total_size);
+        }
+
+        if (!model_loader.done_getting_tensors()) {
+            logger.log_err(func_name, "failed to load all tensors\n");
+            return false;
         }
 
         fprintf(stderr, "\n");
@@ -834,16 +834,17 @@ namespace fastllama {
                 ggml_context* ctx,
                 ggml_tensor* base_t,
                 ggml_tensor* lora_tensor,
-                [[maybe_unused]] float scale,
+                float scale,
                 bool use_cache
             ) {
-            if (!use_cache && scale != 1.f) {
+            auto* lora_t = lora_tensor;
+            if (!use_cache && (scale != 1.f)) {
                 ggml_tensor* factor = ggml_new_f32(ctx, scale);
-                lora_tensor = ggml_scale(ctx, lora_tensor, factor);
+                lora_t = ggml_scale(ctx, lora_tensor, factor);
             }
             
             // W = W + BA * scale
-            return ggml_add_inplace(ctx, base_t, lora_tensor);
+            return ggml_add_inplace(ctx, base_t, lora_t);
         }, __func__, false);
     }
 
