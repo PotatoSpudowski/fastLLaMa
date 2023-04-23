@@ -132,7 +132,7 @@ namespace fastllama {
 
         void progress(std::size_t done, std::size_t total) const {
             if (!m_sink.progress) return;
-            m_sink.progress(done, total);
+            m_sink.progress(std::min(done, total), total);
         }
     private:
         DefaultLogger m_sink{};
