@@ -670,206 +670,160 @@ namespace fastllama {
         return true;
     }
 
-    // template<typename Fn>
-    // inline static bool attach_or_detach_lora_helper(std::string_view filepath, Model& model, Fn&& adapter_fn, const char* func_name, bool is_detach = false) {
-    //     using tensor_map_t = std::unordered_map<std::string, ggml_tensor*>;
-    //     static_assert(std::is_invocable_r_v<
-    //         ggml_tensor*,
-    //         Fn,
-    //         ggml_context*,
-    //         ggml_tensor*,
-    //         tensor_map_t&,
-    //         std::string const&,
-    //         std::string const&,
-    //         std::string const&,
-    //         float,
-    //         bool
-    //     >);
+    template<typename Fn>
+    inline static bool attach_or_detach_lora_helper(std::string_view filepath, Model& model, Fn&& adapter_fn, const char* func_name, bool is_detach = false) {
+        using namespace literals;
+        using tensor_map_t = std::unordered_map<std::string, ggml_tensor*>;
+        static_assert(std::is_invocable_r_v<
+            ggml_tensor*,
+            Fn,
+            ggml_context*,
+            ggml_tensor*,
+            ggml_tensor*,
+            float,
+            bool
+        >);
 
-    //     using namespace literals;
-    //     auto const& logger = model.logger;
+        auto const& logger = model.logger;
 
-    //     auto reader = BinaryFileReader(filepath);
-    //     if (!reader) {
-    //         logger.log_err(func_name, "failed to open file ", filepath, "\n");
-    //         return false;
-    //     }
+        auto model_loader = ModelLoader(filepath, false, false, &logger);
 
-    //     if (!verify_magic_number(reader)) {
-    //         logger.log_err(func_name, "bad file magic\n");
-    //         return false;
-    //     }
+        if (model_loader.is_load_failed) {
+            return false;
+        }
 
-    //     if (!verify_file_version(reader)) {
-    //         logger.log_err(func_name, "unsupported file version\n");
-    //         return false;
-    //     }
+        auto const lora_params = model_loader.file_loaders[0].lora_adapter_params;
 
-    //     bool use_cache = false;
-    //     reader.read(&use_cache);
-
-    //     std::uint32_t r{1};
-    //     std::uint32_t alpha{1};
-    //     float scale{1.0f};
-
-    //     if (use_cache) {
-    //         logger.log(func_name, "cached adapter found\n");
-    //     } else {
-    //         logger.log(func_name, "uncached adapter found\n");
-    //         reader.read(&r);
-    //         reader.read(&alpha);
-    //         scale = static_cast<float>(alpha) / static_cast<float>(r);
-    //         char format_buffer[64];
-    //         logger.log(func_name, "r = ", r, ", alpha = ", alpha, format_str(format_buffer, ", scale = %.2f", scale), "\n");
-    //     }
-
-    //     ggml_context* lora_ctx{nullptr};
-
-    //     std::vector<unsigned char> buff(1_GiB);
-    //     ggml_init_params params = {};
-    //     params.mem_buffer = buff.data();
-    //     params.mem_size = buff.size();
-    //     params.no_alloc = false;
-
-    //     lora_ctx = ggml_init(params);
-
-    //     tensor_map_t lora_tensors;
-    //     tensor_map_t model_tensors = model.tensors.make_tensors_by_name();
-
-    //     auto n_tensors = std::size_t{};
-
-    //     bool warned{false};
-
-    //     while(!reader.eof()) {
-    //         int32_t n_dims;
-    //         int32_t length;
-    //         int32_t ftype;
-
-    //         reader.read(&n_dims);
-    //         reader.read(&length);
-    //         reader.read(&ftype);
-
-    //         if (reader.eof()) break;
-
-    //         int32_t ne[2] = { 1, 1 };
-    //         for(auto i = 0; i < n_dims; ++i) {
-    //             reader.read(ne + i);
-    //         }
-
-    //         std::string name(length, '\0');
-    //         reader.read(name.data(), length);
-
-    //         std::string_view lora_suffix = ".lora";
-    //         auto lora_pos = name.rfind(lora_suffix);
-    //         if (lora_pos == std::string::npos) {
-    //             logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
-    //             return false;
-    //         }
-
-    //         auto base_name = name.substr(0, lora_pos);
-
-    //         if (!model.tensors.contains(base_name)) {
-    //             logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
-    //             return false;
-    //         }
-
-    //         ggml_type wtype;
-    //         switch (ftype) {
-    //             case 0: wtype = GGML_TYPE_F32;  break;
-    //             case 1: wtype = GGML_TYPE_F16;  break;
-    //             case 2: wtype = GGML_TYPE_Q4_0; break;
-    //             case 3: wtype = GGML_TYPE_Q4_1; break;
-    //             default:{
-    //                 logger.log_err(func_name, "unsupported lora tensor type ", ftype, "\n");
-    //                 return false;
-    //             }
-    //         }
-
-    //         if (!use_cache && wtype != GGML_TYPE_F32) {
-    //             logger.log_err(func_name, "currently, we support fp32 for uncached matrix.\n");
-    //             return false;
-    //         }
-
-    //         ggml_tensor* lora_tensor;
-
-    //         if (n_dims == 2) {
-    //             lora_tensor = ggml_new_tensor_2d(lora_ctx, wtype, ne[0], ne[1]);
-    //         } else {
-    //             logger.log_err(func_name, "unsupported tensor dimension ", n_dims, "\n");
-    //             return false;
-    //         }
+        std::cout<<lora_params.use_cache_matrix << std::endl;
+        std::cout<< lora_params.alpha << std::endl;
+        std::cout<< lora_params.r << std::endl;
+        std::cout<< lora_params.get_scale() << std::endl;
+        
+        // Log the lora parameters
+        if (!is_detach) {
             
-    //         {
-    //             auto maybe_offset = reader.tell();
-    //             if (!maybe_offset) {
-    //                 logger.log_err(func_name, "failed to get file offset\n");
-    //                 return false;
-    //             }
-    //             auto offset = *maybe_offset;
-    //             size_t tensor_data_size = ggml_nbytes(lora_tensor);
-    //             offset = (offset + 31) & -32;
-    //             reader.seek(offset);
-    //         }
+            logger.log(func_name, "lora_params: \n");
+            logger.log(func_name, "   use_cache_matrix = ", lora_params.use_cache_matrix ? "Yes" : "No", '\n');
+            logger.log(func_name, "   alpha            = ", lora_params.alpha, '\n');
+            logger.log(func_name, "   r                = ", lora_params.r, '\n');
+            logger.log(func_name, "   scale            = ", lora_params.get_scale(), '\n');
 
-    //         reader.read(lora_tensor->data, sizeof(char), ggml_nbytes(lora_tensor));
+        }
 
-    //         // BA matrix with scaled values in case of cached adapter
-    //         lora_tensors[name] = lora_tensor;
+        bool use_cache = lora_params.use_cache_matrix;
+        // reader.read(&use_cache);
 
-    //         auto loraA_str = base_name + ".loraA";
-    //         auto loraB_str = base_name + ".loraB";
+        float scale{lora_params.get_scale()};
+        
+        UninitializedBuffer buffer(1_GiB);
+        UninitializedBuffer buffer2(1_GiB);
 
-    //         auto has_loraA = lora_tensors.find(loraA_str) != lora_tensors.end();
-    //         auto has_loraB = lora_tensors.find(loraB_str) != lora_tensors.end();
+        tensor_map_t lora_tensors;
+        tensor_map_t model_tensors = model.tensor_by_name;
 
-    //         if (use_cache || (has_loraA && has_loraB)) {
-    //             ggml_tensor* base_t = model_tensors[base_name];
-    //             if (!warned) {
-    //                 if (base_t->type == GGML_TYPE_Q4_0 || base_t->type == GGML_TYPE_Q4_1) {
-    //                     logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
-    //                     warned = true;
-    //                 }
-    //             }
+        auto n_tensors = std::size_t{};
+        auto total_size = model_loader.tensors_map.tensors.size();
+
+        bool warned{false};
+
+        auto adapter_tensor_iter = model_loader.tensors_map.tensor_names.begin();
+
+        for(auto const& [name, tid] : model_loader.tensors_map.tensor_names) {
+
+            model_loader.mem_ctx = MemContext(buffer.data(), buffer.size(), false);
+            
+            auto& lora_tl = model_loader.tensors_map.tensors[tid];
+            
+            static std::string_view lora_suffixes[] = { ".lora" };
+
+            auto has_lora_suffix = false;
+            auto pos = std::string::npos;
+
+            if (use_cache) {
+                if (name.rfind(lora_suffixes[0]) == name.size() - lora_suffixes[0].size()) {
+                    has_lora_suffix = true;
+                    pos = name.size() - lora_suffixes[0].size();
+                }
+            } else {
+                pos = name.rfind(lora_suffixes[0]);
+                if (pos != std::string::npos && pos == name.size() - lora_suffixes[0].size() - 1) {
+                    has_lora_suffix = true;
+                }
+            }
+            if (!has_lora_suffix) {
+                logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
+                return false;
+            }
+
+            auto const base_name = name.substr(0, pos);
+
+            if (!model_tensors.count(base_name)) {
+                logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
+                return false;
+            }
+
+            if (use_cache && lora_tl.type != GGML_TYPE_F32) {
+                logger.log_err(func_name, "currently, we support fp16 for cached matrix.\n");
+                return false;
+            }
+
+            auto* lora_tensor = model_loader.get_tensor_for(lora_tl);
+            model_loader.load_lora_adapter_for(lora_tl);
+
+            
+            lora_tensors[name] = lora_tensor;
+
+            auto loraA_str = base_name + ".loraA";
+            auto loraB_str = base_name + ".loraB";
+
+            auto loraA_tensor = lora_tensors.find(loraA_str);
+            auto loraB_tensor = lora_tensors.find(loraB_str);
+
+            auto has_loraA = use_cache ? true : loraA_tensor != lora_tensors.end();
+            auto has_loraB = use_cache ? true : loraB_tensor != lora_tensors.end();
+
+            if (has_loraA && has_loraB) {
+                auto* base_tensor = model_tensors[base_name];
                 
-    //             if (use_cache) {
-    //                 if (base_t->ne[0] != lora_tensor->ne[0] || base_t->ne[1] != lora_tensor->ne[1]) {
-    //                     logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
-    //                     return false;
-    //                 }
-    //             } else {
-    //                 auto* loraA_t = lora_tensors[loraA_str];
-    //                 auto* loraB_t = lora_tensors[loraB_str];
-    //                 if (base_t->ne[0] != loraA_t->ne[1] || base_t->ne[1] != loraB_t->ne[1]) {
-    //                     logger.log_err(func_name, "incompatible tensor dimensions (", base_t->ne[0], " and ", loraA_t->ne[1], ")", " are you sure that this adapter is for this model?\n");
-    //                     return false;
-    //                 }
-    //             }
+                if (!warned) {
+                    if (base_tensor->type == GGML_TYPE_Q4_0 || base_tensor->type == GGML_TYPE_Q4_1) {
+                        logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
+                        warned = true;
+                    }
+                }
 
-    //             auto* r = adapter_fn(lora_ctx, base_t, lora_tensors, name, loraA_str, loraB_str, scale, use_cache);
+                if (use_cache) {
+                    if (base_tensor->ne[0] != lora_tensor->ne[0] || base_tensor->ne[1] != lora_tensor->ne[1]) {
+                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
+                        return false;
+                    }
+                } else {
+                    if (base_tensor->ne[0] != loraA_tensor->second->ne[1] || base_tensor->ne[1] != loraB_tensor->second->ne[1]) {
+                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->second->ne[1], ")", " are you sure that this adapter is for this model?\n");
+                        return false;
+                    }
+                }
 
-    //             ggml_cgraph gf = ggml_build_forward(r);
-    //             gf.n_threads = model.threads;
-    //             ggml_graph_compute(lora_ctx, &gf);
-                
-    //             // we won't need these tensors again, reset the context to save memory
-    //             ggml_free(lora_ctx);
-    //             lora_ctx = ggml_init(params);
-    //             lora_tensors.clear();
+                ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx.get(), loraA_tensor->second, loraB_tensor->second));
 
-    //             n_tensors++;
-    //             if (n_tensors % 4 == 0) fprintf(stderr, ".");
-    //         }
+                auto* r = adapter_fn(model_loader.mem_ctx.get(), base_tensor, BA, scale, use_cache);
 
+                ggml_cgraph gf = ggml_build_forward(r);
+                gf.n_threads = model.threads;
+                ggml_graph_compute(model_loader.mem_ctx.get(), &gf);
 
+            }
+            
+            n_tensors++;
+            logger.progress(n_tensors, total_size);
+        }
 
-    //     }
-    //     ggml_free(lora_ctx);
-    //     fprintf(stderr, "\n");
+        fprintf(stderr, "\n");
 
-    //     if (is_detach) model.attached_lora_path = "";
-    //     else model.attached_lora_path = filepath;
-    //     return true;
-    // }
+        if (is_detach) model.attached_lora_path = "";
+        else model.attached_lora_path = filepath;
+        return true;
+    }
 
     bool Model::attach_lora(std::string_view filepath) {
         using namespace literals;
@@ -878,37 +832,24 @@ namespace fastllama {
             return false;
         }
         logger.log(__func__, "attaching LoRa model from ", filepath, ". Please wait ...\n");
-        return false;
-        // return attach_or_detach_lora_helper(
-        //     filepath,
-        //     *this,
-        //     [](
-        //         ggml_context* ctx,
-        //         ggml_tensor* base_t,
-        //         std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-        //         std::string const& lora_name,
-        //         std::string const& loraA_str,
-        //         std::string const& loraB_str,
-        //         float scale,
-        //         bool use_cache
-        //     ) {
-        //     ggml_tensor* lora_t = nullptr;
-        //     if (use_cache) {
-        //         lora_t = lora_tensors[lora_name];
-        //     } else {
-        //         auto loraA = lora_tensors[loraA_str];
-        //         auto loraB = lora_tensors[loraB_str];
-        //         // BA matrix
-        //         lora_t = ggml_mul_mat(ctx, loraA, loraB);
-        //         if (scale != 1.f) {
-        //             ggml_tensor* factor = ggml_new_f32(ctx, scale);
-        //             lora_t = ggml_scale(ctx, lora_t, factor);
-        //         }
-        //     }
+        return attach_or_detach_lora_helper(
+            filepath,
+            *this,
+            [](
+                ggml_context* ctx,
+                ggml_tensor* base_t,
+                ggml_tensor* lora_tensor,
+                [[maybe_unused]] float scale,
+                bool use_cache
+            ) {
+            if (!use_cache && scale != 1.f) {
+                ggml_tensor* factor = ggml_new_f32(ctx, scale);
+                lora_tensor = ggml_scale(ctx, lora_tensor, factor);
+            }
             
-        //     // W = W + BA * scale
-        //     return ggml_add_inplace(ctx, base_t, lora_t);
-        // }, __func__, false);
+            // W = W + BA * scale
+            return ggml_add_inplace(ctx, base_t, lora_tensor);
+        }, __func__, false);
     }
 
     bool Model::detach_lora() {
@@ -919,38 +860,22 @@ namespace fastllama {
 
         logger.log(__func__, "detaching LoRa model from ", attached_lora_path, ". Please wait ...\n");
         
-        // return attach_or_detach_lora_helper(
-        //     attached_lora_path,
-        //     *this,
-        //     [](
-        //         ggml_context* ctx,
-        //         ggml_tensor* base_t,
-        //         std::unordered_map<std::string, ggml_tensor*>& lora_tensors,
-        //         std::string const& lora_name,
-        //         std::string const& loraA_str,
-        //         std::string const& loraB_str,
-        //         float scale,
-        //         bool use_cache
-        //     ) {
-        //     ggml_tensor* lora_t = nullptr;
-        //     ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
-        //     if (use_cache) {
-        //         lora_t = lora_tensors[lora_name];
-        //     } else {
-        //         auto loraA = lora_tensors[loraA_str];
-        //         auto loraB = lora_tensors[loraB_str];
-        //         // BA matrix
-        //         lora_t = ggml_mul_mat(ctx, loraA, loraB);
-        //     }
+        return attach_or_detach_lora_helper(
+            attached_lora_path,
+            *this,
+            [](
+                ggml_context* ctx,
+                ggml_tensor* base_t,
+                ggml_tensor* lora_tensor,
+                float scale,
+                [[maybe_unused]] bool use_cache
+            ) {
+            ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
+            ggml_tensor* inv_add = ggml_scale(ctx, lora_tensor, factor);
 
-        //     ggml_tensor* inv_add = ggml_scale(ctx, lora_t, factor);
-        //     // W = W - BA * scale
-        //     return ggml_add_inplace(ctx, base_t, inv_add);
-        // }, __func__, true);
-
-
-
-        return false;
+            // W = W + BA * (-scale)
+            return ggml_add_inplace(ctx, base_t, inv_add);
+        }, __func__, true);
     }
 
     bool Model::reset() noexcept {

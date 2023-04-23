@@ -50,10 +50,9 @@ def translate_tensor_name(t: str) -> Tuple[str, str]:
 
 def write_file_header(fout: BufferedWriter, params: Mapping[str, Any], no_cache: bool = False) -> None:
     fout.write(b"ggla"[::-1])  # magic (ggml lora)
-    fout.write(struct.pack("i", 1))  # file version
+    fout.write(struct.pack("I", 2))  # file version
     fout.write(struct.pack("?", 0 if no_cache else 1))  # cache is enabled or not
-    if no_cache:
-        fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
+    fout.write(struct.pack("II", params["r"], params["lora_alpha"]))
 
 
 def write_tensor_header(
@@ -62,15 +61,15 @@ def write_tensor_header(
     sname = bytes(name, 'utf-8')
     fout.write(
         struct.pack(
-            "iii",
+            "III",
             len(shape),
             len(sname),
             DATA_TYPE_TO_FTYPE[NUMPY_TYPE_TO_DATA_TYPE[data_type]],
         )
     )
-    fout.write(struct.pack("i" * len(shape), *shape[::-1]))
+    fout.write(struct.pack("I" * len(shape), *shape[::-1]))
     fout.write(sname)
-    fout.seek((fout.tell() + 31) & -32)
+    fout.seek(-fout.tell() & 31, os.SEEK_CUR)  # align to 32 bytes
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
