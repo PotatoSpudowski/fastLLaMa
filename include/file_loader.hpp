@@ -503,7 +503,7 @@ namespace fastllama {
             return num_of_ggml_tensors_created == tensors_map.tensors.size();
         }
 
-        constexpr std::size_t total_size_needed_for_the_tensors() const noexcept {
+        std::size_t total_size_needed_for_the_tensors() const noexcept {
             std::size_t size{};
             for(auto const& tl : tensors_map.tensors) {
                 size += tl.size;
