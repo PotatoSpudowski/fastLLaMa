@@ -693,11 +693,6 @@ namespace fastllama {
         }
 
         auto const lora_params = model_loader.file_loaders[0].lora_adapter_params;
-
-        std::cout<<lora_params.use_cache_matrix << std::endl;
-        std::cout<< lora_params.alpha << std::endl;
-        std::cout<< lora_params.r << std::endl;
-        std::cout<< lora_params.get_scale() << std::endl;
         
         // Log the lora parameters
         if (!is_detach) {
