@@ -699,7 +699,7 @@ namespace fastllama {
         
         // Log the lora parameters
         if (!is_detach) {
-            char buff[256];
+            char buff[64];
             logger.log(func_name, "lora_params: \n");
             logger.log(func_name, "   Use cached matrix= ", lora_params.use_cache_matrix ? "Yes" : "No", '\n');
             logger.log(func_name, "   Alpha            = ", lora_params.alpha, '\n');
@@ -715,14 +715,12 @@ namespace fastllama {
         UninitializedBuffer buffer(1_GiB);
 
         tensor_map_t lora_tensors;
-        tensor_map_t model_tensors = model.tensor_by_name;
 
-        auto n_tensors = std::size_t{};
-        auto total_size = model_loader.tensors_map.tensors.size() / (use_cache ? 1 : 2);
+        auto data_loaded = std::size_t{};
+        auto total_size = model_loader.total_size_needed_for_the_tensors();
 
         bool warned{false};
 
-        auto adapter_tensor_iter = model_loader.tensors_map.tensor_names.begin();
 
         for(auto const& [name, tid] : model_loader.tensors_map.tensor_names) {
 
@@ -733,19 +731,11 @@ namespace fastllama {
             static std::string_view lora_suffixes[] = { ".lora" };
 
             auto has_lora_suffix = false;
-            auto pos = std::string::npos;
+            auto pos = name.rfind(lora_suffixes[0]);
+            // cached matrix has no type marker
+            auto suffix_start_pos = name.size() - lora_suffixes[0].size() - (use_cache ? 0 : 1);
+            has_lora_suffix = pos == suffix_start_pos;
 
-            if (use_cache) {
-                if (name.rfind(lora_suffixes[0]) == name.size() - lora_suffixes[0].size()) {
-                    has_lora_suffix = true;
-                    pos = name.size() - lora_suffixes[0].size();
-                }
-            } else {
-                pos = name.rfind(lora_suffixes[0]);
-                if (pos != std::string::npos && pos == name.size() - lora_suffixes[0].size() - 1) {
-                    has_lora_suffix = true;
-                }
-            }
             if (!has_lora_suffix) {
                 logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
                 return false;
@@ -753,7 +743,7 @@ namespace fastllama {
 
             auto const base_name = name.substr(0, pos);
 
-            if (!model_tensors.count(base_name)) {
+            if (!model.tensor_by_name.count(base_name)) {
                 logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
                 return false;
             }
@@ -762,8 +752,10 @@ namespace fastllama {
                 logger.log_err(func_name, "currently, we support fp16 for uncached matrix.\n");
                 return false;
             }
-
+            
+            // Construct the lora tensor
             auto* lora_tensor = model_loader.get_tensor_for(lora_tl);
+            // Loads the tensor into the memory
             model_loader.load_lora_adapter_for(lora_tl);
             
             lora_tensors[name] = lora_tensor;
@@ -778,10 +770,10 @@ namespace fastllama {
             auto has_loraB = use_cache ? true : loraB_tensor != lora_tensors.end();
 
             if (has_loraA && has_loraB) {
-                auto* base_tensor = model_tensors[base_name];
+                auto* base_tensor = model.tensor_by_name[base_name];
                 
                 if (!warned) {
-                    if (base_tensor->type == GGML_TYPE_Q4_0 || base_tensor->type == GGML_TYPE_Q4_1) {
+                    if (ggml_is_quantized(base_tensor->type)) {
                         logger.log_warn(func_name, "using a lora adapter with a quantized model may result in poor quality, use a f16 or f32 base model\n");
                         warned = true;
                     }
@@ -792,11 +784,13 @@ namespace fastllama {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
+                    data_loaded += ggml_nelements(lora_tensor);
                 } else {
                     if (base_tensor->ne[0] != loraA_tensor->second->ne[1] || base_tensor->ne[1] != loraB_tensor->second->ne[1]) {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->second->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
+                    data_loaded += ggml_nelements(loraA_tensor->second) + ggml_nelements(loraB_tensor->second);
                 }
 
                 ggml_tensor* BA = (use_cache ? lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor->second, loraB_tensor->second));
@@ -806,10 +800,11 @@ namespace fastllama {
                 ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = model.threads;
                 ggml_graph_compute(model_loader.mem_ctx, &gf);
-
-                n_tensors++;
-                logger.progress(n_tensors, total_size);
+                
+                logger.progress(data_loaded, total_size);
             }
+
+            // why is the sun flat?
             
         }
 
@@ -828,10 +823,10 @@ namespace fastllama {
     bool Model::attach_lora(std::string_view filepath) {
         using namespace literals;
         if (!attached_lora_path.empty()) {
-            logger.log_err(__func__, "already attached LoRa model from ", attached_lora_path, ". Detach it first or reload the model.\n");
+            logger.log_err(__func__, "already attached LoRa model from '", attached_lora_path, "'. Detach it first or reload the model.\n");
             return false;
         }
-        logger.log(__func__, "attaching LoRa model from ", filepath, ". Please wait ...\n");
+        logger.log(__func__, "attaching LoRa model from '", filepath, "'. Please wait ...\n");
         return attach_or_detach_lora_helper(
             filepath,
             *this,
@@ -859,7 +854,7 @@ namespace fastllama {
             return false;
         }
 
-        logger.log(__func__, "detaching LoRa model from ", attached_lora_path, ". Please wait ...\n");
+        logger.log(__func__, "detaching LoRa model from '", attached_lora_path, "'. Please wait ...\n");
         
         return attach_or_detach_lora_helper(
             attached_lora_path,

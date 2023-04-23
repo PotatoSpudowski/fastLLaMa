@@ -503,11 +503,17 @@ namespace fastllama {
             return num_of_ggml_tensors_created == tensors_map.tensors.size();
         }
 
-        void load_all_data(MemoryLock* lmlock) {
-            std::size_t data_size = 0;
+        constexpr std::size_t total_size_needed_for_the_tensors() const noexcept {
+            std::size_t size{};
             for(auto const& tl : tensors_map.tensors) {
-                data_size += tl.size;
+                size += tl.size;
             }
+            return size;
+        }
+
+        void load_all_data(MemoryLock* lmlock) {
+            std::size_t data_size = total_size_needed_for_the_tensors();
+            
             if (use_mmap) {
                 mmapped_file.reset(new MMappedFile(&file_loaders[0].reader));
                 if (!lmlock) {
