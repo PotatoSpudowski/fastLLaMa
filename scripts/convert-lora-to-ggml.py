@@ -137,16 +137,19 @@ def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = Fa
 
         if no_cache:
             v = v * scale
-            tensor_map[f'{tensor_name}{type}'] = (v, type)
-            continue
-
-        if tensor_name in tensor_map:
-            (old_tensor, old_type) = tensor_map[tensor_name]
-            new_tensor = torch.matmul(v, old_tensor) if old_type == 'A' else torch.matmul(old_tensor, v)
-            new_tensor = new_tensor * scale
-            tensor_map[tensor_name] = (new_tensor, "")
+            if type == 'A':
+                """Scale the A matrix to cut runtime cost of scaling"""
+                tensor_map[f'{tensor_name}{type}'] = (v * scale, type)
+            else:
+                tensor_map[f'{tensor_name}{type}'] = (v, type)
         else:
-            tensor_map[tensor_name] = (v, type)
+            if tensor_name in tensor_map:
+                (old_tensor, old_type) = tensor_map[tensor_name]
+                new_tensor = torch.matmul(v, old_tensor) if old_type == 'A' else torch.matmul(old_tensor, v)
+                new_tensor = new_tensor * scale
+                tensor_map[tensor_name] = (new_tensor, "")
+            else:
+                tensor_map[tensor_name] = (v, type)
     return tensor_map
 
 def main() -> None:

@@ -677,9 +677,7 @@ namespace fastllama {
             Fn,
             MemContext&,
             ggml_tensor*,
-            ggml_tensor*,
-            float,
-            bool
+            ggml_tensor*
         >);
 
         if (model.use_mmap) {
@@ -766,10 +764,12 @@ namespace fastllama {
             temp_lora_tensor.a = name.back() == 'A' ? current_lora_tensor : temp_lora_tensor.a;
             temp_lora_tensor.b = name.back() == 'B' ? current_lora_tensor : temp_lora_tensor.b;
 
-            auto loraA_tensor = use_cache ? current_lora_tensor : temp_lora_tensor.a;
+            // Lora A tensors are scaled during the generation of the lora adapter file
+            // so we need to scale them during runtime
+            auto loraAs_tensor = use_cache ? current_lora_tensor : temp_lora_tensor.a;
             auto loraB_tensor = use_cache ? current_lora_tensor : temp_lora_tensor.b;
 
-            auto has_loraA = use_cache ? true : loraA_tensor != nullptr;
+            auto has_loraA = use_cache ? true : loraAs_tensor != nullptr;
             auto has_loraB = use_cache ? true : loraB_tensor != nullptr;
 
             if (has_loraA && has_loraB) {
@@ -789,16 +789,16 @@ namespace fastllama {
                     }
                     data_loaded += ggml_nelements(current_lora_tensor);
                 } else {
-                    if (base_tensor->ne[0] != loraA_tensor->ne[1] || base_tensor->ne[1] != loraB_tensor->ne[1]) {
-                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraA_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
+                    if (base_tensor->ne[0] != loraAs_tensor->ne[1] || base_tensor->ne[1] != loraB_tensor->ne[1]) {
+                        logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", loraAs_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
                         return false;
                     }
-                    data_loaded += ggml_nelements(loraA_tensor) + ggml_nelements(loraB_tensor);
+                    data_loaded += ggml_nelements(loraAs_tensor) + ggml_nelements(loraB_tensor);
                 }
 
-                ggml_tensor* BA = (use_cache ? current_lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraA_tensor, loraB_tensor));
+                ggml_tensor* BAs = (use_cache ? current_lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraAs_tensor, loraB_tensor));
 
-                auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BA, scale, use_cache);
+                auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BAs);
 
                 ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = model.threads;
@@ -834,16 +834,10 @@ namespace fastllama {
             [](
                 MemContext& ctx,
                 ggml_tensor* base_t,
-                ggml_tensor* lora_tensor,
-                float scale,
-                bool use_cache
+                ggml_tensor* lora_tensor
             ) {
             auto* lora_t = lora_tensor;
-            if (!use_cache && (scale != 1.f)) {
-                ggml_tensor* factor = ggml_new_f32(ctx, scale);
-                lora_t = ggml_scale(ctx, lora_tensor, factor);
-            }
-            
+            // W = W + B*(A * scale)
             // W = W + BA * scale
             return ggml_add_inplace(ctx, base_t, lora_t);
         }, __func__, false);
@@ -863,14 +857,13 @@ namespace fastllama {
             [](
                 MemContext& ctx,
                 ggml_tensor* base_t,
-                ggml_tensor* lora_tensor,
-                float scale,
-                [[maybe_unused]] bool use_cache
+                ggml_tensor* lora_tensor
             ) {
-            ggml_tensor* factor = ggml_new_f32(ctx, -1.f * scale);
+            ggml_tensor* factor = ggml_new_f32(ctx, -1.f);
             ggml_tensor* inv_add = ggml_scale(ctx, lora_tensor, factor);
 
-            // W = W + BA * (-scale)
+            // W = W - (B(A * scale))
+            // W = W - BA * scale
             return ggml_add_inplace(ctx, base_t, inv_add);
         }, __func__, true);
     }
