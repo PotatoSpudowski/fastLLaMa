@@ -823,7 +823,6 @@ namespace fastllama {
     }
 
     bool Model::attach_lora(std::string_view filepath) {
-        using namespace literals;
         if (!attached_lora_path.empty()) {
             logger.log_err(__func__, "already attached LoRa model from '", attached_lora_path, "'. Detach it first or reload the model.\n");
             return false;
