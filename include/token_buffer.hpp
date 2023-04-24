@@ -69,6 +69,11 @@ namespace fastllama {
             return std::make_pair( false, std::string_view{} );
         }
 
+        void clear() {
+            m_buffer.clear();
+            m_num_of_chars_in_unicode_buffer = 0;
+        }
+
     private:
         
         void check_and_put_unicode_char_in_buffer_if_invalid(std::string& in_out) {

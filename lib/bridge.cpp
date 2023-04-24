@@ -267,6 +267,7 @@ namespace fastllama {
             
             if (is_stop_token_present) {
                 fn(std::string(to_be_flush_substr));
+                token_buffer.clear();
                 return true;
             }
 
