@@ -23,9 +23,11 @@ endif()
 include(cmake/CompilerWarnings.cmake)
 include(cmake/CompilerFlags.cmake)
 include(cmake/OpenMP.cmake)
+include(cmake/Cuda.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(ggml_library STATIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ggml.c)
+set_cuda(ggml_library)
 set_target_properties(ggml_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_compiler_lib_and_flags(ggml_library "C")
 
