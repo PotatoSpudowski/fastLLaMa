@@ -259,15 +259,18 @@ namespace fastllama {
             fn(std::forward<decltype(s)>(s));
         });
 
+        token_buffer.restore_partial_state(m_token_buffer_state);
+
         // auto new_line_token = tokenize(m_model.vocabulary, "\n", false);
         // auto new_line_token_id = new_line_token.front();
 
         for (auto i = 0ul; i < num_tokens; ++i) {
-            auto const [is_stop_token_present, to_be_flush_substr] = token_buffer.are_tokens_present_in_buffer(stop_words);
+            auto const [is_stop_token_present, to_be_flush_substr, left_out_string] = token_buffer.are_tokens_present_in_buffer(stop_words);
             
             if (is_stop_token_present) {
                 fn(std::string(to_be_flush_substr));
-                token_buffer.clear();
+                m_token_buffer_state = token_buffer.get_partial_state();
+                m_token_buffer_state.left_out_string = left_out_string;
                 return true;
             }
 

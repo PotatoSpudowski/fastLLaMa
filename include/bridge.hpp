@@ -8,6 +8,7 @@
 #include "vocab.hpp"
 #include "logger.hpp"
 #include "ring_buffer.hpp"
+#include "token_buffer.hpp"
 #include <optional>
 
 namespace fastllama {    
@@ -105,6 +106,7 @@ namespace fastllama {
         RingBuffer<token_id_t> m_last_n_tokens{64};
         std::vector<float> m_logits;
         std::vector<token_id_t> m_system_prompt;
+        TokenBufferPartialState m_token_buffer_state;
     };
 
 } // namespace fastllama

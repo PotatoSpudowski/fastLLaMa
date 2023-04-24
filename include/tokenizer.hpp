@@ -165,7 +165,7 @@ namespace fastllama {
         queue_t m_queue;
     };
 
-    auto tokenize(Vocab const& v, std::string_view text, bool bos) {
+    inline static auto tokenize(Vocab const& v, std::string_view text, bool bos) {
         auto tok = tokenizer(v);
         std::vector<typename Vocab::id_type> out;
         
