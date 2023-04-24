@@ -1,8 +1,4 @@
-import sys
-
-sys.path.append("./interfaces/python")
-
-from build.fastllama import Model, ModelKind
+from build.fastllama import Model
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 

@@ -1,4 +1,4 @@
-from build.fastllama import Model, ModelKind
+from build.fastllama import Model
 
 MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
 
