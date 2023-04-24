@@ -698,14 +698,21 @@ namespace fastllama {
 
         auto const& logger = model.logger;
 
+        auto const set_lora_file_path = [&] {
+            if (is_detach) model.attached_lora_path = "";
+            else model.attached_lora_path = filepath;
+        }
+
         if (is_detach && model.use_mmap) {
             model.buffer_lora_head = 0;
             logger.log(func_name, "freeing ", dyn_humanize_size(model.buffer_lora_for_mmap.size()), '\n');
             if (!reset_tensor_data_ptrs(model)) {
                 model.buffer_lora_for_mmap.free();
+                set_lora_file_path();
                 return false;
             }
             model.buffer_lora_for_mmap.free();
+            set_lora_file_path();
             return true;
         }
 
@@ -879,8 +886,7 @@ namespace fastllama {
 
         fprintf(stderr, "\n");
 
-        if (is_detach) model.attached_lora_path = "";
-        else model.attached_lora_path = filepath;
+        set_lora_file_path();
         return true;
     }
 
