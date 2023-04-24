@@ -65,19 +65,6 @@ class Logger:
         """
         return None
 
-class ModelKind(Enum):
-    """
-    Enumeration of supported model kinds.
-    """
-    LLAMA_7B = "LLAMA-7B"
-    LLAMA_13B = "LLAMA-13B"
-    LLAMA_30B = "LLAMA-30B"
-    LLAMA_65B = "LLAMA-65B"
-    ALPACA_LORA_7B = "ALPACA-LORA-7B"
-    ALPACA_LORA_13B = "ALPACA-LORA-13B"
-    ALPACA_LORA_30B = "ALPACA-LORA-30B"
-    ALPACA_LORA_65B = "ALPACA-LORA-65B"
-
 C_LLAMA_LOGGER_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int)
 C_LLAMA_LOGGER_RESET_FUNC = ctypes.CFUNCTYPE(None)
 C_LLAMA_LOGGER_PROGRESS_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_size_t, ctypes.c_size_t)
