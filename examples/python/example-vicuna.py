@@ -1,7 +1,6 @@
 from build.fastllama import Model
 
-MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
-LORA_ADAPTER_PATH = "./models/ALPACA-7B-ADAPTER/ggml-adapter-model.bin"
+MODEL_PATH = "./models/VICUNA-7B/ggml-vicuna-7b-1.0-uncensored-q4_2.bin"
 
 def stream_token(x: str) -> None:
     """
@@ -12,10 +11,9 @@ def stream_token(x: str) -> None:
 model = Model(
         path=MODEL_PATH, #path to model
         num_threads=16, #number of threads to use
-        n_ctx=512, #context size of model
+        n_ctx=500, #context size of model
         last_n_size=16, #size of last n tokens (used for repetition penalty) (Optional)
-        n_batch=128, 
-        use_mmap=False,
+        n_batch=128,
     )
 
 print("")
@@ -28,18 +26,6 @@ while True:
     if user_input == "exit":
         break
 
-    if user_input == "load_lora":
-        model.attach_lora(LORA_ADAPTER_PATH)
-        continue
-
-    if user_input == "unload_lora":
-        model.detach_lora()
-        continue
-
-    if user_input == "reset":
-        model.reset()
-        continue
-
     user_input = "\n\n### Instruction:\n\n" + user_input + "\n\n### Response:\n\n"
 
     res = model.ingest(user_input)
@@ -50,7 +36,7 @@ while True:
     print("\n")
 
     res = model.generate(
-        num_tokens=100, 
+        num_tokens=500, 
         top_p=0.95, #top p sampling (Optional)
         temp=0.8, #temperature (Optional)
         repeat_penalty=1.0, #repetition penalty (Optional)
