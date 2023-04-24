@@ -701,7 +701,7 @@ namespace fastllama {
         auto const set_lora_file_path = [&] {
             if (is_detach) model.attached_lora_path = "";
             else model.attached_lora_path = filepath;
-        }
+        };
 
         if (is_detach && model.use_mmap) {
             model.buffer_lora_head = 0;
