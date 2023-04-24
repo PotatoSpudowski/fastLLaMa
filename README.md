@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-`fastLLaMa` is a high-performance framework designed to tackle the challenges associated with deploying large language models (LLMs) in production environments. 
+`fastLLaMa` is an experimental high-performance framework designed to tackle the challenges associated with deploying large language models (LLMs) in production environments. 
 
 
 It offers a user-friendly Python interface to a C++ library, [llama.cpp](https://github.com/ggerganov/llama.cpp), enabling developers to create custom workflows, implement adaptable logging, and seamlessly switch contexts between sessions. This framework is geared towards enhancing the efficiency of operating LLMs at scale, with ongoing development focused on introducing features such as optimized cold boot times, Int4 support for NVIDIA GPUs, model artifact management, and multiple programming language support.
@@ -47,31 +47,34 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 
 ## Features
 - [x] Easy-to-use Python interface that allows developers to build custom workflows.
+    - [ ] Pip support (Soon)
 - [x] Ability to ingest system prompts.
     - [x] System prompts will remain in runtime memory, normal prompts are recycled)
 - [x] Customisable logger support.
+- [x] Low memory mode support using mmap
 - [x] Quick context switching between sessions.
     - [x] Ability to save and load session states
 - [x] Quick LoRA adapter switching during runtime.
     - [x] During the conversion of LoRA adapters to bin file, we are caching the result of matrix multiplication to avoid expensive caclulation for every context switch.
-    - [ ] Possible quantization of LoRA adapters with minimal performance degradation (To reduce size of adapters)
+    - [x] Possible quantization of LoRA adapters with minimal performance degradation. (FP16 supported)
+    - [x] Attach and Detach support during runtime.
+    - [x] Support to attach and detach adapters for models running using mmap.
+- [ ] Implement Multimodal models like MiniGPT-4
+    - [ ] Implement ViT and Q-Former 
+    - [ ] TBD ...
 - [ ] Int4 support for NVIDIA GPUs.
 - [ ] Cold boot time optimization using multithreading.
 - [ ] Model artifact management support.
 - [ ] Multiple programming language support.
 
 ### Supported Models
-
-| model | model_id | status |
-|-------|---------------|------------------------|
-| LLaMa 7B    | LLAMA-7B | Done |
-| LLaMa 13B   | LLAMA-13B | Done |
-| LLaMa 30B   | LLAMA-30B | Done |
-| LLaMa 65B   | LLAMA-65B | Done |
-| Alpaca-LoRA 7B   | ALPACA-LORA-7B | Done |
-| Alpaca-LoRA 13B   | ALPACA-LORA-13B | Done |
-| Alpaca-LoRA 30B   | ALPACA-LORA-30B | Done |
-| Alpaca-LoRA 65B   | ALPACA-LORA-65B | Pending |
+- [X] LLaMA 🦙
+- [X] [Alpaca](https://github.com/ggerganov/llama.cpp#instruction-mode-with-alpaca)
+- [X] [GPT4All](https://github.com/ggerganov/llama.cpp#using-gpt4all)
+- [X] [Chinese LLaMA / Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca)
+- [X] [Vigogne (French)](https://github.com/bofenghuang/vigogne)
+- [X] [Vicuna](https://github.com/ggerganov/llama.cpp/discussions/643#discussioncomment-5533894)
+- [X] [Koala](https://bair.berkeley.edu/blog/2023/04/03/koala/)
 ---
 
 ## Requirements
@@ -124,7 +127,6 @@ python ./examples/python/example.py
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
 model = Model(
-        id=ModelKind.LLAMA_7B,
         path=MODEL_PATH, #path to model
         num_threads=8, #number of threads to use
         n_ctx=512, #context size of model
@@ -181,6 +183,7 @@ pip install -r requirements.txt
 # Before running this command
 # You need to provide the HF model paths here
 python ./scripts/export-from-huggingface.py
+# Alternatively you can just download the ggml models from huggingface directly and run them! 
 
 python3 ./scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 
@@ -224,46 +227,6 @@ and sufficient RAM to load them. At the moment, memory and disk requirements are
 
 **Info:** Run time may require extra memory during inference!\
 (Depends on hyperparmeters used during model initialization)
-
-<!-- 
-### Example Dockerfile
-This is a Dockerfile to build a minimal working example. Note that it does not download any models for you. It is also compatible with Alpaca models.
-
-```dockerfile 
-FROM ubuntu:18.04
-# Add GCC and G++ New
-RUN apt-get update && apt-get install software-properties-common curl git -qy 
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 42D5A192B819C5DA
-
-# Add CMAKE New
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
-RUN apt-add-repository "deb https://apt.kitware.com/ubuntu/ bionic main" && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6AF7F09730B3F0A4
-
-RUN apt-get update
-
-# Install
-RUN apt-get install -qy cmake gcc-10 g++-10
-
-# Configure
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 30 && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 30
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 30 && update-alternatives --set cc /usr/bin/gcc
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 30 && update-alternatives --set c++ /usr/bin/g++
-
-ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-RUN add-apt-repository -y ppa:deadsnakes/ppa && apt-get update \
-    && apt-get install -y python3.9-dev python3.9-distutils python3.9
-
-WORKDIR /app
-RUN git clone https://github.com/PotatoSpudowski/fastLLaMa.git /app
-RUN chmod +x build.sh && bash ./build.sh
-
-RUN apt-get install -qy python3-pip
-RUN python3.9 -m pip install --upgrade pip && python3.9 -m pip install setuptools-rust
-RUN python3.9 -m pip install -r requirements.txt
-
-CMD ["python3.9", "example.py"]
-``` -->
 
 ### Contributing
 * Contributors can open PRs

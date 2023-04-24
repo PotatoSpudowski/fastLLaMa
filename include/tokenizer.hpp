@@ -79,7 +79,7 @@ namespace fastllama {
             : m_vocab(v)
         {}
 
-        auto operator()(std::string_view text, std::vector<typename Vocab::id>& out) {
+        auto operator()(std::string_view text, std::vector<typename Vocab::id_type>& out) {
             int index = 0l;
             auto offset = std::size_t{};
             while(offset < text.size()) {
@@ -128,7 +128,7 @@ namespace fastllama {
                     out.push_back(token->second);
                 } else {
                     for(auto const c : sym.text) {
-                        auto id = (static_cast<typename Vocab::id>(c) & 0xff);
+                        auto id = (static_cast<typename Vocab::id_type>(c) & 0xff);
                         out.push_back(id + 3);
                     }
                 }
@@ -165,9 +165,9 @@ namespace fastllama {
         queue_t m_queue;
     };
 
-    auto tokenize(Vocab const& v, std::string_view text, bool bos) {
+    inline static auto tokenize(Vocab const& v, std::string_view text, bool bos) {
         auto tok = tokenizer(v);
-        std::vector<typename Vocab::id> out;
+        std::vector<typename Vocab::id_type> out;
         
         if (text.size() == 0) return out;
         if (bos) out.push_back(1);

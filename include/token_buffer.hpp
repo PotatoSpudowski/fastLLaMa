@@ -4,14 +4,24 @@
 #include "vocab.hpp"
 #include <type_traits>
 #include <deque>
+#include <tuple>
 #include <cassert>
 #include <iostream>
+#include "tokenizer.hpp"
 
 namespace fastllama {
     
+    struct TokenBufferPartialState {
+        static constexpr std::size_t unicode_backlog_buffer_size = 8;
+
+        std::string left_out_string{};
+        std::size_t num_of_chars_in_unicode_buffer{0};
+        char unicode_backlog_buffer[unicode_backlog_buffer_size] = {0};
+    };
+
     template<typename Fn>
     struct TokenBuffer {
-        using id_t = typename Vocab::id;
+        using id_t = typename Vocab::id_type;
         static constexpr std::size_t str_buffer_size = 512;
         static constexpr std::size_t unicode_backlog_buffer_size = 8;
 
@@ -41,8 +51,8 @@ namespace fastllama {
             m_fn(std::move(temp));
         }
 
-        constexpr auto are_tokens_present_in_buffer(Span<std::string> tokens) noexcept -> std::pair<bool, std::string_view> {
-            if (tokens.empty()) return std::make_pair( false, std::string_view{} );
+        constexpr auto are_tokens_present_in_buffer(Span<std::string> tokens) noexcept -> std::tuple<bool, std::string_view, std::string_view> {
+            if (tokens.empty()) return std::make_tuple( false, std::string_view{}, std::string_view{} );
 
             assert(tokens.size() < (str_buffer_size - m_num_of_chars_in_unicode_buffer) && "Max token is reached");
 
@@ -59,14 +69,38 @@ namespace fastllama {
             });
 
             auto temp_str = std::string_view(m_temp_str_buffer, buffer_start);
+
             for (auto const& token : tokens) {
                 auto substr_pos = temp_str.find(token);
                 if (substr_pos != std::string_view::npos) {
-                    return std::make_pair(true, temp_str.substr(0, substr_pos));
+                    return std::make_tuple(true, temp_str.substr(0, substr_pos), temp_str.substr(substr_pos + token.size()));
                 }
             }
 
-            return std::make_pair( false, std::string_view{} );
+            return std::make_tuple( false, std::string_view{}, std::string_view{} );
+        }
+
+        void clear() {
+            m_buffer.clear();
+            m_num_of_chars_in_unicode_buffer = 0;
+        }
+
+        TokenBufferPartialState get_partial_state() const {
+            auto temp = TokenBufferPartialState{};
+            std::copy_n(m_unicode_backlog_buffer, m_num_of_chars_in_unicode_buffer, temp.unicode_backlog_buffer);
+            temp.num_of_chars_in_unicode_buffer = m_num_of_chars_in_unicode_buffer;
+            return temp;
+        }
+
+        void restore_partial_state(TokenBufferPartialState& state) {
+            if (!state.left_out_string.empty()) {
+                check_and_put_unicode_char_in_buffer_if_invalid(state.left_out_string);
+                if (!state.left_out_string.empty()) {
+                    m_fn(std::move(state.left_out_string));
+                }
+            }
+            std::copy_n(state.unicode_backlog_buffer, state.num_of_chars_in_unicode_buffer, m_unicode_backlog_buffer);
+            m_num_of_chars_in_unicode_buffer = state.num_of_chars_in_unicode_buffer;
         }
 
     private:

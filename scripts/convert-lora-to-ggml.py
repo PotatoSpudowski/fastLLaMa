@@ -4,7 +4,7 @@ import os
 import re
 import struct
 import sys
-from typing import Any, Mapping, MutableMapping, Sequence, Tuple
+from typing import Any, List, Mapping, MutableMapping, Sequence, Tuple
 import argparse
 
 import torch
@@ -50,10 +50,9 @@ def translate_tensor_name(t: str) -> Tuple[str, str]:
 
 def write_file_header(fout: BufferedWriter, params: Mapping[str, Any], no_cache: bool = False) -> None:
     fout.write(b"ggla"[::-1])  # magic (ggml lora)
-    fout.write(struct.pack("i", 1))  # file version
+    fout.write(struct.pack("I", 1))  # file version
     fout.write(struct.pack("?", 0 if no_cache else 1))  # cache is enabled or not
-    if no_cache:
-        fout.write(struct.pack("ii", params["r"], params["lora_alpha"]))
+    fout.write(struct.pack("II", params["r"], params["lora_alpha"]))
 
 
 def write_tensor_header(
@@ -62,15 +61,15 @@ def write_tensor_header(
     sname = bytes(name, 'utf-8')
     fout.write(
         struct.pack(
-            "iii",
+            "III",
             len(shape),
             len(sname),
             DATA_TYPE_TO_FTYPE[NUMPY_TYPE_TO_DATA_TYPE[data_type]],
         )
     )
-    fout.write(struct.pack("i" * len(shape), *shape[::-1]))
+    fout.write(struct.pack("I" * len(shape), *shape[::-1]))
     fout.write(sname)
-    fout.seek((fout.tell() + 31) & -32)
+    fout.seek(-fout.tell() & 31, os.SEEK_CUR)  # align to 32 bytes
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -121,11 +120,13 @@ def read_params(input_json: str) -> Mapping[str, Any]:
     return params
 
 
-def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = False) -> Mapping[str, Tuple[torch.Tensor, str]]:
+def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = False) -> Mapping[str, List[Tuple[torch.Tensor, str]]]:
     r = float(params["r"])
     lora_alpha = float(params["lora_alpha"])
     scale = lora_alpha / r
-    tensor_map: MutableMapping[str, Tuple[torch.Tensor, str]] = {}
+    # pair up the tensors into a map of (tensor_name, [A, B]) or (tensor_name, [A]) for cache matrix.
+    # Current implementation requires the tensors to be in the order A, B, A, B, ...
+    tensor_map: MutableMapping[str, List[Tuple[torch.Tensor, str]]] = {}
     for k, v in model.items():
         if k.endswith("lora_A.weight"):
             if v.dtype != torch.float16 and v.dtype != torch.float32:
@@ -136,18 +137,24 @@ def normalize_tensors(model: Any, params: Mapping[str, Any], no_cache: bool = Fa
             v = v.float()
         (tensor_name, type) = translate_tensor_name(k)
 
-        if no_cache:
-            v = v * scale
-            tensor_map[f'{tensor_name}{type}'] = (v, type)
-            continue
+        if tensor_name not in tensor_map:
+            tensor_map[tensor_name] = []
 
-        if tensor_name in tensor_map:
-            (old_tensor, old_type) = tensor_map[tensor_name]
-            new_tensor = torch.matmul(v, old_tensor) if old_type == 'A' else torch.matmul(old_tensor, v)
-            new_tensor = new_tensor * scale
-            tensor_map[tensor_name] = (new_tensor, "")
+        if no_cache:
+            if type == 'A':
+                """Pre-compute the matrix and scale product to save time later"""
+                tensor_map[tensor_name].append((v * scale, type))
+            else:
+                tensor_map[tensor_name].append((v, type))
         else:
-            tensor_map[tensor_name] = (v, type)
+            tensors = tensor_map[tensor_name]
+            assert len(tensors) < 2
+            if len(tensors) == 1:
+                (old_tensor, old_type) = tensors[0]
+                new_tensor = torch.matmul(v, old_tensor) if old_type == 'A' else torch.matmul(old_tensor, v)
+                tensor_map[tensor_name] = [(new_tensor * scale, "")]
+            else:
+                tensor_map[tensor_name].append((v, type))
     return tensor_map
 
 def main() -> None:
@@ -169,17 +176,20 @@ def main() -> None:
         fout.truncate()
 
         write_file_header(fout, params, args.no_cache)
-        for tname, (v, ltype) in tensor_map.items():
-            if ltype != "" and not args.no_cache:
+        for tname, tensors in tensor_map.items():
+
+            if not args.no_cache and (len(tensors) != 1):
                 continue
-            
-            if args.dtype == 'fp16':
-                t = v.half().numpy()
-            else:
-                t = v.numpy()
-            print(f"{tname} {t.shape} {t.dtype} {t.nbytes/1024/1024:.2f}MB")
-            write_tensor_header(fout, tname, t.shape, t.dtype)
-            t.tofile(fout)
+
+            for (v, type) in tensors:
+                if args.dtype == 'fp16':
+                    t = v.half().numpy()
+                else:
+                    t = v.numpy()
+                normalized_name = tname + (type if type != "" else "")
+                print(f"{normalized_name} {t.shape} {t.dtype} {t.nbytes/1024/1024:.2f}MB")
+                write_tensor_header(fout, normalized_name, t.shape, t.dtype)
+                t.tofile(fout)
 
     print(f"Converted {input_json} and {input_model} to {output_path}")
 

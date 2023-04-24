@@ -204,7 +204,9 @@ enum ggml_type {
     GGML_TYPE_F16  = 1,
     GGML_TYPE_Q4_0 = 2,
     GGML_TYPE_Q4_1 = 3,
-    GGML_TYPE_Q8_0 = 4,
+    GGML_TYPE_Q4_2 = 4,
+    GGML_TYPE_Q4_3 = 5,
+    GGML_TYPE_Q8_0 = 6,
     GGML_TYPE_I8,
     GGML_TYPE_I16,
     GGML_TYPE_I32,
@@ -358,6 +360,8 @@ float  ggml_type_sizef(enum ggml_type type); // ggml_type_size()/ggml_blck_size(
 const char * ggml_type_name(enum ggml_type type);
 
 size_t ggml_element_size(const struct ggml_tensor * tensor);
+
+bool ggml_is_quantized(enum ggml_type type);
 
 struct ggml_context * ggml_init(struct ggml_init_params params);
 void ggml_free(struct ggml_context * ctx);
@@ -626,7 +630,8 @@ struct ggml_tensor * ggml_soft_max(
 
 // rotary position embedding
 // in-place, returns view(a)
-// if mode == 1, skip n_past elements
+// if mode & 1 == 1, skip n_past elements
+// if mode & 2 == 1, GPT-NeoX style
 // TODO: avoid creating a new tensor every time
 struct ggml_tensor * ggml_rope(
         struct ggml_context * ctx,
@@ -806,6 +811,10 @@ enum ggml_opt_result ggml_opt(
 
 size_t ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist);
 size_t ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);
+size_t ggml_quantize_q4_2(const float * src, void * dst, int n, int k, int64_t * hist);
+size_t ggml_quantize_q4_3(const float * src, void * dst, int n, int k, int64_t * hist);
+
+size_t ggml_quantize_chunk(enum ggml_type type, const float * src, void * dst, int start, int n, int64_t * hist);
 
 //
 // system info
@@ -814,6 +823,8 @@ size_t ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t *
 int ggml_cpu_has_avx(void);
 int ggml_cpu_has_avx2(void);
 int ggml_cpu_has_avx512(void);
+int ggml_cpu_has_avx512_vbmi(void);
+int ggml_cpu_has_avx512_vnni(void);
 int ggml_cpu_has_fma(void);
 int ggml_cpu_has_neon(void);
 int ggml_cpu_has_arm_fma(void);
@@ -821,6 +832,7 @@ int ggml_cpu_has_f16c(void);
 int ggml_cpu_has_fp16_va(void);
 int ggml_cpu_has_wasm_simd(void);
 int ggml_cpu_has_blas(void);
+int ggml_cpu_has_cublas(void);
 int ggml_cpu_has_sse3(void);
 int ggml_cpu_has_vsx(void);
 

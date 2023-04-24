@@ -4,11 +4,20 @@ from enum import Enum
 import multiprocessing
 from typing import Any, Callable, List, Optional, Type, Union, cast
 import signal
+import sys
 
 LIBRARY_NAME='pyfastllama.so'
 
 def get_library_path(*args) -> str:
     return os.path.join(*args, LIBRARY_NAME)
+
+def progressBar(count_value, total, suffix=''):
+    bar_length = 100
+    filled_up_Length = int(round(bar_length* count_value / float(total)))
+    percentage = round(100.0 * count_value/float(total),1)
+    bar = '=' * filled_up_Length + '-' * (bar_length - filled_up_Length)
+    sys.stdout.write('[%s] %s%s ...%s\r' %(bar, percentage, '%', suffix))
+    sys.stdout.flush()
 
 class Logger:
     """
@@ -40,6 +49,15 @@ class Logger:
         :param message: The log message.
         """
         print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='')
+
+    def progress(self, done_size: int, total_size: int) -> None:
+        """
+        Logs progress messages.
+
+        :param done_size(int): size of the completed task
+        :param total_size(int): total size of the task
+        """
+        progressBar(done_size, total_size)
     
     def reset(self) -> None:
         """
@@ -47,21 +65,9 @@ class Logger:
         """
         return None
 
-class ModelKind(Enum):
-    """
-    Enumeration of supported model kinds.
-    """
-    LLAMA_7B = "LLAMA-7B"
-    LLAMA_13B = "LLAMA-13B"
-    LLAMA_30B = "LLAMA-30B"
-    LLAMA_65B = "LLAMA-65B"
-    ALPACA_LORA_7B = "ALPACA-LORA-7B"
-    ALPACA_LORA_13B = "ALPACA-LORA-13B"
-    ALPACA_LORA_30B = "ALPACA-LORA-30B"
-    ALPACA_LORA_65B = "ALPACA-LORA-65B"
-
 C_LLAMA_LOGGER_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int)
 C_LLAMA_LOGGER_RESET_FUNC = ctypes.CFUNCTYPE(None)
+C_LLAMA_LOGGER_PROGRESS_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_size_t, ctypes.c_size_t)
 
 class c_llama_logger(ctypes.Structure):
     """
@@ -71,7 +77,8 @@ class c_llama_logger(ctypes.Structure):
         ('log', C_LLAMA_LOGGER_FUNC),
         ('log_err', C_LLAMA_LOGGER_FUNC),
         ('log_warn', C_LLAMA_LOGGER_FUNC),
-        ('reset', C_LLAMA_LOGGER_RESET_FUNC)
+        ('reset', C_LLAMA_LOGGER_RESET_FUNC),
+        ('progress', C_LLAMA_LOGGER_PROGRESS_FUNC)
     ]
 
 class llama_array_view_f(ctypes.Structure):
@@ -90,6 +97,8 @@ class c_llama_model_context_args(ctypes.Structure):
     _fields_ = [
         ('embedding_eval_enabled', ctypes.c_bool),
         ('should_get_all_logits', ctypes.c_bool),
+        ('use_mmap', ctypes.c_bool),
+        ('use_mlock', ctypes.c_bool),
         ('seed', ctypes.c_int),
         ('n_keep', ctypes.c_int),
         ('n_ctx', ctypes.c_int),
@@ -119,6 +128,17 @@ def make_c_logger_func(func: Callable[[str, str], None]) -> Any:
         func(ctypes.string_at(func_name, int(func_name_len)).decode('utf-8'), ctypes.string_at(message, int(message_len)).decode('utf-8'))
     return C_LLAMA_LOGGER_FUNC(c_logger_func)
 
+def make_c_progress_func(func: Callable[[int, int], None]) -> Any:
+    """
+    Creates a C-compatible progress function from a Python callable.
+
+    :param func: Python callable to be converted to a C-compatible progress function.
+    :return: C-compatible progress function.
+    """
+    def c_progress_func(done_size: ctypes.c_size_t, total_size: ctypes.c_size_t) -> None:
+        func(int(done_size), int(total_size))
+    return C_LLAMA_LOGGER_PROGRESS_FUNC(c_progress_func)
+
 def make_c_logger_reset_func(func: Callable[[], None]) -> Any:
     """
     Creates a C-compatible logger reset function from a Python callable.
@@ -136,7 +156,6 @@ class Model:
     """
     def __init__(
         self,
-        id: Union[str, ModelKind], 
         path: str, 
         num_threads: int = multiprocessing.cpu_count(), 
         n_ctx: int = 512, 
@@ -144,6 +163,8 @@ class Model:
         seed: int = 0, 
         tokens_to_keep: int = 200,
         n_batch: int = 16, 
+        use_mmap: bool = False,
+        use_mlock: bool = False,
         should_get_all_logits: bool = False,
         embedding_eval_enabled: bool = False,
         allocate_extra_mem: int = 0,
@@ -153,7 +174,6 @@ class Model:
         """
         Initializes a new model instance.
 
-        :param id: Model identifier. Can be a string or a ModelKind enum value.
         :param path: Path to the model file.
         :param num_threads: Number of threads to use during model evaluation. Default is the number of CPU cores.
         :param n_ctx: Size of the memory context to use. Default is 512.
@@ -176,8 +196,6 @@ class Model:
         signal.signal(signal.SIGINT, lambda sig_num, _frame: signal_handler_fn(sig_num))
         signal.siginterrupt(signal.SIGINT, True)
 
-        normalized_id: str = cast(str, id.value if type(id) == ModelKind else id)
-
         ctx_args = self.__get_default_ctx_args__()
 
         ctx_args.seed = seed
@@ -189,6 +207,8 @@ class Model:
         ctx_args.embedding_eval_enabled = embedding_eval_enabled
         ctx_args.should_get_all_logits = should_get_all_logits
         ctx_args.allocate_extra_mem = allocate_extra_mem
+        ctx_args.use_mmap = use_mmap
+        ctx_args.use_mlock = use_mlock
 
         if logger is not None:
             temp_logger = c_llama_logger()
@@ -196,14 +216,15 @@ class Model:
             temp_logger.log_err = make_c_logger_func(logger.log_err)
             temp_logger.log_warn = make_c_logger_func(logger.log_warn)
             temp_logger.reset = make_c_logger_reset_func(logger.reset)
+            temp_logger.progress = make_c_progress_func(logger.progress)
             ctx_args.logger = temp_logger
 
         self.ctx = self.__create_model_ctx__(ctx_args)
 
-        load_fn = self.lib.llama_load_model_str
+        load_fn = self.lib.llama_load_model
         load_fn.restype = ctypes.c_bool
-        load_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p, ctypes.c_char_p]
-        res = bool(load_fn(self.ctx, bytes(normalized_id, 'utf-8'), bytes(path, 'utf-8')))
+        load_fn.argtypes = [c_llama_model_context_ptr, ctypes.c_char_p]
+        res = bool(load_fn(self.ctx, bytes(path, 'utf-8')))
         if not res:
             raise RuntimeError("Unable to load model")
 

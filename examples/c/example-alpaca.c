@@ -17,7 +17,7 @@ int main() {
 
     struct llama_model_context* model_ctx = llama_create_context(args);
     
-    if (!llama_load_model(model_ctx, ALPACA_LORA_7B, "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin")) {
+    if (!llama_load_model(model_ctx, "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin")) {
         return 1;
     }
 
