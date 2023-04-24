@@ -208,8 +208,9 @@ namespace fastllama {
         MemoryLock mlock_buffer;
         MemoryLock mlock_mmap;
 
-        // The position where we start allocating memory for the lora adapter when we mmap the file
+        // The current position in bump allocator.
         std::size_t buffer_lora_head{};
+        // Memory for bump allocator
         UninitializedBuffer buffer_lora_for_mmap;
         std::unordered_map<std::string, void*> org_tensor_data_ptr_for_mmap;
 
