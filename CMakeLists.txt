@@ -12,7 +12,7 @@ else()
   message(STATUS "Unable to find '${GLOBAL_VARS_FILE_PATH}'")
 endif(EXISTS ${GLOBAL_VARS_FILE_PATH})
 
-project(${PROJECT_NAME})
+project(${PROJECT_NAME} C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_CXX_VISIBILITY_PRESET hidden)
