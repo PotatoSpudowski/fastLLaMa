@@ -12,7 +12,7 @@ function(set_cuda project_name)
             target_link_libraries(${project_name} PRIVATE ggml-cuda.cu ggml-cuda.h CUDA::cudart_static CUDA::cublas_static CUDA::cublasLt_static)
             target_compile_definitions(${project_name} PRIVATE "GGML_USE_CUBLAS")
 
-        else()
+        endif()
     endif(LLAMA_CUBLAS)
     
     
