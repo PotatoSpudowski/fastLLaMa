@@ -3,7 +3,10 @@ option(LLAMA_CUBLAS "fastllama: use cuBLAS" ON)
 function(set_cuda project_name)
 
     if(LLAMA_CUBLAS)
+        cmake_minimum_required(VERSION 3.17)
+
         find_package(CUDAToolkit)
+        
         if (CUDAToolkit_FOUND)
             message(STATUS "cuBLAS found")
 
