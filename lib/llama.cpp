@@ -10,6 +10,7 @@
 #include <cmath>
 #include <thread>
 #include <mutex>
+#include <optional>
 #include "file_loader.hpp"
 #include "utils.hpp"
 
@@ -668,6 +669,21 @@ namespace fastllama {
         return true;
     }
 
+    inline static bool reset_tensor_data_ptrs(Model& model) {
+        auto const& logger = model.logger;
+
+        for(auto& [name, data] : model.org_tensor_data_ptr_for_mmap) {
+            auto tensor_it = model.tensor_by_name.find(name);
+            if (tensor_it == model.tensor_by_name.end()) {
+                logger.log_err(__func__, "tensor '", name, "' not found\n");
+                return false;
+            }
+            tensor_it->second->data = data;
+        }
+
+        return true;
+    }
+
     template<typename Fn>
     inline static bool attach_or_detach_lora_helper(std::string_view filepath, Model& model, Fn&& adapter_fn, const char* func_name, bool is_detach = false) {
         using namespace literals;
@@ -680,12 +696,19 @@ namespace fastllama {
             ggml_tensor*
         >);
 
-        if (model.use_mmap) {
-            model.logger.log_err(func_name, "cannot attach/detach lora to mmaped model\n");
-            return false;
+        auto const& logger = model.logger;
+
+        if (is_detach && model.use_mmap) {
+            model.buffer_lora_head = 0;
+            logger.log(func_name, "freeing ", dyn_humanize_size(model.buffer_lora_for_mmap.size()), '\n');
+            if (!reset_tensor_data_ptrs(model)) {
+                model.buffer_lora_for_mmap.free();
+                return false;
+            }
+            model.buffer_lora_for_mmap.free();
+            return true;
         }
 
-        auto const& logger = model.logger;
 
         auto model_loader = ModelLoader(filepath, false, false, &logger);
 
@@ -724,15 +747,10 @@ namespace fastllama {
 
         bool warned{false};
 
-        for(auto& lora_tl : model_loader.tensors_map.tensors) {
-            if (!model_loader.mem_ctx) {
-                model_loader.mem_ctx = MemContext(buffer);
-            }
-            
+        auto const get_base_name = [&](std::string_view name) -> std::optional<std::string> {
             static std::string_view lora_suffixes[] = { ".lora" };
 
             auto has_lora_suffix = false;
-            auto name = lora_tl.name;
             auto pos = name.rfind(lora_suffixes[0]);
             // cached matrix has no type marker
             auto suffix_start_pos = name.size() - lora_suffixes[0].size() - (use_cache ? 0 : 1);
@@ -740,10 +758,39 @@ namespace fastllama {
 
             if (!has_lora_suffix) {
                 logger.log_err(func_name, "'", name, "' is not a lora tensor", "\n");
-                return false;
+                return {};
             }
 
-            auto const base_name = name.substr(0, pos);
+            return std::string(name.substr(0, pos));
+        };
+
+        if (model.use_mmap) {
+
+            auto possible_lora_ctx_size_for_mmap = std::size_t{};
+            
+            // possible context size for mmap
+            for(auto& tensors: model_loader.tensors_map.tensors) {
+                auto const base_name_maybe = get_base_name(tensors.name);
+                if (!base_name_maybe) continue;
+                auto const& base_name = *base_name_maybe;
+                auto it = model.tensor_by_name.find(base_name);
+                if (it == model.tensor_by_name.end()) continue;
+                possible_lora_ctx_size_for_mmap += ggml_nbytes(it->second) + sizeof(ggml_tensor) + GGML_OBJECT_SIZE;
+            }
+            possible_lora_ctx_size_for_mmap = possible_lora_ctx_size_for_mmap;
+            model.buffer_lora_for_mmap = UninitializedBuffer(possible_lora_ctx_size_for_mmap);
+            logger.log(func_name, "Extra memory used = ", dyn_humanize_size(possible_lora_ctx_size_for_mmap), '\n');
+        }
+
+        for(auto& lora_tl : model_loader.tensors_map.tensors) {
+            if (!model_loader.mem_ctx) {
+                model_loader.mem_ctx = MemContext(buffer);
+            }
+            
+            auto const name = lora_tl.name;
+            auto const base_name_maybe = get_base_name(name);
+            if (!base_name_maybe) return false;
+            auto const base_name = *base_name_maybe;
 
             if (model.tensor_by_name.count(base_name) == 0) {
                 logger.log_err(func_name, "unknown tensor '", base_name, "' in lora adapter\n");
@@ -781,9 +828,10 @@ namespace fastllama {
                 }
             }
             
+
             if (has_loraA && has_loraB) {
-                auto* base_tensor = model.tensor_by_name[base_name];;
-                
+                auto* base_tensor = model.tensor_by_name[base_name];
+
                 if (use_cache) {
                     if (base_tensor->ne[0] != current_lora_tensor->ne[0] || base_tensor->ne[1] != current_lora_tensor->ne[1]) {
                         logger.log_err(func_name, "incompatible tensor dimensions (", base_tensor->ne[0], " and ", current_lora_tensor->ne[1], ")", " are you sure that this adapter is for this model?\n");
@@ -796,17 +844,27 @@ namespace fastllama {
                     }
                 }
 
+                ggml_tensor* dest_tensor = base_tensor;
+                if (model.use_mmap) {
+                    auto tensor_data = reinterpret_cast<void*>(model.buffer_lora_for_mmap.data() + model.buffer_lora_head);
+                    model.buffer_lora_head += ggml_nbytes(base_tensor);
+                    std::memcpy(tensor_data, base_tensor->data, ggml_nbytes(base_tensor));
+                    model.org_tensor_data_ptr_for_mmap[base_name] = base_tensor->data;
+                    base_tensor->data = tensor_data;
+                }
+
                 ggml_tensor* BAs = (use_cache ? current_lora_tensor : ggml_mul_mat(model_loader.mem_ctx, loraAs_tensor, loraB_tensor));
 
-                auto* r = adapter_fn(model_loader.mem_ctx, base_tensor, BAs);
+                auto* r = adapter_fn(model_loader.mem_ctx, dest_tensor, BAs);
 
                 ggml_cgraph gf = ggml_build_forward(r);
                 gf.n_threads = model.threads;
                 ggml_graph_compute(model_loader.mem_ctx, &gf);
-                
+
                 // why is the sun flat?
 
                 model_loader.mem_ctx.free();
+                
             }
 
             data_loaded += ggml_nelements(current_lora_tensor);

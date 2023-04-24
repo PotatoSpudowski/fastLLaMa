@@ -452,7 +452,7 @@ namespace fastllama {
 
         auto calc_sizes(std::size_t* ctx_size_p, std::size_t* mmapped_size_p) const noexcept -> bool {
             *ctx_size_p = 0;
-            *mmapped_size_p = 0;
+            if (mmapped_size_p) *mmapped_size_p = 0;
             for(auto const& tl : tensors_map.tensors) {
                 *ctx_size_p += sizeof(ggml_tensor) + GGML_OBJECT_SIZE;
                 *(use_mmap ? mmapped_size_p : ctx_size_p) += tl.size;
@@ -481,10 +481,10 @@ namespace fastllama {
             ggml_tensor* tensor{nullptr};
 
             if (tl.extents.size() == 2) {
-                tensor = ggml_new_tensor_2d(mem_ctx.get(), tl.type, tl.extents[0], tl.extents[1]);
+                tensor = ggml_new_tensor_2d(mem_ctx, tl.type, tl.extents[0], tl.extents[1]);
             } else {
                 FAST_LLAMA_ASSERT(tl.extents.size() == 1, "invalid tensor rank");
-                tensor = ggml_new_tensor_1d(mem_ctx.get(), tl.type, tl.extents[0]);
+                tensor = ggml_new_tensor_1d(mem_ctx, tl.type, tl.extents[0]);
             }
 
             FAST_LLAMA_ASSERT(tensor, "failed to create tensor");
