@@ -4,6 +4,7 @@ import os
 import shutil
 from setuptools import setup, find_packages, Command
 from setuptools.command.install import install
+import site
 
 class CustomInstallCommand(install):
     def run(self):
@@ -22,14 +23,18 @@ class CustomInstallCommand(install):
             print("Error: compile.py not found in the current directory", file=sys.stderr)
             sys.exit(1)
 
+        print("Current working directory:", os.getcwd())
+
         return_code = os.system("python compile.py -l python > build_logs.txt")
 
         if return_code != 0:
             print("Error: compile.py execution failed", file=sys.stderr)
             sys.exit(1)
         
-        # Copy the .so file to the fastLLaMa folder
-        shutil.copy("build/interfaces/python/pyfastllama.so", "fastLLaMa/")
+        # Copy the .so file to the fastLLaMa folder in site-packages
+        site_packages_dir = site.getsitepackages()[0]
+        fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
+        shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
 
 setup(
     name="fastllama",
