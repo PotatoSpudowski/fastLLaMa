@@ -175,7 +175,7 @@ class Model:
         embedding_eval_enabled: bool = False,
         allocate_extra_mem: int = 0,
         logger: Optional[Logger] = None, 
-        library_path = get_library_path('build', 'interfaces','python')
+        library_path = get_library_path('.')
         ):
         """
         Initializes a new model instance.
