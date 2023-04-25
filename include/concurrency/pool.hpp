@@ -9,171 +9,103 @@ using namespace std::chrono_literals;
 
 namespace fastllama {
 
-    template <typename W>
     struct ThreadPool {
-        static_assert(std::is_invocable_v<W>, "Type 'W' should invocable");
 
-        struct Worker;
+        using WorkerFn = std::function<void()>;
 
-        using size_type = std::size_t;
-
-        ThreadPool(size_type workers = std::thread::hardware_concurrency())
-            : m_mu(workers)
-            , m_cv(workers)
+        ThreadPool(std::size_t num_threads = std::thread::hardware_concurrency())
+            : m_num_threads(num_threads)
+            , m_stop{false}
+            , m_pending_tasks{0}
         {
-            for(auto i = 0ul; i < workers; ++i) {
-                m_workers.emplace_back(this, i);
-                m_threads.emplace_back([i, this] {
-                    m_workers[i].run(m_force_stop, m_stop, m_mu[i], m_cv[i], [this](size_type id){ return this->try_steal(id); });
-                });
+            m_worker_tasks.resize(num_threads);
+            m_threads.reserve(num_threads);
+            for (auto i = 0ul; i < num_threads; ++i) {
+                m_worker_tasks.emplace_back();
+                m_threads.push_back(std::thread([this, i] { work(i); }));
             }
         }
 
-        constexpr void stop() noexcept { m_stop = true; }
 
-        void add_work(W&& work) {
-            auto idx = m_current_work_receiver_id;
-            m_current_work_receiver_id = (m_current_work_receiver_id + 1) % m_workers.size();
-            m_workers[idx].add_work(std::move(work));
-            m_cv[idx].notify_all();
+        void stop() noexcept {
+            m_stop.store(true, std::memory_order_relaxed);
         }
 
-        void notify_all() {
-            for(auto i = 0ul; i < m_workers.size(); ++i) {
-                m_cv[i].notify_all();
+        bool is_stopped() const noexcept {
+            return m_stop.load(std::memory_order_relaxed);
+        }
+
+        void wait() noexcept {
+            std::mutex mtx;
+            while(m_pending_tasks.load(std::memory_order_relaxed) > 0) {
+                std::unique_lock<std::mutex> lock{mtx};
+                m_wait_cv.wait_for(lock, 1ms, [this] { return m_pending_tasks.load(std::memory_order_relaxed) == 0; });
             }
         }
 
-        void wait() {
-            stop();
-            notify_all();
-            join_workers();
-        }
-        
-        void force_stop() {
-            m_force_stop = true;
-        }
-
-        void force_stop_wait() {
-            force_stop();
-            notify_all();
-            join_workers();
+        void add_work(WorkerFn&& fn) {
+            FAST_LLAMA_ASSERT(!m_threads.empty(), "No threads in the pool");
+            auto& task_queue = m_worker_tasks[m_current_worker];
+            task_queue.emplace(std::move(fn));
+            m_pending_tasks.fetch_add(1, std::memory_order_relaxed);
+            m_cv.notify_all();
+            m_current_worker = (m_current_worker + 1) % m_num_threads;
         }
 
         ~ThreadPool() {
-            wait();
+            join_threads();
         }
 
     private:
 
-        void join_workers() {
-            for(auto& t : m_threads) {
-                if (t.joinable()) t.join();
+        void join_threads() {
+            stop();
+            m_cv.notify_all();
+            for (auto& thread : m_threads) {
+                if (thread.joinable()) thread.join();
             }
         }
 
-    private:
-        auto try_steal(size_type id) noexcept -> std::optional<W> {
-            for(auto i = std::size_t{}; i < m_workers.size(); ++i) {
+        void work(std::size_t id) {
+            auto& task_queue = m_worker_tasks[id];
+            while (!m_stop) {
+                while(!task_queue.empty() && !m_stop) {
+                    auto task = task_queue.pop();
+                    if (task) {
+                        (*task)();
+                        m_pending_tasks.fetch_sub(1, std::memory_order_relaxed);
+                    }
+                }
+                if (task_queue.empty() && try_steal(id)) continue;
+                std::unique_lock<std::mutex> lock{m_mtx};
+                m_cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
+            }
+        }
+
+        bool try_steal(std::size_t id) {
+            for (auto i = 0ul; i < m_worker_tasks.size(); ++i) {
                 if (i == id) continue;
-                auto& worker = m_workers[i];
-                auto item = worker.try_steal_local_work();
-                if (item) return item;
+                auto& task_queue = m_worker_tasks[i];
+                if (task_queue.empty()) continue;
+                auto task = task_queue.steal();
+                if (task) {
+                    m_worker_tasks[id].emplace(std::move(*task));
+                    return true;
+                }
             }
-            return {};
+            return false;
         }
-    private:
-        std::vector<std::mutex> m_mu;
-        std::vector<std::condition_variable> m_cv;
-        std::vector<Worker> m_workers;
-        std::vector<std::thread> m_threads;
-        size_type m_current_work_receiver_id{}; // Used for round robin work so that all threads get some work
-        bool m_stop{false};
-        bool m_force_stop{false};
-    };
-
-    template <typename W>
-    struct ThreadPool<W>::Worker {
-        using size_type = std::size_t;
-
-        Worker() = default;
         
-        Worker(ThreadPool* pool, size_type worker_id)
-            : m_worker_id(worker_id)
-        {}
-
-        Worker(Worker&& other) noexcept
-            : m_local_queue(std::move(other.m_local_queue))
-            , m_pool(std::move(other.m_pool))
-            , m_worker_id(std::move(other.m_worker_id))
-        {}
-        Worker& operator=(Worker&& other) noexcept {
-            auto temp = Worker(std::move(other));
-            swap(*this, temp);
-            return *this;
-        }
-
-        ~Worker() = default;
-
-        template<typename Fn>
-        void run(bool const& m_force_stop, bool const& stop, std::mutex& mu, std::condition_variable& cv, Fn&& try_steal_from_worker_fn) noexcept {
-            while (!m_force_stop) {
-                {
-                    std::unique_lock lk{mu};
-                    cv.wait(lk, [this, &stop, &try_steal_from_worker_fn, &m_force_stop]{
-                        if (m_local_queue.empty()) {
-                            auto item = try_steal_from_worker_fn(m_worker_id);
-                            if (item) {
-                                this->m_local_queue.emplace(std::move(*item));
-                                return true;
-                            }
-                        }
-                        return m_force_stop || stop || !m_local_queue.empty();
-                    });
-                }
-
-                std::cout<<m_force_stop<<"\n";
-
-                if (m_force_stop) break;
-
-                if (m_local_queue.empty()) {
-                    auto item = try_steal_from_worker_fn(m_worker_id);
-                    if (item) this->m_local_queue.emplace(std::move(*item));
-                    else if (stop) break;
-                }
-
-                while(!m_local_queue.empty()) {
-                    auto task_maybe = m_local_queue.pop();
-                    if (!task_maybe) break;
-
-                    std::invoke(std::move(*task_maybe));
-                }
-            }
-        }
-
-        void add_work(W&& work) noexcept {
-            m_local_queue.emplace(std::move(work));
-            std::this_thread::sleep_for(1s);
-            std::cout<<"Id: "<<m_worker_id<<", Size: "<<m_local_queue.size()<<", Empty: "<<m_local_queue.empty()<<std::endl;
-            // exit(0);
-        }
-
-        std::optional<W> try_steal_local_work() noexcept {
-            if (!m_pool) return {};
-            return std::move(m_local_queue.steal());
-        }
-
-        constexpr void set_worker_id(size_type id) noexcept { m_worker_id = id; }
-
-        friend void swap(Worker& lhs, Worker& rhs) noexcept {
-            std::swap(lhs.m_local_queue, rhs.m_local_queue);
-            std::swap(lhs.m_pool, rhs.m_pool);
-            std::swap(lhs.m_worker_id, rhs.m_worker_id);
-        }
     private:
-        ThreadPool*             m_pool{nullptr};
-        Deque<W>                m_local_queue{};
-        size_type               m_worker_id{};
+        std::size_t                                                                             m_num_threads;
+        std::vector<std::thread>                                                                m_threads;
+        std::vector<Deque<WorkerFn>>                                                            m_worker_tasks;
+        alignas(detail::hardware_destructive_interference_size) std::atomic<bool>               m_stop;
+        alignas(detail::hardware_destructive_interference_size) std::atomic<std::size_t>        m_pending_tasks;
+        std::mutex                                                                              m_mtx;
+        std::condition_variable                                                                 m_cv;
+        std::size_t                                                                             m_current_worker{0};
+        std::condition_variable                                                                 m_wait_cv;
     };
 
 } // namespace fastllama
