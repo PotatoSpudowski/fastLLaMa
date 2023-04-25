@@ -10,12 +10,25 @@ from enum import Enum
 import multiprocessing
 from typing import Any, Callable, List, Optional, Type, Union, cast
 import signal
+import site
 # import sys
 
 LIBRARY_NAME='pyfastllama.so'
 
+def get_input_for_library_path():
+    site_packages = site.getsitepackages()
+    if site_packages:
+        site_packages_dir = site_packages[0]
+        fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
+        if os.path.exists(fastllama_dir):
+            return fastllama_dir
+    else:
+        return os.path.join('build', 'interfaces', 'python')
+
 def get_library_path(*args) -> str:
     return os.path.join(*args, LIBRARY_NAME)
+
+input_for_library_path = get_input_for_library_path()
 
 def progressBar(count_value, total, suffix=''):
     bar_length = 100
@@ -175,7 +188,7 @@ class Model:
         embedding_eval_enabled: bool = False,
         allocate_extra_mem: int = 0,
         logger: Optional[Logger] = None, 
-        library_path = get_library_path('.')
+        library_path = get_library_path(input_for_library_path)
         ):
         """
         Initializes a new model instance.
