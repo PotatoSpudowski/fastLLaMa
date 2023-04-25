@@ -4,6 +4,9 @@
 #include <thread>
 #include "deque.hpp"
 #include <chrono>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 using namespace std::chrono_literals;
 
@@ -17,15 +20,16 @@ namespace fastllama {
             : m_num_threads(num_threads)
             , m_stop{false}
             , m_pending_tasks{0}
-        {
-            m_worker_tasks.resize(num_threads);
-            m_threads.reserve(num_threads);
-            for (auto i = 0ul; i < num_threads; ++i) {
+        {}
+
+        void start() {
+            m_threads.reserve(m_num_threads);
+            m_worker_tasks.reserve(m_num_threads);
+            for (auto i = 0ul; i < m_num_threads; ++i) {
                 m_worker_tasks.emplace_back();
-                m_threads.push_back(std::thread([this, i] { work(i); }));
+                m_threads.emplace_back([this, i] { work(i); });
             }
         }
-
 
         void stop() noexcept {
             m_stop.store(true, std::memory_order_relaxed);
@@ -44,7 +48,10 @@ namespace fastllama {
         }
 
         void add_work(WorkerFn&& fn) {
-            FAST_LLAMA_ASSERT(!m_threads.empty(), "No threads in the pool");
+            if (m_threads.empty() || m_num_threads == 1) {
+                fn();
+                return;
+            }
             auto& task_queue = m_worker_tasks[m_current_worker];
             task_queue.emplace(std::move(fn));
             m_pending_tasks.fetch_add(1, std::memory_order_relaxed);
@@ -71,7 +78,7 @@ namespace fastllama {
             while (!m_stop) {
                 while(!task_queue.empty() && !m_stop) {
                     auto task = task_queue.pop();
-                    if (task) {
+                    if (task.has_value() && task.value()) {
                         (*task)();
                         m_pending_tasks.fetch_sub(1, std::memory_order_relaxed);
                     }
@@ -79,6 +86,7 @@ namespace fastllama {
                 if (task_queue.empty() && try_steal(id)) continue;
                 std::unique_lock<std::mutex> lock{m_mtx};
                 m_cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
+                // std::printf("Worker %lu woke up with %lu tasks\n", id, task_queue.size());
             }
         }
 
@@ -88,7 +96,7 @@ namespace fastllama {
                 auto& task_queue = m_worker_tasks[i];
                 if (task_queue.empty()) continue;
                 auto task = task_queue.steal();
-                if (task) {
+                if (task.has_value()) {
                     m_worker_tasks[id].emplace(std::move(*task));
                     return true;
                 }
