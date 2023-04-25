@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+import shutil
 from setuptools import setup, find_packages, Command
 from setuptools.command.install import install
 
@@ -26,6 +27,9 @@ class CustomInstallCommand(install):
         if return_code != 0:
             print("Error: compile.py execution failed", file=sys.stderr)
             sys.exit(1)
+        
+        # Copy the .so file to the fastLLaMa folder
+        shutil.copy("build/interfaces/python/pyfastllama.so", "fastLLaMa/")
 
 setup(
     name="fastllama",
