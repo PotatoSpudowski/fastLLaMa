@@ -1,17 +1,11 @@
-import sys
-
-sys.path.append("../build/interfaces/python")
-
-# from fastLLaMa import Model
-
 import os
+import sys
 import ctypes
 from enum import Enum
 import multiprocessing
 from typing import Any, Callable, List, Optional, Type, Union, cast
 import signal
 import site
-# import sys
 
 LIBRARY_NAME='pyfastllama.so'
 
