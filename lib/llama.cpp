@@ -118,7 +118,9 @@ namespace fastllama {
         }
 
         vocabulary = std::move(model_loader.file_loaders[0].vocab);
+        auto n_ctx = params.n_ctx; 
         params = std::move(model_loader.file_loaders[0].hyperparams);
+        params.n_ctx = n_ctx;
         file_version = model_loader.file_loaders[0].version;
 
         std::uint32_t n_ff = ((2*(4*params.n_embd)/3 + params.n_mult - 1)/params.n_mult)*params.n_mult;
