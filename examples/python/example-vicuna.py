@@ -1,4 +1,4 @@
-from build.fastllama import Model
+from fastLLaMa import Model
 
 MODEL_PATH = "./models/VICUNA-7B/ggml-vicuna-7b-1.0-uncensored-q4_2.bin"
 

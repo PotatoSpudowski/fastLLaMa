@@ -1,4 +1,4 @@
-from build.fastllama import Model
+from fastLLaMa import Model
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
