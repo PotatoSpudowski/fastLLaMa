@@ -90,8 +90,9 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
    * For Windows \
 Download cmake-*.exe installer from [Download page](https://cmake.org/download/) and run it.
 
-2. Minimum C++ 17
-3. Python 3.x
+2. GCC 11 or greater
+3. Minimum C++ 17
+4. Python 3.x
 
 ## Installation 
 
