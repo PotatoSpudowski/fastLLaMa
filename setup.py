@@ -25,7 +25,7 @@ class CustomInstallCommand(install):
 
         print("Current working directory:", os.getcwd())
 
-        return_code = os.system("python compile.py -l python > build_logs.txt")
+        return_code = os.system("python3 compile.py -l python > build_logs.txt")
 
         if return_code != 0:
             print("Error: compile.py execution failed", file=sys.stderr)
