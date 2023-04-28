@@ -11,8 +11,6 @@ class CustomInstallCommand(install):
         # Install required packages before running compile.py
         self.distribution.install_requires = [
             "numpy==1.24.2",
-            "sentencepiece==0.1.97",
-            "torch==2.0.0",
             "py-cpuinfo==9.0.0",
             "inquirer==3.1.3"
         ]
@@ -44,8 +42,6 @@ setup(
     packages=["fastLLaMa"],
     install_requires=[
         "numpy==1.24.2",
-        "sentencepiece==0.1.97",
-        "torch==2.0.0",
         "py-cpuinfo==9.0.0",
         "inquirer==3.1.3"
     ],
