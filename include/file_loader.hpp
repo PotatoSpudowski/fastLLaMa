@@ -10,6 +10,7 @@
 #include "tensor/mem_context.hpp"
 #include "mmap.hpp"
 #include "uninitialized_buffer.hpp"
+#include "concurrency/utils.hpp"
 
 namespace fastllama {
 
@@ -539,6 +540,48 @@ namespace fastllama {
                     lmlock->grow_to(done_size);
                 }
             }
+
+            if (call_progress_callback) {
+                logger->progress(data_size, data_size);
+            }
+        }
+
+        void parallel_load_all_data(MemoryLock* lmlock) {
+            std::size_t data_size = total_size_needed_for_the_tensors();
+            
+            if (use_mmap) {
+                mmapped_file.reset(new MMappedFile(&file_loaders[0].reader));
+                if (!lmlock) {
+                    // Don't call the callback since the actual loading will be lazy
+                    // and we can't measure it.
+                    call_progress_callback = false;
+                } else {
+                    lmlock->init(mmapped_file.get());
+                }
+            }
+
+            std::atomic<std::size_t> done_size{0};
+            auto thread_pool = ThreadPool(8);
+            thread_pool.start();
+
+            parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), 8 }, [&](parallel::Block block) {
+                if (call_progress_callback) {
+                    logger->progress(done_size.load(std::memory_order_relaxed), data_size);
+                }
+
+
+                BinaryFileReader reader(file_loaders[0].reader.path());
+                FAST_LLAMA_ASSERT(reader, "failed to open file");
+                for(auto i = block.start; i < block.end; ++i) {
+                    auto& tl = tensors_map.tensors[i];
+                    FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
+                    reader.seek(tl.shards[0].file_off);
+                    tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
+                    reader.read(tl.data, tl.shards[0].size);
+                    tl.tensor->data = reinterpret_cast<void*>(tl.data);
+                    done_size.fetch_add(tl.size, std::memory_order_relaxed);
+                }
+            });
 
             if (call_progress_callback) {
                 logger->progress(data_size, data_size);
