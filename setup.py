@@ -17,6 +17,7 @@ class CustomInstallCommand(install):
             "numpy==1.24.2",
             "py-cpuinfo==9.0.0",
             "inquirer==3.1.3"
+            "cmake==3.20"
         ]
 
         # Explicitly install the required packages using subprocess
@@ -52,7 +53,8 @@ setup(
     install_requires=[
         "numpy==1.24.2",
         "py-cpuinfo==9.0.0",
-        "inquirer==3.1.3"
+        "inquirer==3.1.3",
+        "cmake==3.20"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
