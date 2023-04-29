@@ -311,7 +311,7 @@ def set_android_arg_parser(parser: argparse._SubParsersAction) -> None:
     )
 
 
-def parse_args(project_name: str, global_compiler_flags: List[str]) -> Tuple[bool, Optional[argparse.Namespace]]:
+def parse_args(cmd_args: Optional[List[str]],project_name: str, global_compiler_flags: List[str]) -> Tuple[bool, Optional[argparse.Namespace]]:
     parser = argparse.ArgumentParser(
         prog="Fastllama",
         description="Fastllama tries to provide llama wrapper interfaces for all popular languages."
@@ -327,7 +327,7 @@ def parse_args(project_name: str, global_compiler_flags: List[str]) -> Tuple[boo
 
     # parser.add_argument('-cc', '--cross-compile', choices=['android'], help="Cross compile for specific operating system", default=None)
 
-    args = parser.parse_args(sys.argv[1:])
+    args = parser.parse_args(cmd_args)
 
     threads = args.threads if args is not None else None
     make_cmd: List[str] = ['make', '-j', f'{threads}'] if threads is not None and threads > 1 else ['make']
@@ -374,10 +374,9 @@ def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None
         os.chmod(module_path, 0o700)
         os.symlink(os.path.abspath(module_path), os.path.abspath(lib_path))
 
-def main(project_name: str) -> None:
-    
+def main(cmd_args: Optional[List[str]] = None, project_name: str = "fastllama") -> None:
     global_compiler_flags: List[str] = []
-    (should_continue, args) = parse_args(project_name, global_compiler_flags)
+    (should_continue, args) = parse_args(cmd_args, project_name, global_compiler_flags)
     if not should_continue:
         return
     generate_compiler_flags(global_compiler_flags)
@@ -385,4 +384,4 @@ def main(project_name: str) -> None:
     build_example(project_name, args)
 
 if __name__ == "__main__":
-    main('fastllama')
+    main()

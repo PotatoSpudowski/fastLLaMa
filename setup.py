@@ -4,6 +4,7 @@ import os
 import shutil
 from setuptools import setup, find_packages, Command
 from setuptools.command.install import install
+from compile import main as compile_main
 import site
 
 class CustomInstallCommand(install):
@@ -23,12 +24,8 @@ class CustomInstallCommand(install):
 
         print("Current working directory:", os.getcwd())
 
-        return_code = os.system("python3 compile.py -l python > build_logs.txt")
+        compile_main(["-l", "python"])
 
-        if return_code != 0:
-            print("Error: compile.py execution failed", file=sys.stderr)
-            sys.exit(1)
-        
         # Copy the .so file to the fastLLaMa folder in site-packages
         site_packages_dir = site.getsitepackages()[0]
         fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
