@@ -21,7 +21,9 @@ class CustomInstallCommand(install):
         ]
 
         # Run the egg_info command to generate the egg metadata
-        self.run_command('egg_info')
+        egg_info_cmd = self.get_finalized_command('egg_info')
+        egg_info_cmd.tag_build = None
+        egg_info_cmd.run()
         
         for ext in self.extensions:
             self.build_extension(ext)
