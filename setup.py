@@ -22,8 +22,8 @@ class CustomInstallCommand(install):
         # Explicitly install the required packages using subprocess
         for package in self.distribution.install_requires:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-            
-        install.run(self)
+
+        # install.run(self)
 
         # Run compile.py after the package is installed
         if not os.path.exists("compile.py"):
