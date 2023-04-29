@@ -14,10 +14,10 @@ class CustomInstallCommand(install):
     def run(self):
         # Install required packages before running compile.py
         self.distribution.install_requires = [
-            "numpy==1.24.2",
-            "py-cpuinfo==9.0.0",
-            "inquirer==3.1.3"
-            "cmake==3.20"
+            "numpy>=1.24.2",
+            "py-cpuinfo>=9.0.0",
+            "inquirer>=3.1.3",
+            "cmake>=3.20.2"
         ]
 
         # Explicitly install the required packages using subprocess
@@ -51,10 +51,10 @@ setup(
     package_dir={"fastLLaMa": "fastLLaMa"},
     packages=["fastLLaMa"],
     install_requires=[
-        "numpy==1.24.2",
-        "py-cpuinfo==9.0.0",
-        "inquirer==3.1.3",
-        "cmake==3.20"
+        "numpy>=1.24.2",
+        "py-cpuinfo>=9.0.0",
+        "inquirer>=3.1.3",
+        "cmake>=3.20.2"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
