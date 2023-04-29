@@ -18,6 +18,11 @@ class CustomInstallCommand(install):
             "py-cpuinfo==9.0.0",
             "inquirer==3.1.3"
         ]
+
+        # Explicitly install the required packages using subprocess
+        for package in self.distribution.install_requires:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            
         install.run(self)
 
         # Run compile.py after the package is installed
