@@ -4,10 +4,13 @@ import os
 import shutil
 from setuptools import setup, find_packages, Command
 from setuptools.command.install import install
-from compile import main as compile_main
 import site
 
+import importlib
+
+
 class CustomInstallCommand(install):
+
     def run(self):
         # Install required packages before running compile.py
         self.distribution.install_requires = [
@@ -23,6 +26,10 @@ class CustomInstallCommand(install):
             sys.exit(1)
 
         print("Current working directory:", os.getcwd())
+
+        # Dynamically import the 'compile' module
+        compile_module = importlib.import_module("compile")
+        compile_main = getattr(compile_module, "main")
 
         compile_main(["-l", "python"])
 
