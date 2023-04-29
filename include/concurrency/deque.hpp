@@ -60,7 +60,7 @@ namespace fastllama{
             auto resize(size_type b, size_type t) -> ArrayBuffer* {
                 ArrayBuffer* ptr = new ArrayBuffer(m_capacity << 1);
                 for(auto i = t; i != b; ++i){
-                    ptr->store(i, load(i));
+                    ptr->store(i, std::move(load(i)));
                 }
                 return ptr;
             }
@@ -135,7 +135,7 @@ namespace fastllama{
             auto next_b = b + 1;
 
             base_type* buf = m_data.load(std::memory_order_relaxed);
-            auto size = 1 + (b >= t ? b - t : 0);
+            auto size = 1 + (b >= t ? b - t : buf->capacity() + b - t);
             if (buf->capacity() < size) {
                 m_garbage.emplace_back(std::exchange(buf, buf->resize(b, t)));
                 m_data.store(buf, std::memory_order_relaxed);
@@ -171,7 +171,7 @@ namespace fastllama{
                 m_bottom.store(b + 1, std::memory_order_relaxed);
             }
 
-            return buf->load(b);
+            return std::move(buf->load(b));
         }
 
         std::optional<T> steal() noexcept {
