@@ -7,6 +7,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include "lock_queue.hpp"
 
 using namespace std::chrono_literals;
 
@@ -23,6 +24,7 @@ namespace fastllama {
         {}
 
         void start() {
+            if (m_threads.size() > 0) return;
             m_threads.reserve(m_num_threads);
             m_worker_tasks.reserve(m_num_threads);
             for (auto i = 0ul; i < m_num_threads; ++i) {
@@ -56,7 +58,7 @@ namespace fastllama {
             task_queue.emplace(std::move(fn));
             m_pending_tasks.fetch_add(1, std::memory_order_relaxed);
             m_cv.notify_all();
-            m_current_worker = (m_current_worker + 1) % m_num_threads;
+            m_current_worker = (m_current_worker + 1) % m_worker_tasks.size();
         }
 
         ~ThreadPool() {
@@ -76,12 +78,12 @@ namespace fastllama {
         void work(std::size_t id) {
             auto& task_queue = m_worker_tasks[id];
             while (!m_stop) {
-                while(!task_queue.empty() && !m_stop) {
-                    auto task = task_queue.pop();
-                    if (task.has_value() && task.value()) {
-                        (*task)();
+                std::optional<WorkerFn> task;
+                while(!m_stop.load(std::memory_order_relaxed) && (task = task_queue.pop()).has_value()) {
+                    if (task.value()) {
+                        std::invoke(task.value());
                         m_pending_tasks.fetch_sub(1, std::memory_order_relaxed);
-                    }
+                    } else break;
                 }
                 if (task_queue.empty() && try_steal(id)) continue;
                 std::unique_lock<std::mutex> lock{m_mtx};
@@ -94,7 +96,6 @@ namespace fastllama {
             for (auto i = 0ul; i < m_worker_tasks.size(); ++i) {
                 if (i == id) continue;
                 auto& task_queue = m_worker_tasks[i];
-                if (task_queue.empty()) continue;
                 auto task = task_queue.steal();
                 if (task.has_value()) {
                     m_worker_tasks[id].emplace(std::move(*task));
@@ -107,7 +108,7 @@ namespace fastllama {
     private:
         std::size_t                                                                             m_num_threads;
         std::vector<std::thread>                                                                m_threads;
-        std::vector<Deque<WorkerFn>>                                                            m_worker_tasks;
+        std::vector<LockedQueue<WorkerFn>>                                                      m_worker_tasks;
         alignas(detail::hardware_destructive_interference_size) std::atomic<bool>               m_stop;
         alignas(detail::hardware_destructive_interference_size) std::atomic<std::size_t>        m_pending_tasks;
         std::mutex                                                                              m_mtx;
