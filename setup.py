@@ -20,6 +20,12 @@ class CustomInstallCommand(install):
             "cmake>=3.20.2"
         ]
 
+        # Run the egg_info command to generate the egg metadata
+        self.run_command('egg_info')
+        
+        for ext in self.extensions:
+            self.build_extension(ext)
+
         # Explicitly install the required packages using subprocess
         for package in self.distribution.install_requires:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
