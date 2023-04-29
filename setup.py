@@ -43,7 +43,6 @@ class CustomInstallCommand(install):
         site_packages_dir = site.getsitepackages()[0]
         fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
         shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
-        shutil.copy("build_logs.txt", fastllama_dir)
 
 setup(
     name="fastllama",
