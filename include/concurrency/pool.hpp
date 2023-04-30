@@ -13,9 +13,10 @@ using namespace std::chrono_literals;
 
 namespace fastllama {
 
+    template<typename WorkerFn = std::function<void()>>
     struct ThreadPool {
 
-        using WorkerFn = std::function<void()>;
+        static_assert(std::is_invocable_r_v<void, WorkerFn>, "WorkerFn must be invocable with no arguments and return void");
 
         ThreadPool(std::size_t num_threads = std::thread::hardware_concurrency())
             : m_num_threads(num_threads)

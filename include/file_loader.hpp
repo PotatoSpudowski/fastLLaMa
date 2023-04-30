@@ -561,11 +561,8 @@ namespace fastllama {
             }
 
             std::atomic<std::size_t> done_size{0};
-            auto thread_pool = ThreadPool(static_cast<std::size_t>(n_thread));
-            thread_pool.start();
 
-            parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), static_cast<std::size_t>(block_size) }, [&](parallel::Block block) {
-                
+            auto worker = [&](parallel::Block block) {
                 auto& reader = file_loaders[0].reader;
                 FAST_LLAMA_ASSERT(reader, "failed to open file");
                 for(auto i = block.start; i < block.end; ++i) {
@@ -578,7 +575,12 @@ namespace fastllama {
                     tl.tensor->data = reinterpret_cast<void*>(tl.data);
                     done_size.fetch_add(tl.size, std::memory_order_acquire);
                 }
-            });
+            };
+
+            auto thread_pool = ThreadPool<parallel::ForWorker<decltype(worker)>>(static_cast<std::size_t>(n_thread));
+            thread_pool.start();
+
+            parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), static_cast<std::size_t>(block_size) }, std::move(worker));
 
             if (call_progress_callback) {
                 logger->progress(data_size, data_size);

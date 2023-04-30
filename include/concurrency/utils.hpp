@@ -21,20 +21,60 @@ namespace fastllama::parallel {
     struct blocking_tag {};
     struct non_blocking_tag {};
 
-    template<typename Tag = blocking_tag, typename W>
-    inline static auto for_(ThreadPool& pool, Range range, W&& work, Tag tag = blocking_tag{}) {
+    template<typename W>
+    struct ForWorker{
+        static_assert(std::is_invocable_v<W, Block>, "Type 'W' should invocable with two std::size_t arguments");
+        W* work{nullptr};
+        std::size_t i;
+        std::size_t ib;
+
+        void operator()() {
+            std::invoke(*work, Block {
+                i,
+                i + ib,
+                ib
+            });
+        }
+
+        constexpr operator bool() const noexcept {
+            return work != nullptr;
+        }
+    };
+
+    namespace detail {
+        
+        template<typename T>
+        struct is_for_woker : std::false_type {};
+
+        template<typename W>
+        struct is_for_woker<ForWorker<W>> : std::true_type {};
+
+    } // namespace detail
+    
+
+    template<typename Tag = blocking_tag, typename W, typename V = ForWorker<W>>
+    inline static auto for_(ThreadPool<V>& pool, Range range, W&& work, Tag tag = blocking_tag{}) {
         static_assert(std::is_invocable_v<W, Block>, "Type 'W' should invocable with two std::size_t arguments");
         FAST_LLAMA_ASSERT(range.start < range.end, "Range start should be less than range end");
 
         for(auto i = range.start; i < range.end; i += range.block_size) {
             auto ib = std::min(range.block_size, range.end - i);
-            pool.add_work([i, work=std::move(work), ib] {
-                work(Block {
+            if constexpr(detail::is_for_woker<V>::value) {
+                auto temp_work = ForWorker<W> {
+                    &work,
                     i,
-                    i + ib,
                     ib
+                };
+                pool.add_work(std::move(temp_work));
+            } else {
+                pool.add_work([&work, i, ib]() {
+                    std::invoke(work, Block {
+                        i,
+                        i + ib,
+                        ib
+                    });
                 });
-            });
+            }
         }
 
         if constexpr (std::is_same_v<Tag, blocking_tag>) {
@@ -43,8 +83,8 @@ namespace fastllama::parallel {
     }
 
     // Always blocking
-    template<typename InitialValue, typename Container, typename W>
-    inline static auto reduce(ThreadPool& pool, Container const& c, InitialValue value, W&& work, std::size_t block_size = 32, blocking_tag tag = blocking_tag{}) {
+    template<typename InitialValue, typename Container, typename W, typename V>
+    inline static auto reduce(ThreadPool<V>& pool, Container const& c, InitialValue value, W&& work, std::size_t block_size = 32, blocking_tag tag = blocking_tag{}) {
         static_assert(std::is_invocable_v<W, InitialValue, typename Container::value_type>, "Type 'W' should invocable with two arguments");
 
         auto result = value;
@@ -66,8 +106,8 @@ namespace fastllama::parallel {
         return result;
     }
 
-    template<typename Container, typename Tag = blocking_tag, typename W>
-    inline static auto transform(ThreadPool& pool, Container& c, W&& work, std::size_t block_size = 32, Tag tag = blocking_tag{}) {
+    template<typename Container, typename Tag = blocking_tag, typename W, typename V>
+    inline static auto transform(ThreadPool<V>& pool, Container& c, W&& work, std::size_t block_size = 32, Tag tag = blocking_tag{}) {
         static_assert(std::is_invocable_v<W, typename Container::value_type>, "Type 'W' should invocable with one argument");
 
         auto range = Range{ 0, c.size(), block_size };
