@@ -28,6 +28,8 @@ class CustomBuildExtCommand(build_ext):
         # Copy the .so file to the fastLLaMa folder in site-packages
         site_packages_dir = site.getsitepackages()[0]
         fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
+        if not os.path.exists(fastllama_dir):
+            os.makedirs(fastllama_dir)
         shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
 
         super().run()
