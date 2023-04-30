@@ -13,4 +13,4 @@ COPY models/ models/
 #Change this to your own example
 COPY examples/python/* .
 
-CMD ["python3.9", "example.py"]
+CMD ["python3", "example.py"]
