@@ -87,8 +87,9 @@ namespace fastllama {
                     } else break;
                 }
                 if (task_queue.empty() && try_steal(id)) continue;
-                std::unique_lock<std::mutex> lock{m_mtx};
-                m_cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
+                std::this_thread::yield();
+                // std::unique_lock<std::mutex> lock{m_mtx};
+                // m_cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
                 // std::printf("Worker %lu woke up with %lu tasks\n", id, task_queue.size());
             }
         }
