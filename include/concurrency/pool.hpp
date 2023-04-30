@@ -28,6 +28,13 @@ namespace fastllama {
             if (m_threads.size() > 0) return;
             m_threads.reserve(m_num_threads);
             m_worker_tasks.reserve(m_num_threads);
+            
+            auto temp_mutexes = std::vector<std::mutex>(m_num_threads);
+            std::swap(temp_mutexes, m_worker_mutexes);
+
+            auto temp_cvs = std::vector<std::condition_variable>(m_num_threads);
+            std::swap(temp_cvs, m_cvs);
+
             for (auto i = 0ul; i < m_num_threads; ++i) {
                 m_worker_tasks.emplace_back();
                 m_threads.emplace_back([this, i] { work(i); });
@@ -112,11 +119,11 @@ namespace fastllama {
         std::size_t                                                                             m_num_threads;
         std::vector<std::thread>                                                                m_threads;
         std::vector<LockedQueue<WorkerFn>>                                                      m_worker_tasks;
-        std::vector<std::mutex>                                                                 m_worker_mutexes{std::thread::hardware_concurrency()};
+        std::vector<std::mutex>                                                                 m_worker_mutexes;
         alignas(detail::hardware_destructive_interference_size) std::atomic<bool>               m_stop;
         alignas(detail::hardware_destructive_interference_size) std::atomic<std::size_t>        m_pending_tasks;
         std::mutex                                                                              m_mtx;
-        std::vector<std::condition_variable>                                                    m_cvs{std::thread::hardware_concurrency()};
+        std::vector<std::condition_variable>                                                    m_cvs;
         std::size_t                                                                             m_current_worker{0};
         std::condition_variable                                                                 m_wait_cv;
     };
