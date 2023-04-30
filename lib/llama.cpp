@@ -106,6 +106,9 @@ namespace fastllama {
         using namespace ::fastllama::literals;
 
         logger.log("Model", "loading model from ", filepath, " - please wait ...\n");
+        if (load_parallel){
+            logger.log("Model", "parallel loading with block size of ", n_load_parallel_blocks,"\n");
+        }
         
         this->is_valid = false;
 
