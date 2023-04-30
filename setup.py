@@ -10,28 +10,9 @@ import site
 import importlib
 
 
-class CustomInstallCommand(build_ext):
-
+class CustomBuildExtCommand(build_ext):
     def run(self):
-        # Install required packages before running compile.py
-        self.distribution.install_requires = [
-            "numpy>=1.24.2",
-            "py-cpuinfo>=9.0.0",
-            "inquirer>=3.1.3",
-            "cmake>=3.20.2"
-        ]
-
-        # Run the egg_info command to generate the egg metadata
-        egg_info_cmd = self.get_finalized_command('egg_info')
-        egg_info_cmd.tag_build = None
-        egg_info_cmd.run()
-
-        # Build the extensions
         super().run()
-
-        # Explicitly install the required packages using subprocess
-        for package in self.distribution.install_requires:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
         # Run compile.py after the package is installed
         if not os.path.exists("compile.py"):
@@ -45,6 +26,24 @@ class CustomInstallCommand(build_ext):
         compile_main = getattr(compile_module, "main")
 
         compile_main(["-l", "python"])
+
+
+class CustomInstallCommand(install):
+    def run(self):
+        # Install required packages before running compile.py
+        self.distribution.install_requires = [
+            "numpy>=1.24.2",
+            "py-cpuinfo>=9.0.0",
+            "inquirer>=3.1.3",
+            "cmake>=3.20.2"
+        ]
+
+        # Explicitly install the required packages using subprocess
+        for package in self.distribution.install_requires:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+        # Run the original install command
+        super().run()
 
         # Copy the .so file to the fastLLaMa folder in site-packages
         site_packages_dir = site.getsitepackages()[0]
@@ -71,6 +70,7 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     cmdclass={
+        'build_ext': CustomBuildExtCommand,
         'install': CustomInstallCommand,
     },
 )
