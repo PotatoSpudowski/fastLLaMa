@@ -2,14 +2,15 @@ import subprocess
 import sys
 import os
 import shutil
-from setuptools import setup, find_packages, Command
+from setuptools import setup, find_packages, Command, Extension
 from setuptools.command.install import install
+from setuptools.command.build_ext import build_ext
 import site
 
 import importlib
 
 
-class CustomInstallCommand(install):
+class CustomInstallCommand(build_ext):
 
     def run(self):
         # Install required packages before running compile.py
@@ -24,15 +25,13 @@ class CustomInstallCommand(install):
         egg_info_cmd = self.get_finalized_command('egg_info')
         egg_info_cmd.tag_build = None
         egg_info_cmd.run()
-        
-        for ext in self.extensions:
-            self.build_extension(ext)
+
+        # Build the extensions
+        super().run()
 
         # Explicitly install the required packages using subprocess
         for package in self.distribution.install_requires:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-        # install.run(self)
 
         # Run compile.py after the package is installed
         if not os.path.exists("compile.py"):
@@ -51,6 +50,7 @@ class CustomInstallCommand(install):
         site_packages_dir = site.getsitepackages()[0]
         fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
         shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
+
 
 setup(
     name="fastllama",
