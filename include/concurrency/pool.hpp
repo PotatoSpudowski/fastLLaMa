@@ -58,7 +58,7 @@ namespace fastllama {
             auto& task_queue = m_worker_tasks[m_current_worker];
             task_queue.emplace(std::move(fn));
             m_pending_tasks.fetch_add(1, std::memory_order_relaxed);
-            m_cv.notify_all();
+            m_cvs[m_current_worker].notify_all();
             m_current_worker = (m_current_worker + 1) % m_worker_tasks.size();
         }
 
@@ -70,7 +70,7 @@ namespace fastllama {
 
         void join_threads() {
             stop();
-            m_cv.notify_all();
+            for(auto& cv : m_cvs) cv.notify_all();
             for (auto& thread : m_threads) {
                 if (thread.joinable()) thread.join();
             }
@@ -78,6 +78,8 @@ namespace fastllama {
 
         void work(std::size_t id) {
             auto& task_queue = m_worker_tasks[id];
+            auto& mutex = m_worker_mutexes[id];
+            auto& cv = m_cvs[id];
             while (!m_stop) {
                 std::optional<WorkerFn> task;
                 while(!m_stop.load(std::memory_order_relaxed) && (task = task_queue.pop()).has_value()) {
@@ -87,9 +89,8 @@ namespace fastllama {
                     } else break;
                 }
                 if (task_queue.empty() && try_steal(id)) continue;
-                std::this_thread::yield();
-                // std::unique_lock<std::mutex> lock{m_mtx};
-                // m_cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
+                std::unique_lock<std::mutex> lock{mutex};
+                cv.wait(lock, [this, &task_queue] { return m_stop || !task_queue.empty(); });
                 // std::printf("Worker %lu woke up with %lu tasks\n", id, task_queue.size());
             }
         }
@@ -111,10 +112,11 @@ namespace fastllama {
         std::size_t                                                                             m_num_threads;
         std::vector<std::thread>                                                                m_threads;
         std::vector<LockedQueue<WorkerFn>>                                                      m_worker_tasks;
+        std::vector<std::mutex>                                                                 m_worker_mutexes{std::thread::hardware_concurrency()};
         alignas(detail::hardware_destructive_interference_size) std::atomic<bool>               m_stop;
         alignas(detail::hardware_destructive_interference_size) std::atomic<std::size_t>        m_pending_tasks;
         std::mutex                                                                              m_mtx;
-        std::condition_variable                                                                 m_cv;
+        std::vector<std::condition_variable>                                                    m_cvs{std::thread::hardware_concurrency()};
         std::size_t                                                                             m_current_worker{0};
         std::condition_variable                                                                 m_wait_cv;
     };
