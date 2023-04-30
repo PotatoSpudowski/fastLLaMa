@@ -189,6 +189,8 @@ class Model:
         :param embedding_eval_enabled: Flag to enable embedding evaluation. Default is False.
         :param allocate_extra_mem: Amount of extra memory to allocate. Default is 0.
         :param logger: Logger instance to be used for reporting messages. Default is None.
+        :param load_parallel: Flag to indicate if the model should be loaded in parallel. Default is False.
+        :param n_load_parallel_blocks: Number of task that each thread will handle. Default is 1.
         :param library_path: Path to the library file. Default is the result of get_library_path('build', 'interfaces','python').
         """
 
