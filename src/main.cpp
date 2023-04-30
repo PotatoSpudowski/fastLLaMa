@@ -12,7 +12,7 @@ int main() {
 
     pool.start();
 
-    auto natural_number = std::vector(100, 0);
+    auto natural_number = std::vector(10000000, 0);
     std::iota(natural_number.begin(), natural_number.end(), 0);
     
     // parallel::for_(pool, parallel::Range{0, 100, 10}, [](parallel::Block block) {
@@ -30,9 +30,9 @@ int main() {
         sum += natural_number[i];
     }
 
-    auto result = parallel::reduce(pool, natural_number, 0, [](auto a, auto b) {
+    auto result = parallel::reduce(pool, natural_number, 0ul, [](auto a, auto b) {
         return a + b;
-    });
+    }, 512);
 
 
     std::cout<<"Result: "<<result << " == " << sum <<"\n";
