@@ -248,7 +248,8 @@ namespace fastllama {
         // populate `tensors_by_name`
         tensor_by_name = model_loader.tensors_map.make_tensors_by_name();
 
-        model_loader.load_all_data(use_mlock ? &mlock_mmap : nullptr);
+        if (load_parallel) model_loader.parallel_load_all_data(use_mlock ? &mlock_mmap : nullptr, threads, n_load_parallel_blocks);
+        else               model_loader.load_all_data(use_mlock ? &mlock_mmap : nullptr);
 
         if (model_loader.is_load_failed) return false;
 

@@ -121,6 +121,8 @@ namespace fastllama {
         temp.m_model.allocate_extra_mem = allocate_extra_mem;
         temp.m_model.use_mmap = use_mmap;
         temp.m_model.use_mlock = use_mlock;
+        temp.m_model.load_parallel = use_parallel_loading;
+        temp.m_model.n_load_parallel_blocks = n_load_parallel_blocks;
 
         printf("\n\n\x1b[32m%s\x1b[0m\n\n", internal::watermark);
         fflush(stdout);
