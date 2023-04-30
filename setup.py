@@ -2,17 +2,29 @@ import subprocess
 import sys
 import os
 import shutil
-from setuptools import setup, find_packages, Command, Extension
+from setuptools import setup, find_packages, Command
 from setuptools.command.install import install
-from setuptools.command.build_ext import build_ext
 import site
 
 import importlib
 
 
-class CustomBuildExtCommand(build_ext):
+class CustomInstallCommand(install):
+
     def run(self):
-        super().run()
+        # Install required packages before running compile.py
+        self.distribution.install_requires = [
+            "numpy>=1.24.2",
+            "py-cpuinfo>=9.0.0",
+            "inquirer>=3.1.3",
+            "cmake>=3.20.2"
+        ]
+
+        # Explicitly install the required packages using subprocess
+        for package in self.distribution.install_requires:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+        # install.run(self)
 
         # Run compile.py after the package is installed
         if not os.path.exists("compile.py"):
@@ -27,29 +39,10 @@ class CustomBuildExtCommand(build_ext):
 
         compile_main(["-l", "python"])
 
-
-class CustomInstallCommand(install):
-    def run(self):
-        # Install required packages before running compile.py
-        self.distribution.install_requires = [
-            "numpy>=1.24.2",
-            "py-cpuinfo>=9.0.0",
-            "inquirer>=3.1.3",
-            "cmake>=3.20.2"
-        ]
-
-        # Explicitly install the required packages using subprocess
-        for package in self.distribution.install_requires:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-        # Run the original install command
-        super().run()
-
         # Copy the .so file to the fastLLaMa folder in site-packages
         site_packages_dir = site.getsitepackages()[0]
         fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
         shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
-
 
 setup(
     name="fastllama",
@@ -70,7 +63,6 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     cmdclass={
-        'build_ext': CustomBuildExtCommand,
         'install': CustomInstallCommand,
     },
 )
