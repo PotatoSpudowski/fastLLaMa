@@ -577,7 +577,7 @@ namespace fastllama {
                 }
             };
 
-            auto thread_pool = ThreadPool<parallel::ForWorker<decltype(worker)>>(static_cast<std::size_t>(n_thread));
+            auto thread_pool = ThreadPool(static_cast<std::size_t>(n_thread));
             thread_pool.start();
 
             parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), static_cast<std::size_t>(block_size) }, std::move(worker));
