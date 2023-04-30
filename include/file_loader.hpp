@@ -546,7 +546,7 @@ namespace fastllama {
             }
         }
 
-        void parallel_load_all_data(MemoryLock* lmlock) {
+        void parallel_load_all_data(MemoryLock* lmlock, int n_thread, std::uint32_t block_size) {
             std::size_t data_size = total_size_needed_for_the_tensors();
             
             if (use_mmap) {
@@ -561,25 +561,22 @@ namespace fastllama {
             }
 
             std::atomic<std::size_t> done_size{0};
-            auto thread_pool = ThreadPool(8);
+            auto thread_pool = ThreadPool(static_cast<std::size_t>(n_thread));
             thread_pool.start();
 
-            parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), 8 }, [&](parallel::Block block) {
-                if (call_progress_callback) {
-                    logger->progress(done_size.load(std::memory_order_relaxed), data_size);
-                }
-
-
-                BinaryFileReader reader(file_loaders[0].reader.path());
+            parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), static_cast<std::size_t>(block_size) }, [&](parallel::Block block) {
+                
+                auto& reader = file_loaders[0].reader;
                 FAST_LLAMA_ASSERT(reader, "failed to open file");
                 for(auto i = block.start; i < block.end; ++i) {
+                    if (call_progress_callback) logger->progress(done_size.load(std::memory_order_relaxed), data_size);
+
                     auto& tl = tensors_map.tensors[i];
                     FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
-                    reader.seek(tl.shards[0].file_off);
                     tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
-                    reader.read(tl.data, tl.shards[0].size);
+                    load_data_for(tl);
                     tl.tensor->data = reinterpret_cast<void*>(tl.data);
-                    done_size.fetch_add(tl.size, std::memory_order_relaxed);
+                    done_size.fetch_add(tl.size, std::memory_order_acquire);
                 }
             });
 
@@ -601,14 +598,12 @@ namespace fastllama {
                 tl.data = mmapped_file->get_data_offset(tl.shards[0].file_off);
             } else if (tl.split_type == SplitType::None) {
                 auto& reader = file_loaders[tl.shards[0].file_idx].reader;
-                reader.seek(tl.shards[0].file_off, BinaryFileReader::SeekReference::Begin);
-                reader.read(tl.data, tl.size);
+                FAST_LLAMA_ASSERT(reader.read_at_offset(tl.data, tl.size, tl.shards[0].file_off), "failed to read data");
             } else if (tl.split_type == SplitType::ByRows) {
                 std::size_t offset{};
                 for(auto& shard : tl.shards) {
                     auto& reader = file_loaders[shard.file_idx].reader;
-                    reader.seek(shard.file_off, BinaryFileReader::SeekReference::Begin);
-                    reader.read(tl.data + offset, shard.size);
+                    FAST_LLAMA_ASSERT(reader.read_at_offset(tl.data + offset, shard.size, shard.file_off), "failed to read data");
                     offset += shard.size;
                 }
                 FAST_LLAMA_ASSERT(offset == tl.size, "invalid tensor size");
@@ -618,9 +613,8 @@ namespace fastllama {
                 tmp_buffers.reserve(tl.shards.size());
                 for(auto& shard : tl.shards) {
                     auto& reader = file_loaders[shard.file_idx].reader;
-                    reader.seek(shard.file_off, BinaryFileReader::SeekReference::Begin);
                     tmp_buffers.emplace_back(shard.size);
-                    reader.read(tmp_buffers.back().data(), shard.size);
+                    FAST_LLAMA_ASSERT(reader.read_at_offset(tmp_buffers.back().data(), shard.size, shard.file_off), "failed to read data");
                 }
 
                 // Then reshape.

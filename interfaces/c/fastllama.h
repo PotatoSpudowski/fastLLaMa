@@ -2,6 +2,7 @@
 #define FAST_LLAMA_BRIDGE_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -37,11 +38,13 @@ struct llama_model_context_args {
     bool should_get_all_logits;
     bool use_mmap;
     bool use_mlock;
+    bool load_parallel;
     int seed;
     int n_keep;
     int n_ctx;
     int n_threads;
     int n_batch;
+    uint32_t n_load_parallel_blocks;
     size_t last_n_tokens;
     size_t allocate_extra_mem;
     struct llama_logger logger;
