@@ -19,6 +19,8 @@ env/
 /main
 /quantize
 
+examples/python/fastllama/
+
 arm_neon.h
 compile_commands.json
 
