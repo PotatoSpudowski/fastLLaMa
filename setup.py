@@ -1,9 +1,11 @@
-import subprocess
+from pathlib import Path
 import sys
 import os
 from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
+import shutil
+from site import getsitepackages
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -20,6 +22,14 @@ class CustomBuildExtCommand(build_ext):
         # print("Current working directory:", os.getcwd())
 
         compile_main(["-l", "python"])
+
+        source_path = Path(os.path.dirname(os.path.abspath(__file__)))/ "examples" / "python" / "fastllama"
+        dest_path = Path(getsitepackages()[0])/ "fastllama"
+        dest_path.mkdir(parents=True, exist_ok=True)
+        if not source_path.exists():
+            raise Exception("Project did not compile correctly.")
+        
+        shutil.copytree(source_path, dest_path, dirs_exist_ok=True)
 
         super().run()
 
@@ -44,28 +54,9 @@ class CustomInstallCommand(install):
 
         super().run()
 
-description = """
-fastLLaMa is an experimental high-performance framework for running Decoder-only LLMs with 4-bit quantization in Python using a C/C++ backend.
-"""  
 setup(
-    name="fastllama",
-    version="1.0.0",
-    package_dir={"fastllama": "examples/python/fastllama"},
-    packages=["fastllama"],
-    package_data={"fastllama": ["pyfastllama.so"]},
-    author="PotatoSpudowski, Amit Singh",
-    author_email="bahushruth.cs@gmail.com, amitsingh19975@gmail.com",
-    description=description,
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-    ],
     cmdclass={
         'build_ext': CustomBuildExtCommand,
         'install': CustomInstallCommand,
     },
-    setup_requires=["setuptools", "wheel", "py-cpuinfo>=9.0.0", "cmake>=3.20.2"]
 )
