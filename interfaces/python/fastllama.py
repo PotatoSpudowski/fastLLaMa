@@ -182,7 +182,7 @@ class Model:
         logger: Optional[Logger] = None, 
         load_parallel: bool = False,
         n_load_parallel_blocks: int = 1,
-        library_path = get_library_path('build', 'interfaces','python')
+        library_path: Optional[str] = None
         ):
         """
         Initializes a new model instance.
