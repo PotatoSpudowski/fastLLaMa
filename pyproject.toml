@@ -19,6 +19,10 @@ classifiers=[
 ]
 
 [tool.setuptools]
-package_dir = { "fastllama" = "examples/python/fastllama" }
 packages = ["fastllama"]
-package_data = { "fastllama" = ["pyfastllama.so"] }
+
+[tool.setuptools.package_dir]
+fastllama = "examples/python/fastllama"
+
+[tool.setuptools.package_data]
+fastllama = ["pyfastllama.so"]
