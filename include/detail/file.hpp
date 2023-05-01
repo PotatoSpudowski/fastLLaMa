@@ -146,8 +146,15 @@ namespace fastllama::detail {
             }
 
             auto rd_advisory(off_t off = 0, int count = 0) noexcept -> void {
-                struct radvisory radv{off, count};
-                fcntl(native_handle(), F_RDADVISE, radv);
+                #if defined(__APPLE__) || defined(__FreeBSD__)
+                    struct radvisory radv{off, count};
+                    fcntl(native_handle(), F_RDADVISE, radv);
+                #elif defined(__linux__)
+                    posix_fadvise(native_handle(), off, count, POSIX_FADV_WILLNEED);
+                #else
+                    (void)off;
+                    (void)count;
+                #endif
             }
         #endif
 
