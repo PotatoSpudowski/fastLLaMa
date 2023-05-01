@@ -228,13 +228,13 @@ class Model:
         ctx_args.n_load_parallel_blocks = n_load_parallel_blocks
 
         if logger is not None:
-            temp_logger = c_llama_logger()
-            temp_logger.log = make_c_logger_func(logger.log_info)
-            temp_logger.log_err = make_c_logger_func(logger.log_err)
-            temp_logger.log_warn = make_c_logger_func(logger.log_warn)
-            temp_logger.reset = make_c_logger_reset_func(logger.reset)
-            temp_logger.progress = make_c_progress_func(logger.progress)
-            ctx_args.logger = temp_logger
+            self.logger = c_llama_logger()
+            self.logger.log = make_c_logger_func(logger.log_info)
+            self.logger.log_err = make_c_logger_func(logger.log_err)
+            self.logger.log_warn = make_c_logger_func(logger.log_warn)
+            self.logger.reset = make_c_logger_reset_func(logger.reset)
+            self.logger.progress = make_c_progress_func(logger.progress)
+            ctx_args.logger = self.logger
 
         self.ctx = self.__create_model_ctx__(ctx_args)
 
