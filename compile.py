@@ -222,6 +222,10 @@ def run_cmd_on_build_dirs(cmd: Sequence[Union[List[str], str]]) -> None:
             finally:
                 os.chdir(current_path)
 
+    build_python_examples()
+    
+
+
 def set_cc_android_flags(cmake_vars: CmakeVarType, args: argparse.Namespace, global_compiler_flags: List[str]) -> None:
     ndk = args.android_ndk
     abi = args.android_abi
@@ -349,22 +353,8 @@ def parse_args(cmd_args: Optional[List[str]],project_name: str, global_compiler_
     save_cmake_vars_helper(os.path.join('.', 'cmake', 'GlobalVars.cmake'), cmake_global_vars)
     return (True, args)
 
-def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None:
-    global g_selected_language
-    example_path = os.path.join('.', 'examples', g_selected_language[0])
-    if not os.path.exists(example_path):
-        return
-    
-    if os.path.exists(os.path.join(example_path, 'CMakeLists.txt')):
-        print('\n\nBuilding Examples....\n')
-        current_dir = os.getcwd()
-        os.chdir(example_path)
-        try:
-            run_make(project_name, args)
-        finally:
-            os.chdir(current_dir)
-            print('\nBuilding examples completed\n')
-    if g_selected_language[0] == 'python':
+def build_python_examples() -> None:
+        example_path = Path(os.path.dirname(os.path.abspath(__file__))) / 'examples' / 'python'
         dest_path = os.path.join(example_path, 'fastllama')
         module_path = os.path.join('.', 'interfaces', 'python', 'fastllama.py')
         main_lib_path = os.path.join(dest_path, 'fastllama.py')
@@ -382,6 +372,25 @@ def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None
             return
         os.chmod(module_path, 0o700)
         os.symlink(os.path.abspath(module_path), os.path.abspath(main_lib_path))
+
+def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None:
+    global g_selected_language
+    example_path = os.path.join('.', 'examples', g_selected_language[0])
+    if not os.path.exists(example_path):
+        return
+    
+    if os.path.exists(os.path.join(example_path, 'CMakeLists.txt')):
+        print('\n\nBuilding Examples....\n')
+        current_dir = os.getcwd()
+        os.chdir(example_path)
+        try:
+            run_make(project_name, args)
+        finally:
+            os.chdir(current_dir)
+            print('\nBuilding examples completed\n')
+    if g_selected_language[0] == 'python':
+        build_python_examples()
+
 
 def main(cmd_args: Optional[List[str]] = None, project_name: str = "fastllama") -> None:
     global_compiler_flags: List[str] = []
