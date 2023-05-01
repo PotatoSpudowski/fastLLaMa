@@ -2,11 +2,13 @@
 requires = ["setuptools", "wheel", "py-cpuinfo>=9.0.0", "cmake>=3.20.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.metadata]
+[project]
 name="fastllama"
 version="1.0.0"
-author="PotatoSpudowski, Amit Singh"
-author_email="bahushruth.cs@gmail.com, amitsingh19975@gmail.com"
+authors=[
+    { name="PotatoSpudowski", email="bahushruth.cs@gmail.com" },
+    { name="Amit Singh", email="amitsingh19975@gmail.com" }
+]
 description="fastLLaMa is an experimental high-performance framework for running Decoder-only LLMs with 4-bit quantization in Python using a C/C++ backend."
 classifiers=[
     "Development Status :: 3 - Alpha",
@@ -16,7 +18,7 @@ classifiers=[
     "Programming Language :: Python :: 3.7",
 ]
 
-[tool.setuptools.options]
-package_dir = {"fastllama" = "examples/python/fastllama"}
+[tool.setuptools]
+package_dir = { "fastllama" = "examples/python/fastllama" }
 packages = ["fastllama"]
-package_data = {"fastllama" = ["pyfastllama.so"]}
+package_data = { "fastllama" = ["pyfastllama.so"] }
