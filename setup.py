@@ -5,11 +5,9 @@ from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
 
-print("Current working directory:", os.getcwd())
+print("Current working directory:", os.listdir(os.getcwd()))
 
-from .compile import main as compile_main
-
-import importlib
+from compile import main as compile_main
 
 
 class CustomBuildExtCommand(build_ext):
