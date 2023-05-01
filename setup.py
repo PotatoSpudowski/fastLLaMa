@@ -46,25 +46,7 @@ class CustomInstallCommand(install):
 
         super().run()
 
-description = """
-fastLLaMa is an experimental high-performance framework for running Decoder-only LLMs with 4-bit quantization in Python using a C/C++ backend.
-"""  
 setup(
-    name="fastllama",
-    version="1.0.0",
-    package_dir={"fastllama": "examples/python/fastllama"},
-    packages=["fastllama"],
-    package_data={"fastllama": ["pyfastllama.so"]},
-    author="PotatoSpudowski, Amit Singh",
-    author_email="bahushruth.cs@gmail.com, amitsingh19975@gmail.com",
-    description=description,
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-    ],
     cmdclass={
         'build_ext': CustomBuildExtCommand,
         'install': CustomInstallCommand,
