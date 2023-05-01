@@ -19,19 +19,21 @@ namespace fastllama {
         static constexpr token_id_t BOS = 1;
 
         struct Params {
-            int seed{};
-            int n_keep{64};
-            int n_ctx{512};
-            int n_threads{1};
-            int n_batch{16};
-            bool is_old_model{false};
-            bool embedding_eval_enabled{false};
-            bool should_get_all_logits{false};
-            bool use_mmap{false};
-            bool use_mlock{false};
-            std::size_t last_n_tokens{64};
-            std::size_t allocate_extra_mem{};
-            Logger logger{};
+            int             seed{};
+            int             n_keep{64};
+            int             n_ctx{512};
+            int             n_threads{1};
+            int             n_batch{16};
+            std::uint32_t   n_load_parallel_blocks{1};
+            bool            is_old_model{false};
+            bool            embedding_eval_enabled{false};
+            bool            should_get_all_logits{false};
+            bool            use_mmap{false};
+            bool            use_mlock{false};
+            bool            use_parallel_loading{false};
+            std::size_t     last_n_tokens{64};
+            std::size_t     allocate_extra_mem{};
+            Logger          logger{};
 
             constexpr Params& set_seed(int in_seed) noexcept { this->seed = in_seed; return *this; }
             constexpr Params& set_number_of_tokens_to_keep(int keep) noexcept { this->n_keep = keep; return *this; }
@@ -44,6 +46,8 @@ namespace fastllama {
             constexpr Params& set_allocate_extra_mem(std::size_t allocate_extra_mem) noexcept { this->allocate_extra_mem = allocate_extra_mem; return *this; }
             constexpr Params& set_use_mmap(bool flag) noexcept { this->use_mmap = flag; return *this; }
             constexpr Params& set_use_mlock(bool flag) noexcept { this->use_mlock = flag; return *this; }
+            constexpr Params& set_use_parallel_loading(bool flag) noexcept { this->use_parallel_loading = flag; return *this; }
+            constexpr Params& set_n_parallel_load_blocks(std::uint32_t n_load_parallel_blocks) noexcept { this->n_load_parallel_blocks = n_load_parallel_blocks; return *this; }
             Params& set_logger(Logger in_logger) noexcept { this->logger = std::move(in_logger); return *this; }
 
             std::optional<FastLlama> build(std::string_view const& filepath);

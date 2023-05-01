@@ -10,8 +10,9 @@ int main() {
         .set_number_of_batches(64)
         .set_number_of_contexts(512)
         .set_number_of_tokens_to_keep(48)
-        .set_is_old_model(true)
-        .build("./models/7B/ggml-alpaca-7b-q4.bin");
+        .set_use_mmap(false)
+        .set_use_parallel_loading(true)
+        .build("./models/alpaca-lora-7B/alpaca-model");
     
     if (!maybe_bridge) {
         return 1;

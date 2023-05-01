@@ -222,14 +222,16 @@ namespace fastllama {
 
         std::unique_ptr<MMappedFile> mapping;
 
-        bool        is_valid{false};
-        bool        embeddings_eval_enable{false};
-        bool        should_put_all_logits{false};
-        bool        use_mmap{false};
-        bool        use_mlock{false};
-        int         threads{ static_cast<int>(std::thread::hardware_concurrency()) };
-        int         n_batch{64};
-        FileVersion file_version{ FileVersion::GGML };
+        bool            is_valid{false};
+        bool            embeddings_eval_enable{false};
+        bool            should_put_all_logits{false};
+        bool            use_mmap{false};
+        bool            use_mlock{false};
+        bool            load_parallel{false};
+        int             threads{ static_cast<int>(std::thread::hardware_concurrency()) };
+        int             n_batch{64};
+        std::uint32_t   n_load_parallel_blocks{1}; // Block size for parallel loading
+        FileVersion     file_version{ FileVersion::GGML };
     };
 
     bool quantize(std::string_view in_filepath, std::string_view out_filepath, FType ftype, int threads);

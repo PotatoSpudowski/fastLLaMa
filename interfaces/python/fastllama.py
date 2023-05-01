@@ -99,11 +99,13 @@ class c_llama_model_context_args(ctypes.Structure):
         ('should_get_all_logits', ctypes.c_bool),
         ('use_mmap', ctypes.c_bool),
         ('use_mlock', ctypes.c_bool),
+        ('load_parallel', ctypes.c_bool),
         ('seed', ctypes.c_int),
         ('n_keep', ctypes.c_int),
         ('n_ctx', ctypes.c_int),
         ('n_threads', ctypes.c_int),
         ('n_batch', ctypes.c_int),
+        ('n_load_parallel_blocks', ctypes.c_uint32),
         ('last_n_tokens', ctypes.c_size_t),
         ('allocate_extra_mem', ctypes.c_size_t),
         ('logger', c_llama_logger)
@@ -169,6 +171,8 @@ class Model:
         embedding_eval_enabled: bool = False,
         allocate_extra_mem: int = 0,
         logger: Optional[Logger] = None, 
+        load_parallel: bool = False,
+        n_load_parallel_blocks: int = 1,
         library_path = get_library_path('build', 'interfaces','python')
         ):
         """
@@ -185,6 +189,8 @@ class Model:
         :param embedding_eval_enabled: Flag to enable embedding evaluation. Default is False.
         :param allocate_extra_mem: Amount of extra memory to allocate. Default is 0.
         :param logger: Logger instance to be used for reporting messages. Default is None.
+        :param load_parallel: Flag to indicate if the model should be loaded in parallel. Default is False.
+        :param n_load_parallel_blocks: Number of task that each thread will handle. Default is 1.
         :param library_path: Path to the library file. Default is the result of get_library_path('build', 'interfaces','python').
         """
 
@@ -209,6 +215,8 @@ class Model:
         ctx_args.allocate_extra_mem = allocate_extra_mem
         ctx_args.use_mmap = use_mmap
         ctx_args.use_mlock = use_mlock
+        ctx_args.load_parallel = load_parallel
+        ctx_args.n_load_parallel_blocks = n_load_parallel_blocks
 
         if logger is not None:
             temp_logger = c_llama_logger()

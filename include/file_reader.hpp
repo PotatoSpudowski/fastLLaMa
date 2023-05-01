@@ -5,6 +5,17 @@
 #include <type_traits>
 #include "detail/file.hpp"
 
+#ifdef __has_include
+    #if __has_include(<unistd.h>)
+        #include <unistd.h>
+    #endif
+#endif
+
+#if defined(_WIN32)
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+#endif
+
 namespace fastllama{
     
     struct BinaryFileReader : detail::File {
@@ -18,6 +29,19 @@ namespace fastllama{
         BinaryFileReader& operator=(BinaryFileReader&& other) noexcept = default;
         BinaryFileReader& operator=(BinaryFileReader const& other) noexcept = delete;
         ~BinaryFileReader() noexcept = default;
+
+        template<typename T>
+        auto read_at_offset(T* val, std::size_t num_of_objects, std::size_t off) noexcept -> bool {
+            #if defined(_WIN32)
+                auto fd = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(handle())));
+                auto res = ReadFile(fd, val, sizeof(T) * num_of_objects, nullptr, reinterpret_cast<LPOVERLAPPED>(&off));
+                return res == TRUE;
+            #else
+                auto fd = fileno(handle());
+                auto res = pread(fd, val, sizeof(T) * num_of_objects, off);
+                return res == sizeof(T) * num_of_objects;
+            #endif
+        }
 
         template<typename T>
         auto read(T* val, std::size_t num_of_objects = 1) noexcept -> bool {

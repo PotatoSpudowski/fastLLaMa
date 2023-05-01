@@ -2,6 +2,7 @@
 #define FAST_LLAMA_BRIDGE_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -33,18 +34,20 @@ struct llama_array_view_f {
 // Arguments to the model for creating a context. This helps us from having very large function parament
 // and allows us to have default arguments.
 struct llama_model_context_args {
-    bool embedding_eval_enabled;
-    bool should_get_all_logits;
-    bool use_mmap;
-    bool use_mlock;
-    int seed;
-    int n_keep;
-    int n_ctx;
-    int n_threads;
-    int n_batch;
-    size_t last_n_tokens;
-    size_t allocate_extra_mem;
-    struct llama_logger logger;
+    bool embedding_eval_enabled;        // if true, embedding's vector will be filled
+    bool should_get_all_logits;         // if true, all logits will be filled
+    bool use_mmap;                      // if true, it will use mmap to load the model
+    bool use_mlock;                     // if true, it will use mlock to lock the memory
+    bool load_parallel;                 // if true, it will load the model in parallel
+    int seed;                           // seed for random number generator
+    int n_keep;                         // number of tokens to keep in memory across memory reset
+    int n_ctx;                          // number of tokens in the context
+    int n_threads;                      // number of threads to use for loading and evaluating the model
+    int n_batch;                        // size of a batch that will be used for evaluation
+    uint32_t n_load_parallel_blocks;    // number of task that a single thread will deal
+    size_t last_n_tokens;               // size of the buffer that will store the last n tokens
+    size_t allocate_extra_mem;          // extra memory to allocate for the model
+    struct llama_logger logger;         // logger that will be used for logging
 };
 
 // Creates the default context arguments to reduce the initialization complexity.
