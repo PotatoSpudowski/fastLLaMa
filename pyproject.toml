@@ -18,8 +18,9 @@ classifiers=[
     "Programming Language :: Python :: 3.7",
 ]
 
-[tool.setuptools]
-packages = ["examples/python/fastllama", "examples/python/fastllama/pyfastllama.so"]
+[tool.setuptools.packages.find]
+where = "examples/python/fastllama"
+include = ["pyfastllama.so"]
 
 # [tool.setuptools.package_dir]
 # fastllama = "examples/python/fastllama"
