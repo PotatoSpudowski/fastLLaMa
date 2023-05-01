@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" style=" height: 98%;">
+
+<head>
+    <meta charset="UTF-8">
+    <title>LLAMA Interface</title>
+</head>
+
+<body style="background-color: #1a1a1a; color: white; height: 100%;">
+    <div style="display: flex; flex-direction: column; height: 100%;">
+        <div style="display: flex; flex-direction: row; vertical-align: middle;">
+            <textarea id="prompt"></textarea>
+            <div>
+                <button id="ingestButton" onclick="sendPrompt()" disabled>Ingest</button><br>
+                <progress id="ingestProgress" value="0" max="255"> 32%</progress>
+            </div>
+            <div>
+                <select id = "models"></select>
+                <button id = "loadModelButton" onclick="selectModel()">Load model</button>
+            </div>
+        </div>
+        <br>
+        <div id="generation"
+            style="overflow-y:auto; flex-grow: 1 ; border:solid; border-color: darkgray; border-radius: 2px; border-width: 2px;">
+        </div>
+    </div>
+</body>
+<script>
+    let connected = false;
+    const socket = new WebSocket('ws://localhost:8765');
+
+    socket.addEventListener('open', (event) => { console.log("Connexion successful!"); connected = true; socket.send("list_models")});
+    socket.addEventListener('close', (event) => { console.log("Connexion closed!"); connected = false; });
+    socket.addEventListener('message', messageHandler);
+
+    function lockButtons() {
+        document.getElementById("ingestButton").disabled = true;
+        document.getElementById("loadModelButton").disabled = true;
+    }
+
+    function unlockButtons() {
+        document.getElementById("ingestButton").disabled = false;
+        document.getElementById("loadModelButton").disabled = false;
+    }
+
+    function sendPrompt() {
+        const prompt = document.getElementById("prompt").value;
+        document.getElementById("generation").innerHTML += prompt.replace(/(?:\r\n|\n)/g, '<br>');
+        socket.send("P:" + prompt);
+        lockButtons();
+    }
+
+    function selectModel() {
+        socket.send("load_model:"+
+        document.getElementById("models").value);
+        lockButtons();
+    }
+
+    function messageHandler(event) {
+        console.log(event.data);
+        if (event.data.startsWith("UNLOCK")) {
+            unlockButtons();
+        }
+        if (event.data.startsWith("ST:")) {
+            document.getElementById("generation").innerHTML += event.data.slice(3).replace(/(?:\r\n|\n)/g, '<br>');
+        }
+        if (event.data.startsWith("Prog:")) {
+            document.getElementById("ingestProgress").value = event.data.slice(5);
+        }
+        if (event.data.startsWith("Models:")) {
+            modelsList = event.data.slice(7).split('|');
+            modelsList.forEach(modelName => {
+                document.getElementById("models").innerHTML+="<option>"+modelName+"</option>"
+            });
+            console.log(modelsList)
+        }
+    }
+
+</script>
+
+</html>
