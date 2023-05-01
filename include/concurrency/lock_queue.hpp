@@ -54,6 +54,10 @@ namespace fastllama {
             std::scoped_lock lock(m_mutex);
             return m_queue.empty();
         }
+        
+        bool weak_empty() const noexcept {
+            return m_queue.empty();
+        }
 
         size_type size() const noexcept {
             std::scoped_lock lock(m_mutex);
@@ -97,28 +101,21 @@ namespace fastllama {
         }
 
         std::optional<T> pop() {
-            std::scoped_lock lock(m_mutex);
-            if (m_queue.empty()) {
-                return std::nullopt;
-            }
+            std::unique_lock lock(m_mutex, std::defer_lock);
+            if (!lock.try_lock()) return std::nullopt;
+            if (m_queue.empty()) return std::nullopt;
             T value = std::move(m_queue.front());
             m_queue.pop_front();
             return std::move(value);
         }
 
         std::optional<T> steal() {
-            std::scoped_lock lock(m_mutex);
-            if (m_queue.size() < 2) {
-                return std::nullopt;
-            }
-            T value = std::move(m_queue.back());
-            m_queue.pop_back();
-            return std::move(value);
+            return pop();
         }
 
     private:
         std::deque<T> m_queue;
-        mutable std::mutex m_mutex;
+        mutable std::mutex m_mutex{};
     };
 
 } // namespace fastllama
