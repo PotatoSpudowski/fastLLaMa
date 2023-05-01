@@ -178,7 +178,7 @@ class Model:
         embedding_eval_enabled: bool = False,
         allocate_extra_mem: int = 0,
         logger: Optional[Logger] = None, 
-        library_path = get_library_path('build', 'interfaces','python')
+        library_path: Optional[str] = None
         ):
         """
         Initializes a new model instance.
@@ -197,7 +197,7 @@ class Model:
         :param library_path: Path to the library file. Default is the result of get_library_path('build', 'interfaces','python').
         """
 
-        self.lib = ctypes.cdll.LoadLibrary(library_path)
+        self.lib = ctypes.cdll.LoadLibrary(get_library_path('build', 'interfaces','python') if library_path is None else library_path)
 
         signal_handler_fn = self.lib.llama_handle_signal
         signal_handler_fn.argtypes = [ctypes.c_int]
