@@ -7,9 +7,18 @@ import signal
 import sys
 
 LIBRARY_NAME='pyfastllama.so'
+LIBRARY_PATH: Optional[str]=None
+
+def set_library_path(path: str) -> None:
+    global LIBRARY_PATH
+    LIBRARY_PATH = path
 
 def get_library_path(*args) -> str:
-    return os.path.join(*args, LIBRARY_NAME)
+    global LIBRARY_PATH
+    if LIBRARY_PATH is None:
+        return os.path.join(*args, LIBRARY_NAME)
+    else:
+        return os.path.join(LIBRARY_PATH, LIBRARY_NAME)
 
 def progressBar(count_value, total, suffix=''):
     bar_length = 100

@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 import os
-import sys
+from pathlib import Path
+import shutil
 import subprocess
+import sys
 from typing import Callable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union, cast
 from cpuinfo import get_cpu_info
 from scripts.utils.paths import get_file_name_to_file_path_mapping
@@ -363,16 +365,23 @@ def build_example(project_name: str, args: Optional[argparse.Namespace]) -> None
             os.chdir(current_dir)
             print('\nBuilding examples completed\n')
     if g_selected_language[0] == 'python':
+        dest_path = os.path.join(example_path, 'fastllama')
         module_path = os.path.join('.', 'interfaces', 'python', 'fastllama.py')
-        lib_path = os.path.join(example_path, 'build', 'fastllama.py')
-        if not os.path.exists(os.path.join(example_path, 'build')):
-            os.mkdir(os.path.join(example_path, 'build'))
-        if os.path.exists(lib_path):
+        main_lib_path = os.path.join(dest_path, 'fastllama.py')
+        build_lib_path = Path('.') / 'build' / 'interfaces' / 'python' / 'pyfastllama.so' 
+        
+        if not os.path.exists(dest_path):
+            os.mkdir(dest_path)
+
+        if not os.path.exists(build_lib_path):
+            print(f'Could not find {build_lib_path}', file=sys.stderr)
             return
-        # with open(os.path.join('.', 'interfaces', 'python', 'lib_path.py'), 'wt') as f:
-        #     f.write(f'WORKSPACE={os.getcwd()}')
+        shutil.copy(build_lib_path, dest_path)
+        
+        if os.path.exists(main_lib_path):
+            return
         os.chmod(module_path, 0o700)
-        os.symlink(os.path.abspath(module_path), os.path.abspath(lib_path))
+        os.symlink(os.path.abspath(module_path), os.path.abspath(main_lib_path))
 
 def main(cmd_args: Optional[List[str]] = None, project_name: str = "fastllama") -> None:
     global_compiler_flags: List[str] = []
