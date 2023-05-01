@@ -1,12 +1,9 @@
 import subprocess
 import sys
 import os
-import shutil
-from pathlib import Path
 from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
-import site
 
 import importlib
 
