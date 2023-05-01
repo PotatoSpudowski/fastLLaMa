@@ -1,4 +1,4 @@
-from fastLLaMa import Model
+from fastllama import Model
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 LORA_ADAPTER_PATH = "./models/ALPACA-7B-ADAPTER/ggml-adapter-model.bin"
