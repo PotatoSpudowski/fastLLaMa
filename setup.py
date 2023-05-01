@@ -51,7 +51,7 @@ class CustomInstallCommand(install):
         
 setup(
     name="fastllama",
-    version="0.5",
+    version="1.0.0",
     package_dir={"fastllama": "examples/python/fastllama"},
     packages=["fastllama"],
     install_requires=[
