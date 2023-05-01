@@ -5,6 +5,8 @@ from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
 
+sys.path.insert(0, os.path.abspath("."))
+
 print("Current working directory:", os.listdir(os.getcwd()))
 
 from compile import main as compile_main
