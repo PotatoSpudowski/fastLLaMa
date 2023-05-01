@@ -67,5 +67,5 @@ setup(
         'build_ext': CustomBuildExtCommand,
         'install': CustomInstallCommand,
     },
-    requires=["setuptools", "wheel", "py-cpuinfo>=9.0.0", "cmake>=3.20.2"]
+    setup_requires=["setuptools", "wheel", "py-cpuinfo>=9.0.0", "cmake>=3.20.2"]
 )
