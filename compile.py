@@ -357,7 +357,7 @@ def build_python_examples() -> None:
         example_path = Path(os.path.dirname(os.path.abspath(__file__))) / 'examples' / 'python'
         dest_path = os.path.join(example_path, 'fastllama')
         module_path = os.path.join('.', 'interfaces', 'python', 'fastllama.py')
-        main_lib_path = os.path.join(dest_path, 'fastllama.py')
+        main_lib_path = os.path.join(dest_path, 'api.py')
         build_lib_path = Path('.') / 'build' / 'interfaces' / 'python' / 'pyfastllama.so' 
         
         if not os.path.exists(dest_path):

@@ -32,5 +32,5 @@ cmake/GlobalVars.cmake
 __pycache__/
 build/
 
-examples/python/fastllama/fastllama.py
+examples/python/fastllama/api.py
 examples/python/fastllama/pyfastllama.so
