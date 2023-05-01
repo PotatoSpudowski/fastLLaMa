@@ -54,6 +54,7 @@ setup(
     version="1.0.0",
     package_dir={"fastllama": "examples/python/fastllama"},
     packages=["fastllama"],
+    package_data={"fastllama": ["pyfastllama.so"]},
     install_requires=[
         "numpy>=1.24.2",
         "py-cpuinfo>=9.0.0",
