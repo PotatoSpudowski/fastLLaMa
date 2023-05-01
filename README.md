@@ -49,21 +49,24 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 - [x] Easy-to-use Python interface that allows developers to build custom workflows.
     - [x] Pip install support.
 - [x] Ability to ingest system prompts.
-    - [x] System prompts will remain in runtime memory, normal prompts are recycled)
+    - [x] System prompts will remain in runtime memory, normal prompts are recycled.
 - [x] Customisable logger support.
-- [x] Low memory mode support using mmap
+- [x] Low memory mode support using mmap.
 - [x] Quick context switching between sessions.
-    - [x] Ability to save and load session states
+    - [x] Ability to save and load session states.
 - [x] Quick LoRA adapter switching during runtime.
     - [x] During the conversion of LoRA adapters to bin file, we are caching the result of matrix multiplication to avoid expensive caclulation for every context switch.
     - [x] Possible quantization of LoRA adapters with minimal performance degradation. (FP16 supported)
     - [x] Attach and Detach support during runtime.
     - [x] Support to attach and detach adapters for models running using mmap.
+- [ ] Cold boot time optimization using multithreading.
+    - [x] Improve loading using threads.
+    - [ ] Support for `aio_read` for posix.
+    - [ ] Experiment with Linux `io_uring`. 
 - [ ] Implement Multimodal models like MiniGPT-4
     - [ ] Implement ViT and Q-Former 
     - [ ] TBD ...
 - [ ] Int4 support for NVIDIA GPUs.
-- [ ] Cold boot time optimization using multithreading.
 - [ ] Model artifact management support.
 - [ ] Multiple programming language support.
 
@@ -99,27 +102,8 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 To install `fastLLaMa` through pip use
 
 ```bash
-pip install git+https://github.com/PotatoSpudowski/fastLLaMa.git@feature/pip
+pip install git+https://github.com/PotatoSpudowski/fastLLaMa.git@main
 ```
-
-### Debugging
-
-If the installation was successful but you cannot import the package run
-
-```bash
-pip show fastLLaMa
-```
-
-Using the location of the site packages folder run
-
-```bash
-cat {{LOCATION}}/fastLLaMa/build_logs.txt
-```
-
-Note:  Replace {{ LOCATION }} with the actual location of site packages. 
-
-If you have difficulties building, Please raise an issue and we can resolve it!
-
 
 ## Usage
 
@@ -128,7 +112,7 @@ If you have difficulties building, Please raise an issue and we can resolve it!
 To import fastLLaMa just run
 
 ```python
-from fastLLaMa import Model 
+from fastllama import Model 
 ```
 
 ### Initializing the Model
@@ -174,6 +158,19 @@ res = model.generate(
     repeat_penalty=1.0, #repetition penalty (Optional)
     streaming_fn=stream_token, #streaming function
     stop_word=["User:", "\n"] #stop generation when this word is encountered (Optional)
+    )
+```
+### Loading model using Multithreads 
+
+```python
+model = Model(
+        path=MODEL_PATH, #path to model
+        num_threads=8, #number of threads to use
+        n_ctx=512, #context size of model
+        last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
+        seed=0, #seed for random number generator (Optional)
+        n_batch=128, #batch size (Optional)
+        load_parallel=True
     )
 ```
 
