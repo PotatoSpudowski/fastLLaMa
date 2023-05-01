@@ -4,6 +4,7 @@ import os
 from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
+from compile import main as compile_main
 
 import importlib
 
@@ -16,10 +17,6 @@ class CustomBuildExtCommand(build_ext):
             sys.exit(1)
 
         print("Current working directory:", os.getcwd())
-
-        # Dynamically import the 'compile' module
-        compile_module = importlib.import_module("compile")
-        compile_main = getattr(compile_module, "main")
 
         compile_main(["-l", "python"])
 
