@@ -2,9 +2,9 @@ from dataclasses import dataclass
 import subprocess
 import sys
 from typing import List, Optional, Sequence, Tuple, Union
-import inquirer
 from scripts.utils.paths import get_file_name_to_file_path_mapping
 from scripts.utils.python_version import get_python_exec_paths
+import importlib
 
 def run_shell(commands: Sequence[Union[List[str], str]]) -> None:
     for cmd in commands:
@@ -21,6 +21,7 @@ def run_shell(commands: Sequence[Union[List[str], str]]) -> None:
                 break
 
 def choose_option(name: str, message: str, options: List[str]) -> Optional[str]:
+    inquirer = importlib.import_module("inquirer")
     questions = [
         inquirer.List(name, message=message, choices=options)
     ]
