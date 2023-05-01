@@ -4,7 +4,10 @@ import os
 from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
-from compile import main as compile_main
+
+print("Current working directory:", os.getcwd())
+
+from .compile import main as compile_main
 
 import importlib
 
