@@ -26,12 +26,6 @@ class CustomBuildExtCommand(build_ext):
 
         compile_main(["-l", "python"])
 
-        # site_packages_dir = site.getsitepackages()[0]
-        # source_dir = Path(os.path.dirname(os.path.realpath(__file__)))/ "examples"/ "python"/ "fastllama"
-        # fastllama_dir = Path(site_packages_dir)/ "fastllama"
-        # fastllama_dir.mkdir(parents=True, exist_ok=True)
-        # shutil.copytree(source_dir, fastllama_dir, dirs_exist_ok=True)
-
         super().run()
 
 
