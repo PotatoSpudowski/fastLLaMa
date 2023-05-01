@@ -12,6 +12,11 @@
 #include <vector>
 #include "macro.hpp"
 
+#if defined(__unix__) || defined(__APPLE__)
+    #include <unistd.h>
+    #include <fcntl.h>
+#endif
+
 namespace fastllama::detail {
     
     struct File {
@@ -124,6 +129,28 @@ namespace fastllama::detail {
         auto set_buffer(char* buffer, std::size_t size) noexcept {
             setvbuf(handle(), buffer, _IOFBF, size);
         }
+
+        #ifdef _WIN32
+            using native_handle_type = HANDLE;
+            auto native_handle() noexcept -> native_handle_type {
+                return reinterpret_cast<native_handle_type>(_get_osfhandle(_fileno(handle())));
+            }
+            auto rd_advisory(off_t off = 0, int count = 0) noexcept -> void {
+                (void)off;
+                (void)count;
+            }
+        #else
+            using native_handle_type = int;
+            auto native_handle() noexcept -> native_handle_type {
+                return fileno(handle());
+            }
+
+            auto rd_advisory(off_t off = 0, int count = 0) noexcept -> void {
+                struct radvisory radv{off, count};
+                fcntl(native_handle(), F_RDADVISE, radv);
+            }
+        #endif
+
 
     private:
         std::string m_path;

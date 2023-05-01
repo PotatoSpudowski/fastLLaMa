@@ -233,6 +233,7 @@ namespace fastllama {
 
                 if (!shard.calc_size(*logger)) return false;
                 reader.seek(shard.size, BinaryFileReader::SeekReference::Current);
+                reader.rd_advisory(shard.file_off, shard.size);
 
                 std::size_t idx{};
 
@@ -563,11 +564,9 @@ namespace fastllama {
             std::atomic<std::size_t> done_size{0};
 
             auto worker = [&](parallel::Block block) {
-                auto& reader = file_loaders[0].reader;
-                FAST_LLAMA_ASSERT(reader, "failed to open file");
+
                 for(auto i = block.start; i < block.end; ++i) {
                     if (call_progress_callback) logger->progress(done_size.load(std::memory_order_relaxed), data_size);
-
                     auto& tl = tensors_map.tensors[i];
                     FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
                     tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
