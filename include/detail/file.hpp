@@ -12,9 +12,18 @@
 #include <vector>
 #include "macro.hpp"
 
-#if defined(__unix__) || defined(__APPLE__)
-    #include <unistd.h>
-    #include <fcntl.h>
+#ifdef __has_include
+    #if __has_include(<unistd.h>)
+        #include <unistd.h>
+    #endif
+    #if __has_include(<fcntl.h>)
+        #include <fcntl.h>
+    #endif
+#else
+    #if defined(__unix__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__linux__)
+        #include <unistd.h>
+        #include <fcntl.h>
+    #endif
 #endif
 
 namespace fastllama::detail {
