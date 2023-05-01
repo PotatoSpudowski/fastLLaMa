@@ -4,10 +4,10 @@ import shutil
 import subprocess
 import sys
 from typing import Callable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union, cast
-from cpuinfo import get_cpu_info
 from scripts.utils.paths import get_file_name_to_file_path_mapping
 from scripts.utils.shell import get_python_info, run_shell, select_language
 import argparse
+import importlib
 
 cmake_variable_type = str
 CmakeVarType = MutableMapping[str, Union[List[str], bool, str]]
@@ -187,7 +187,8 @@ def fix_flags(vars: MutableMapping[cmake_variable_type, List[str]], global_compi
             vars[v] = global_compiler_flags + COMPILER_FLAG_FIX_LOOKUP_TABLE[v](flags)
 
 def generate_compiler_flags(global_compiler_flags: List[str]) -> None:
-    info = get_cpu_info()
+    cpuinfo = importlib.import_module('cpuinfo')
+    info = cpuinfo.get_cpu_info()
     arch: str = info['arch'] if 'arch' in info else ''
 
     cmake_vars: MutableMapping[cmake_variable_type, List[str]] = { v : init_cmake_vars(v, arch.upper()) for v in COMPILER_LOOKUP_TABLE.keys() }
