@@ -1,4 +1,4 @@
-from build.fastllama import Model
+from fastllama import Model
 
 MODEL_PATH = "./models/7B/ggml-model-q4_0.bin"
 
@@ -13,5 +13,7 @@ model = Model(
 # Perplexity caculation on a file named test.txt (8000 bytes)
 with open("test.txt", "r") as f:
     data = f.read(8000)
-    total_perplexity = model.perplexity(data)
-    print(f"Total Perplexity: {total_perplexity:.4f}")
+    
+    
+total_perplexity = model.perplexity(data)
+print(f"Total Perplexity: {total_perplexity:.4f}")

@@ -47,7 +47,7 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 
 ## Features
 - [x] Easy-to-use Python interface that allows developers to build custom workflows.
-    - [ ] Pip support (Soon)
+    - [x] Pip install support.
 - [x] Ability to ingest system prompts.
     - [x] System prompts will remain in runtime memory, normal prompts are recycled)
 - [x] Customisable logger support.
@@ -69,12 +69,12 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 
 ### Supported Models
 - [X] LLaMA 🦙
-- [X] [Alpaca](https://github.com/ggerganov/llama.cpp#instruction-mode-with-alpaca)
-- [X] [GPT4All](https://github.com/ggerganov/llama.cpp#using-gpt4all)
-- [X] [Chinese LLaMA / Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca)
-- [X] [Vigogne (French)](https://github.com/bofenghuang/vigogne)
-- [X] [Vicuna](https://github.com/ggerganov/llama.cpp/discussions/643#discussioncomment-5533894)
-- [X] [Koala](https://bair.berkeley.edu/blog/2023/04/03/koala/)
+- [X] Alpaca
+- [X] GPT4All
+- [X] Chinese LLaMA / Alpaca
+- [X] Vigogne (French)
+- [X] Vicuna
+- [X] Koala
 ---
 
 ## Requirements
@@ -90,36 +90,45 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
    * For Windows \
 Download cmake-*.exe installer from [Download page](https://cmake.org/download/) and run it.
 
-2. Minimum C++ 17
-3. Python 3.x
+2. GCC 11 or greater
+3. Minimum C++ 17
+4. Python 3.x
+
+## Installation 
+
+To install `fastLLaMa` through pip use
+
+```bash
+pip install git+https://github.com/PotatoSpudowski/fastLLaMa.git@feature/pip
+```
+
+### Debugging
+
+If the installation was successful but you cannot import the package run
+
+```bash
+pip show fastLLaMa
+```
+
+Using the location of the site packages folder run
+
+```bash
+cat {{LOCATION}}/fastLLaMa/build_logs.txt
+```
+
+Note:  Replace {{ LOCATION }} with the actual location of site packages. 
+
+If you have difficulties building, Please raise an issue and we can resolve it!
+
 
 ## Usage
 
-### Example
-```sh
-git clone https://github.com/PotatoSpudowski/fastLLaMa
-cd fastLLaMa
+### Importing the package
 
-# install Python dependencies
-pip install -r requirements.txt
+To import fastLLaMa just run
 
-
-python setup.py -l python
-
-# obtain the original LLaMA model weights and place them in ./models
-ls ./models
-65B 30B 13B 7B tokenizer_checklist.chk tokenizer.model
-
-# convert the 7B model to ggml FP16 format
-# python [PythonFile] [ModelPath] [Floattype] [Vocab Only] [SplitType]
-python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0
-
-# quantize the model to 4-bits
-./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
-
-# run the inference
-#Run the scripts from the root dir of the project for now!
-python ./examples/python/example.py
+```python
+from fastLLaMa import Model 
 ```
 
 ### Initializing the Model
@@ -132,6 +141,8 @@ model = Model(
         n_ctx=512, #context size of model
         last_n_size=64, #size of last n tokens (used for repetition penalty) (Optional)
         seed=0, #seed for random number generator (Optional)
+        n_batch=128, #batch size (Optional)
+        use_mmap=False, #use mmap to load model (Optional)
     )
 ```
 
@@ -147,6 +158,7 @@ User: """
 
 res = model.ingest(prompt, is_system_prompt=True) #ingest model with prompt
 ```
+
 ### Generating Output
 ```python
 def stream_token(x: str) -> None:
@@ -166,20 +178,124 @@ res = model.generate(
 ```
 
 ### Saving Model State
+
+To cache the session, you can use the `save_state` method.
+
 ```python
 res = model.save_state("./models/fast_llama.bin")
 ```
 
 ### Loading Model State
+
+To load the session, use the `load_state` method.
+
 ```python
 res = model.load_state("./models/fast_llama.bin")
+```
+
+### Resetting the Model State
+
+To reset the session use the `reset` method.
+
+```python
+model.reset()
+```
+### Attaching LoRA Adapters to Base model during runtime
+
+To attach LoRA Adapter during runtime use the `attach_lora` method.
+
+```python
+LORA_ADAPTER_PATH = "./models/ALPACA-7B-ADAPTER/ggml-adapter-model.bin"
+
+model.attach_lora(LORA_ADAPTER_PATH)
+```
+
+Note: It is a good idea to reset the state of the model after attaching a LoRA Adapter.
+
+### Detaching LoRA Adapters to Base model during runtime
+
+To detach LoRA Adapter during runtime use the `detach_lora` method.
+
+```python
+model.detach_lora()
+```
+
+### Calculating perplexity
+
+To caculate the perplexity, use the `perplexity` method.
+
+```python
+
+with open("test.txt", "r") as f:
+    data = f.read(8000)
+       
+total_perplexity = model.perplexity(data)
+print(f"Total Perplexity: {total_perplexity:.4f}")
+```
+
+### Getting the embeddings of the model
+
+To get the embeddings of the model, use the `get_embeddings` method.
+
+```python
+embeddings = model.get_embeddings()
+```
+
+### Getting the logits of the model
+
+To get the logits of the model, use the `get_logits` method.
+
+```python
+logits = model.get_logits()
+```
+
+### Using the logger
+
+```python
+from fastLLaMa import Logger
+
+class MyLogger(Logger):
+    def __init__(self):
+        super().__init__()
+        self.file = open("logs.log", "w")
+
+    def log_info(self, func_name: str, message: str) -> None:
+        #Modify this to do whatever you want when you see info logs
+        print(f"[Info]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
+        pass
+    
+    def log_err(self, func_name: str, message: str) -> None:
+        #Modify this to do whatever you want when you see error logs
+        print(f"[Error]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
+    
+    def log_warn(self, func_name: str, message: str) -> None:
+        #Modify this to do whatever you want when you see warning logs
+        print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
+```
+
+For more clarity, check the `examples/python/` folder.
+
+### Running LLaMA
+```sh
+# obtain the original LLaMA model weights and place them in ./models
+ls ./models
+65B 30B 13B 7B tokenizer_checklist.chk tokenizer.model
+
+# convert the 7B model to ggml FP16 format
+# python [PythonFile] [ModelPath] [Floattype] [Vocab Only] [SplitType]
+python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0
+
+# quantize the model to 4-bits
+./build/src/quantize models/7B/ggml-model-f16.bin models/7B/ggml-model-q4_0.bin 2
+
+# run the inference
+#Run the scripts from the root dir of the project for now!
+python ./examples/python/example.py
 ```
 
 ### Running Alpaca-LoRA 
 
 ```sh
-pip install -r requirements.txt
-
 # Before running this command
 # You need to provide the HF model paths here
 python ./scripts/export-from-huggingface.py

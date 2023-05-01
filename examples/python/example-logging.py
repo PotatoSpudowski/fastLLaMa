@@ -1,5 +1,4 @@
-from build.fastllama import Model, Logger
-from enum import Enum
+from fastllama import Model, Logger
 
 MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
 

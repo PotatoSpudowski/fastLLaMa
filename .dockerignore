@@ -16,8 +16,6 @@ build-sanitize-thread/
 
 env/
 
-models/*
-
 /main
 /quantize
 
