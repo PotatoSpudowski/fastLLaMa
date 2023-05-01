@@ -2,7 +2,8 @@ import subprocess
 import sys
 import os
 import shutil
-from setuptools import setup, find_packages, Command
+from pathlib import Path
+from setuptools import setup
 from setuptools.command.install import install
 from setuptools.command.build_ext import build_ext
 import site
@@ -25,12 +26,11 @@ class CustomBuildExtCommand(build_ext):
 
         compile_main(["-l", "python"])
 
-        # Copy the .so file to the fastLLaMa folder in site-packages
         site_packages_dir = site.getsitepackages()[0]
-        fastllama_dir = os.path.join(site_packages_dir, "fastLLaMa")
-        if not os.path.exists(fastllama_dir):
-            os.makedirs(fastllama_dir)
-        shutil.copy("build/interfaces/python/pyfastllama.so", fastllama_dir)
+        source_dir = Path(os.path.dirname(os.path.realpath(__file__)))/ "examples"/ "python"/ "fastllama"
+        fastllama_dir = Path(site_packages_dir)/ "fastllama"
+        fastllama_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, fastllama_dir, dirs_exist_ok=True)
 
         super().run()
 
