@@ -183,7 +183,7 @@ namespace fastllama {
         return m_model.dump_vocab(filepath);
     }
 
-    bool FastLlama::ingest(std::string prompt, bool is_system_prompt) {
+    bool FastLlama::ingest(std::string prompt,std::function<void(size_t const&, size_t const&)> fn, bool is_system_prompt) {
         m_model.logger.reset();
         if (!m_model.is_valid) {
             m_model.logger.log_err("FastLlama::ingest", "tried to ingest using invalid model");
