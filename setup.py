@@ -26,11 +26,11 @@ class CustomBuildExtCommand(build_ext):
 
         compile_main(["-l", "python"])
 
-        site_packages_dir = site.getsitepackages()[0]
-        source_dir = Path(os.path.dirname(os.path.realpath(__file__)))/ "examples"/ "python"/ "fastllama"
-        fastllama_dir = Path(site_packages_dir)/ "fastllama"
-        fastllama_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(source_dir, fastllama_dir, dirs_exist_ok=True)
+        # site_packages_dir = site.getsitepackages()[0]
+        # source_dir = Path(os.path.dirname(os.path.realpath(__file__)))/ "examples"/ "python"/ "fastllama"
+        # fastllama_dir = Path(site_packages_dir)/ "fastllama"
+        # fastllama_dir.mkdir(parents=True, exist_ok=True)
+        # shutil.copytree(source_dir, fastllama_dir, dirs_exist_ok=True)
 
         super().run()
 
@@ -58,7 +58,8 @@ class CustomInstallCommand(install):
 setup(
     name="fastllama",
     version="0.5",
-    package_dir={"fastLLaMa": "fastLLaMa"},
+    package_dir={"fastllama": "examples/python/fastllama"},
+    packages=["fastllama"],
     install_requires=[
         "numpy>=1.24.2",
         "py-cpuinfo>=9.0.0",
