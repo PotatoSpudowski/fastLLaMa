@@ -59,7 +59,6 @@ setup(
     name="fastllama",
     version="0.5",
     package_dir={"fastLLaMa": "fastLLaMa"},
-    packages=["fastLLaMa"],
     install_requires=[
         "numpy>=1.24.2",
         "py-cpuinfo>=9.0.0",
