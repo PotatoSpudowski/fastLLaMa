@@ -321,7 +321,7 @@ class Model:
         fn.restype = ctypes.c_bool
         return bool(fn(self.ctx, bytes(filepath, 'utf-8')))
 
-    def ingest(self, prompt: str, progress_fn=Callable[[int,int], None], is_system_prompt: bool = False) -> bool:
+    def ingest(self, prompt: str, progress_fn=None, is_system_prompt: bool = False) -> bool:
         """
         Ingests a prompt into the model.
 
@@ -331,7 +331,8 @@ class Model:
         """
 
         def callback_fn(s: ctypes.c_size_t, t: ctypes.c_size_t):
-            progress_fn(int(s),int(t))
+            if progress_fn is not None:
+                progress_fn(int(s),int(t))
         ctype_callback_fn = ctypes.CFUNCTYPE(None, ctypes.c_size_t, ctypes.c_size_t)
         
         if is_system_prompt:
