@@ -121,6 +121,8 @@ namespace fastllama {
         temp.m_model.allocate_extra_mem = allocate_extra_mem;
         temp.m_model.use_mmap = use_mmap;
         temp.m_model.use_mlock = use_mlock;
+        temp.m_model.load_parallel = use_parallel_loading;
+        temp.m_model.n_load_parallel_blocks = n_load_parallel_blocks;
 
         printf("\n\n\x1b[32m%s\x1b[0m\n\n", internal::watermark);
         fflush(stdout);
@@ -130,12 +132,12 @@ namespace fastllama {
             return std::nullopt;
         }
 
-        token_id_t inputs[] = { 0, 1, 2, 3 };
+        // token_id_t inputs[] = { 0, 1, 2, 3 };
 
-        if (!temp.m_model.eval(0, inputs, temp.m_logits, temp.m_mem_per_token)) {
-            temp.get_logger().log_err("FastLlama::Params::build", "Unable to evaluate model\n");
-            return std::nullopt;
-        }
+        // if (!temp.m_model.eval(0, inputs, temp.m_logits, temp.m_mem_per_token)) {
+        //     temp.get_logger().log_err("FastLlama::Params::build", "Unable to evaluate model\n");
+        //     return std::nullopt;
+        // }
 
         auto const logits_size = static_cast<std::size_t>(n_ctx * (should_get_all_logits ? temp.m_model.params.n_vocab : 1));
         temp.m_logits.reserve(logits_size);

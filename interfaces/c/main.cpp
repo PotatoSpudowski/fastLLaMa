@@ -63,6 +63,8 @@ extern "C" {
         result.allocate_extra_mem = 0ul;
         result.embedding_eval_enabled = false;
         result.should_get_all_logits = false;
+        result.load_parallel = false;
+        result.n_load_parallel_blocks = 1u;
         return result;
     }
 
@@ -80,6 +82,8 @@ extern "C" {
         builder.embedding_eval_enabled = arg.embedding_eval_enabled;
         builder.use_mmap = arg.use_mmap;
         builder.use_mlock = arg.use_mlock;
+        builder.use_parallel_loading = arg.load_parallel;
+        builder.n_load_parallel_blocks = arg.n_load_parallel_blocks;
 
         auto def_logger = DefaultLogger{};
         def_logger.log = arg.logger.log;
