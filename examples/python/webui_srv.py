@@ -4,7 +4,7 @@ import threading
 from os import listdir
 from os.path import isfile, join
 import queue
-from build.fastllama import Model
+from fastllama import Model
 # from examples.python.build.fastllama import Model
 lock = Lock()
 message_queue = queue.Queue()
@@ -97,6 +97,7 @@ def echo(websocket: serve):
                         # call the load function when a "load" message is received
                         if message == "loaded":
                             break
+            print("model loaded!")
         if(model != None):
             websocket.send(f"UNLOCK")
 
