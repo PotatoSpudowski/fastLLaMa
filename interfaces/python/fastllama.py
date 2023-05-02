@@ -28,6 +28,34 @@ def progressBar(count_value, total, suffix=''):
     sys.stdout.write('[%s] %s%s ...%s\r' %(bar, percentage, '%', suffix))
     sys.stdout.flush()
 
+class ProgressTag(Enum):
+    Unknown = 0,
+    Init    = 1,
+    Load    = 2,
+    Save    = 3,
+    Ingest  = 4,
+    AttachLoraAdapter = 5,
+    DetachLoraAdapter = 6,
+
+    @staticmethod
+    def from_int(value: int) -> 'ProgressTag':
+        if value == 0:
+            return ProgressTag.Unknown
+        elif value == 1:
+            return ProgressTag.Init
+        elif value == 2:
+            return ProgressTag.Load
+        elif value == 3:
+            return ProgressTag.Save
+        elif value == 4:
+            return ProgressTag.Ingest
+        elif value == 5:
+            return ProgressTag.AttachLoraAdapter
+        elif value == 6:
+            return ProgressTag.DetachLoraAdapter
+        else:
+            raise Exception(f"Unknown progress tag value: {value}")
+
 class Logger:
     """
     Logger class for reporting messages.
@@ -59,13 +87,15 @@ class Logger:
         """
         print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='')
 
-    def progress(self, done_size: int, total_size: int) -> None:
+    def progress(self, tag: ProgressTag, done_size: int, total_size: int) -> None:
         """
         Logs progress messages.
 
         :param done_size(int): size of the completed task
         :param total_size(int): total size of the task
         """
+        if tag == ProgressTag.Ingest:
+            return
         progressBar(done_size, total_size)
     
     def reset(self) -> None:
@@ -76,7 +106,7 @@ class Logger:
 
 C_LLAMA_LOGGER_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int)
 C_LLAMA_LOGGER_RESET_FUNC = ctypes.CFUNCTYPE(None)
-C_LLAMA_LOGGER_PROGRESS_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_size_t, ctypes.c_size_t)
+C_LLAMA_LOGGER_PROGRESS_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_uint8, ctypes.c_size_t, ctypes.c_size_t)
 
 class c_llama_logger(ctypes.Structure):
     """
@@ -139,15 +169,15 @@ def make_c_logger_func(func: Callable[[str, str], None]) -> Any:
         func(ctypes.string_at(func_name, int(func_name_len)).decode('utf-8'), ctypes.string_at(message, int(message_len)).decode('utf-8'))
     return C_LLAMA_LOGGER_FUNC(c_logger_func)
 
-def make_c_progress_func(func: Callable[[int, int], None]) -> Any:
+def make_c_progress_func(func: Callable[[ProgressTag, int, int], None]) -> Any:
     """
     Creates a C-compatible progress function from a Python callable.
 
     :param func: Python callable to be converted to a C-compatible progress function.
     :return: C-compatible progress function.
     """
-    def c_progress_func(done_size: ctypes.c_size_t, total_size: ctypes.c_size_t) -> None:
-        func(int(done_size), int(total_size))
+    def c_progress_func(tag: ctypes.c_uint8, done_size: ctypes.c_size_t, total_size: ctypes.c_size_t) -> None:
+        func(ProgressTag.from_int(int(tag)), int(done_size), int(total_size))
     return C_LLAMA_LOGGER_PROGRESS_FUNC(c_progress_func)
 
 def make_c_logger_reset_func(func: Callable[[], None]) -> Any:

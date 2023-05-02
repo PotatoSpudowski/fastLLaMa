@@ -193,16 +193,18 @@ namespace fastllama {
         prompt.insert(0, 1, ' ');
 
         auto embd_input = tokenize(m_model.vocabulary, prompt, true);
+
+        auto const embd_input_size = embd_input.size();
         
         auto max_input_size = m_model.params.n_ctx - 4;
-        if (embd_input.size() > static_cast<std::size_t>(max_input_size)) {
-            m_model.logger.log_err("ingest", "prompt size(='", embd_input.size(), "') exceeds maximum allowed size('", max_input_size, "')");
+        if (embd_input_size > static_cast<std::size_t>(max_input_size)) {
+            m_model.logger.log_err("ingest", "prompt size(='", embd_input_size, "') exceeds maximum allowed size('", max_input_size, "')");
             return false;
         }
         
         if (is_system_prompt) {
-            if (m_keep < static_cast<int>(embd_input.size())) {
-                m_model.logger.log_err("ingest", "system prompt size(='", embd_input.size(), "') exceeds 'n_keep'(='", m_keep, "')");
+            if (m_keep < static_cast<int>(embd_input_size)) {
+                m_model.logger.log_err("ingest", "system prompt size(='", embd_input_size, "') exceeds 'n_keep'(='", m_keep, "')");
                 return false;
             }
             m_system_prompt = embd_input;
@@ -210,12 +212,12 @@ namespace fastllama {
 
         auto const n_batch = m_model.n_batch;
 
-        for(auto i = 0ul; i < embd_input.size(); i += static_cast<std::size_t>(n_batch)) {
-            auto block = std::min(static_cast<std::size_t>(n_batch), embd_input.size() - i);
+        get_logger().progress(ProgressTag::Ingest, 0, embd_input_size);
+
+        for(auto i = 0ul; i < embd_input_size; i += static_cast<std::size_t>(n_batch)) {
+            auto block = std::min(static_cast<std::size_t>(n_batch), embd_input_size - i);
 
             recycle_embed_if_exceeds_context();
-
-            // std::cout<<"E Size: " << m_embd.size()<<", Past: "<<n_past<<", Mem: "<<m_mem_per_token<<std::endl;
 
             if (!m_embd.empty()) {
                 if (!m_model.eval(static_cast<std::size_t>(n_past), m_embd, m_logits, m_mem_per_token)) {
@@ -228,7 +230,10 @@ namespace fastllama {
 
             std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_embd));
             std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_last_n_tokens));
+            get_logger().progress(ProgressTag::Ingest, block, embd_input_size);
         }
+
+        get_logger().progress(ProgressTag::Ingest, embd_input_size, embd_input_size);
 
         m_last_n_tokens.clear();
         return true;

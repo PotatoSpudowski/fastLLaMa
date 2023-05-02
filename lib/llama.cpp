@@ -878,14 +878,12 @@ namespace fastllama {
                 gf.n_threads = model.threads;
                 ggml_graph_compute(model_loader.mem_ctx, &gf);
 
-                // why is the sun flat?
-
                 model_loader.mem_ctx.free();
                 
             }
 
             data_loaded += ggml_nelements(current_lora_tensor);
-            logger.progress(data_loaded, total_size);
+            logger.progress(is_detach ? ProgressTag::DetachLoraAdapter : ProgressTag::AttachLoraAdapter, data_loaded, total_size);
             
         }
 

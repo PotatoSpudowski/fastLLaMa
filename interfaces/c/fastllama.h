@@ -9,9 +9,19 @@
 extern "C" {
 #endif
 
+enum progress_type_tag : uint8_t {
+    PROGRESS_TAG_UNKNOWN = 0,
+    PROGRESS_TAG_INIT    = 1,
+    PROGRESS_TAG_LOAD    = 2,
+    PROGRESS_TAG_SAVE    = 3,
+    PROGRESS_TAG_INGEST  = 4,
+    PROGRESS_TAG_ATTACH_LORA_ADAPTER = 5,
+    PROGRESS_TAG_DETACH_LORA_ADAPTER = 6,
+};
+
 typedef void(*LLAMA_LOGGER_FUNC)(char const* function_name, int function_name_size, char const* message, int message_size);
 typedef void(*LLAMA_LOGGER_RESET_FUNC)();
-typedef void(*LLAMA_LOGGER_PROGRESS_FUNC)(size_t done_size, size_t total_size);
+typedef void(*LLAMA_LOGGER_PROGRESS_FUNC)(progress_type_tag, size_t done_size, size_t total_size);
 typedef void(*LLAMA_STREAM_FUNC)(char const* token_stream, int token_stream_size);
 
 struct llama_model_context;

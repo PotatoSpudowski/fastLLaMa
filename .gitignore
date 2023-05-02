@@ -34,3 +34,5 @@ build/
 
 examples/python/fastllama/api.py
 examples/python/fastllama/pyfastllama.so
+
+node_modules/

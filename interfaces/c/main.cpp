@@ -49,8 +49,8 @@ extern "C" {
         result.logger.log_err = make_def_err_logger_func();
         result.logger.log_warn = make_def_warn_logger_func();
         result.logger.reset = make_def_reset_logger_func();
-        result.logger.progress = +[](std::size_t progress, std::size_t total) {
-            fastllama::Logger::get_default_logger().progress(progress, total);
+        result.logger.progress = +[](progress_type_tag tag, std::size_t progress, std::size_t total) {
+            fastllama::Logger::get_default_logger().progress(static_cast<fastllama::ProgressTag>(tag), progress, total);
         };
 
         result.use_mmap = false;
@@ -90,7 +90,7 @@ extern "C" {
         def_logger.log_err = arg.logger.log_err;
         def_logger.log_warn = arg.logger.log_warn;
         def_logger.reset = arg.logger.reset;
-        def_logger.progress = arg.logger.progress;
+        def_logger.progress = reinterpret_cast<void(*)(fastllama::ProgressTag, std::size_t, std::size_t)>(arg.logger.progress);
         
         builder.logger = Logger(std::move(def_logger));
 
