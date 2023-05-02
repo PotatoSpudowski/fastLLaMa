@@ -61,7 +61,7 @@ namespace fastllama {
         FastLlama& operator=(FastLlama &&) noexcept = default;
         ~FastLlama() { m_model.unload(); }
 
-        bool ingest(std::string prompt, std::function<void(size_t const&, size_t const&)> fn, bool is_system_prompt = false);
+        bool ingest(std::string prompt, bool is_system_prompt = false);
         bool generate(
             std::function<void(std::string const&)> fn,
             std::size_t num_tokens,

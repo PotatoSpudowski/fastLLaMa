@@ -149,16 +149,16 @@ extern "C" {
         return true;
     }
 
-    bool llama_ingest(struct llama_model_context* model_context, char const* prompt, LLAMA_LOGGER_PROGRESS_FUNC progress_fn) {
+    bool llama_ingest(struct llama_model_context* model_context, char const* prompt) {
         if (!is_model_valid(model_context)) return false;
 
-        return model_context->inner->ingest(std::string(prompt),progress_fn, false);
+        return model_context->inner->ingest(std::string(prompt), false);
     }
 
-    bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt, LLAMA_LOGGER_PROGRESS_FUNC progress_fn) {
+    bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt) {
         if (!is_model_valid(model_context)) return false;
 
-        return model_context->inner->ingest(std::string(prompt), progress_fn, true);
+        return model_context->inner->ingest(std::string(prompt), true);
     }
 
     bool llama_generate(

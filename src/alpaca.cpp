@@ -33,7 +33,7 @@ int main() {
 
         prompt = "### Instruction:\n\n" + prompt + "\n\n ### Response:\n\n";
         
-        if (!bridge.ingest(prompt,[](size_t const& s,size_t const& t){})) return 2;
+        if (!bridge.ingest(prompt)) return 2;
 
         auto gen_res = bridge.generate([](std::string const& s) {
             std::cout<<s;

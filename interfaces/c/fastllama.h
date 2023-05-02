@@ -98,11 +98,10 @@ bool llama_set_stop_words(struct llama_model_context* model_context, char const*
  * 
  * @param model_context is the context that is constructed using `llama_create_context`.
  * @param prompt is user string that will be processed and produce output.
- * @param progress_fn callback used to keep track of the advancement of the ingestion
  * @return true if it successfully ingests the prompt.
  * @return false if it is unable to ingest the prompt.
  */
-bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt, LLAMA_LOGGER_PROGRESS_FUNC progress_fn);
+bool llama_ingest_system_prompt(struct llama_model_context* model_context, char const* prompt);
 
 /**
  * @brief Ingests the prompt that will not be preserved across memory reset to save memory.
@@ -110,11 +109,10 @@ bool llama_ingest_system_prompt(struct llama_model_context* model_context, char 
  * 
  * @param model_context is the context that is constructed using `llama_create_context`.
  * @param prompt is user string that will be processed and produce output.
- * @param progress_fn callback used to keep track of the advancement of the ingestion
  * @return true if it successfully ingests the prompt.
  * @return false if it is unable to ingest the prompt.
  */
-bool llama_ingest(struct llama_model_context* model_context, char const* prompt, LLAMA_LOGGER_PROGRESS_FUNC progress_fn);
+bool llama_ingest(struct llama_model_context* model_context, char const* prompt);
 
 /**
  * @brief Generate the model output from pervious ingested prompt or past conversation.
