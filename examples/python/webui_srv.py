@@ -1,4 +1,3 @@
-from typing import List
 from websockets.sync.server import serve
 from threading import Lock
 import threading
@@ -14,8 +13,6 @@ response_queue = queue.Queue()
 
 def stream_token(x: str) -> None:
     global socket
-    # print(x)
-    # Here the messages are put into a queue instead of immediately sending them
     with lock:
         socket.send(f"ST:{x}")
 
@@ -53,7 +50,7 @@ def generate(callback):
         repeat_penalty=1.2,  # repetition penalty (Optional)
         streaming_fn=callback,  # streaming function
         # stop generation when this word is encountered (Optional)
-        stop_words=['\n\n']
+        stop_words=['###']
     )
 
 
@@ -65,7 +62,6 @@ def set_model(model_name: str) -> str:
     model_root = f"{MODELS_FOLDER}/{model_name}"
     models = [f for f in listdir(model_root) if isfile(
         join(model_root, f)) and f.endswith("q4_0.bin")]
-    print(models)
     return f"{model_root}/{models[0]}"
 
 
@@ -75,12 +71,12 @@ def echo(websocket: serve):
     for msg in websocket:
         message = str(msg)
 
-        print(message)
+        print(f"recieved: {message}")
         websocket.send(f"Recieved: {message}")
         if message.startswith("P:"):
             prompt = message[2:]
             model.ingest(prompt, update_progress)
-            print("ingested !")
+            print("prompt ingested !")
             websocket.send("Prog:255")
             generate(stream_token)
         if message == "list_models":
