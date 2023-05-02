@@ -31,7 +31,8 @@ class MyLogger(Logger):
         print(f"[Warn]: Func('{func_name}') {message}",
               flush=True, end='', file=self.file)
 
-    def progress(self, done_size: int, total_size: int) -> None:
+    def progress(self,_ , done_size: int, total_size: int) -> None:
+        # update progress bar no mater what is progressing
         update_progress(done_size, total_size)
 
 
@@ -103,7 +104,7 @@ def echo(websocket: serve):
         websocket.send(f"Recieved: {message}")
         if message.startswith("P:"):
             prompt = message[2:]
-            model.ingest(prompt, update_progress)
+            model.ingest(prompt)
             logger.log_info("Server:",f"Prompt ingested")
             websocket.send("Prog:255")
             generate(stream_token)
