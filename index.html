@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full w-full">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://unpkg.com/ionicons@latest/dist/ionicons.js"></script>
+        <title>FastLLaMa</title>
+    </head>
+
+    <body class="body-container">
+        <header class="border-b border-zinc-700 bg-zinc-800 text-white">
+            <nav class="h-full">
+                <ul class="flex h-full items-center justify-center">
+                    <li>
+                        <h1 class="font-medium">FastLLaMa</h1>
+                    </li>
+                </ul>
+            </nav>
+        </header>
+        <main class="flex flex-grow bg-zinc-900 text-white">
+            <section
+                aria-label="Chat-Box"
+                class="chat-box"
+                id="main-body"
+            ></section>
+            <aside class="w-[18rem] border-l border-zinc-700 bg-zinc-800">
+                Options
+            </aside>
+        </main>
+        <!-- <footer class="border-2 border-blue-500"></footer> -->
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

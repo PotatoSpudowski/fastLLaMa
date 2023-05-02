@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html,
+    body {
+        height: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        overscroll-behavior: none;
+    }
+}
+
+@layer components {
+    .body-container {
+        @apply h-full w-full;
+        display: grid;
+        grid-template-rows: 2.5rem calc(100% - 2.5rem);
+    }
+
+    .chat-box {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        @apply flex-grow px-5 pb-5 overflow-hidden h-full;
+    }
+
+    .message-element {
+        @apply flex flex-col bg-zinc-800 w-fit min-w-[10rem] max-w-[80%] px-4 py-2 rounded border border-zinc-700;
+    }
+
+    .message-element-right {
+        @apply self-end text-right;
+    }
+
+    .message-element-right > :first-child {
+        @apply justify-end;
+    }
+
+    .message__content {
+        @apply text-sm font-sans whitespace-pre-wrap;
+    }
+
+    .message-element-model {
+        @apply bg-zinc-800 border-zinc-700 text-zinc-100;
+    }
+
+    .message__model-title {
+        @apply text-xs text-zinc-200;
+    }
+
+    .message-element-user {
+        @apply bg-emerald-700 border-emerald-600 text-emerald-100;
+    }
+
+    .message__user-title {
+        @apply text-xs text-emerald-200;
+    }
+
+    .system-message-tag {
+        @apply text-xs font-bold uppercase min-w-[9ch] flex;
+    }
+
+    .system-message-tag[data-kind="info"] {
+        @apply text-emerald-400;
+    }
+
+    .system-message-tag[data-kind="warning"] {
+        @apply text-yellow-400;
+    }
+
+    .system-message-tag[data-kind="error"] {
+        @apply text-rose-400;
+    }
+
+    .fastllama-watermark {
+        @apply text-sm whitespace-pre-wrap w-full text-center text-emerald-300 pb-2;
+    }
+}
