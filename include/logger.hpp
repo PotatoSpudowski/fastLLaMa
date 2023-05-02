@@ -9,10 +9,33 @@
 
 namespace fastllama {
 
+    enum class ProgressTag : std::uint8_t {
+        Unknown = 0,
+        Init    = 1,
+        Load    = 2,
+        Save    = 3,
+        Ingest  = 4,
+        AttachLoraAdapter = 5,
+        DetachLoraAdapter = 6,
+    };
+
+    inline static std::string_view to_string(ProgressTag tag) noexcept {
+        switch (tag) {
+            case ProgressTag::Unknown: return "Unknown";
+            case ProgressTag::Init: return "Init";
+            case ProgressTag::Load: return "Load";
+            case ProgressTag::Save: return "Save";
+            case ProgressTag::Ingest: return "Ingest";
+            case ProgressTag::AttachLoraAdapter: return "AttachLoraAdapter";
+            case ProgressTag::DetachLoraAdapter: return "DetachLoraAdapter";
+            default: return "Unknown";
+        }
+    }
+
     struct DefaultLogger {
         using LoggerFunction = std::function<void(char const*, int, char const*, int)>;
         using LoggerResetFunction = std::function<void()>;
-        using ProgressCallback = std::function<void(std::size_t, std::size_t)>;
+        using ProgressCallback = std::function<void(ProgressTag, std::size_t, std::size_t)>;
 
         DefaultLogger() noexcept = default;
         DefaultLogger(DefaultLogger const&) = delete;
@@ -41,7 +64,9 @@ namespace fastllama {
             fflush(stdout);
         }
 
-        static void progress_func(std::size_t done, std::size_t total) {
+        static void progress_func(ProgressTag tag, ::size_t done, std::size_t total) {
+            if (tag == ProgressTag::Ingest) return;
+            
             auto perc = (static_cast<float>(done) / static_cast<float>(total)) * 100.0f;
             auto perc_int = static_cast<int>(perc);
 
@@ -70,7 +95,7 @@ namespace fastllama {
             DefaultLogger::log_err = [](char const*, int, char const*, int) {};
             DefaultLogger::log_warn = [](char const*, int, char const*, int) {};
             DefaultLogger::reset = []() {};
-            DefaultLogger::progress = [](std::size_t, std::size_t) {};
+            DefaultLogger::progress = [](ProgressTag, std::size_t, std::size_t) {};
         }
     };
 
@@ -130,9 +155,9 @@ namespace fastllama {
             m_sink.log_warn(func_name.data(), static_cast<int>(func_name.size()), message.data(), static_cast<int>(message.size()));
         }
 
-        void progress(std::size_t done, std::size_t total) const {
+        void progress(ProgressTag tag, std::size_t done, std::size_t total) const {
             if (!m_sink.progress) return;
-            m_sink.progress(std::min(done, total), total);
+            m_sink.progress(tag, std::min(done, total), total);
         }
     private:
         DefaultLogger m_sink{};

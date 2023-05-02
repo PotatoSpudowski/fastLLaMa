@@ -1,4 +1,4 @@
-from fastllama import Model, Logger
+from fastllama import Model, Logger, ProgressTag
 
 MODEL_PATH = "./models/ALPACA-LORA-7B/alpaca-lora-q4_0.bin"
 
@@ -25,6 +25,9 @@ class MyLogger(Logger):
     def log_warn(self, func_name: str, message: str) -> None:
         #Modify this to do whatever you want when you see warning logs
         print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
+
+    def progress(self, tag: ProgressTag, done_size: int, total_size) -> None:
+        print(f"[Progress]: {tag} {done_size}/{total_size}", flush=True, file=self.file)
         
 
 model = Model(

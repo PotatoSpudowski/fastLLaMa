@@ -528,7 +528,7 @@ namespace fastllama {
             std::size_t done_size{};
             for(auto& tl : tensors_map.tensors) {
                 if (call_progress_callback) {
-                    logger->progress(done_size, data_size);
+                    logger->progress(ProgressTag::Init, done_size, data_size);
                 }
 
                 FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
@@ -543,7 +543,7 @@ namespace fastllama {
             }
 
             if (call_progress_callback) {
-                logger->progress(data_size, data_size);
+                logger->progress(ProgressTag::Init, data_size, data_size);
             }
         }
 
@@ -566,7 +566,7 @@ namespace fastllama {
             auto worker = [&](parallel::Block block) {
 
                 for(auto i = block.start; i < block.end; ++i) {
-                    if (call_progress_callback) logger->progress(done_size.load(std::memory_order_relaxed), data_size);
+                    if (call_progress_callback) logger->progress(ProgressTag::Init, done_size.load(std::memory_order_relaxed), data_size);
                     auto& tl = tensors_map.tensors[i];
                     FAST_LLAMA_ASSERT(tl.tensor, "tensor not created");
                     tl.data = static_cast<std::uint8_t*>(tl.tensor->data);
@@ -582,7 +582,7 @@ namespace fastllama {
             parallel::for_(thread_pool, parallel::Range{ 0, tensors_map.tensors.size(), static_cast<std::size_t>(block_size) }, std::move(worker));
 
             if (call_progress_callback) {
-                logger->progress(data_size, data_size);
+                logger->progress(ProgressTag::Init, data_size, data_size);
             }
         }
 
