@@ -4,11 +4,38 @@ import threading
 from os import listdir
 from os.path import isfile, join
 import queue
-from fastllama import Model
-# from examples.python.build.fastllama import Model
+from fastllama import Model, Logger
+
 lock = Lock()
 message_queue = queue.Queue()
 response_queue = queue.Queue()
+
+
+class MyLogger(Logger):
+    def __init__(self):
+        super().__init__()
+        self.file = open("sergver_logs.log", "w")
+
+    def log_info(self, func_name: str, message: str) -> None:
+        print(f"[Info]: Func('{func_name}') {message}",
+              flush=True, end='', file=self.file)
+        pass
+
+    def log_err(self, func_name: str, message: str) -> None:
+        print(f"[Error]: Func('{func_name}') {message}",
+              flush=True, end='', file=self.file)
+        print(f"[Error]: Func('{func_name}') {message}",
+              flush=True)
+
+    def log_warn(self, func_name: str, message: str) -> None:
+        print(f"[Warn]: Func('{func_name}') {message}",
+              flush=True, end='', file=self.file)
+
+    def progress(self, done_size: int, total_size: int) -> None:
+        update_progress(done_size, total_size)
+
+
+logger = MyLogger()
 
 
 def stream_token(x: str) -> None:
@@ -17,10 +44,10 @@ def stream_token(x: str) -> None:
         socket.send(f"ST:{x}")
 
 
-def update_progress(a, b):
+def update_progress(done, total):
     global socket
     with lock:
-        socket.send(f"Prog:{int(255*a/b)}")
+        socket.send(f"Prog:{int(255*done/total)}")
 
 
 MODELS_FOLDER = "./models"
@@ -30,14 +57,15 @@ model = None
 
 
 def load_model():
-    global model, MODEL_PATH
+    global model, logger, MODEL_PATH
     model = Model(
         path=MODEL_PATH,  # path to model
         num_threads=8,  # number of threads to use
         n_ctx=2048,  # context size of model
         # size of last n tokens (used for repetition penalty) (Optional)
         last_n_size=64,
-        seed=0  # seed for random number generator (Optional)
+        seed=0,  # seed for random number generator (Optional)
+        logger=logger
     )
 
 
@@ -66,19 +94,20 @@ def set_model(model_name: str) -> str:
 
 
 def echo(websocket: serve):
-    global socket, model, message_queue, response_queue, MODEL_PATH
+    global socket, model, message_queue, response_queue, MODEL_PATH, logger
     socket = websocket
     for msg in websocket:
         message = str(msg)
 
-        print(f"recieved: {message}")
+        logger.log_info("Socket:",f"recieved: {message}")
         websocket.send(f"Recieved: {message}")
         if message.startswith("P:"):
             prompt = message[2:]
             model.ingest(prompt, update_progress)
-            print("prompt ingested !")
+            logger.log_info("Server:",f"Prompt ingested")
             websocket.send("Prog:255")
             generate(stream_token)
+            logger.log_info("Server:",f"Generation over")
         if message == "list_models":
             websocket.send("Models:"+"|".join(list_models()))
         if message.startswith("load_model:"):
@@ -97,7 +126,7 @@ def echo(websocket: serve):
                         # call the load function when a "load" message is received
                         if message == "loaded":
                             break
-            print("model loaded!")
+                logger.log_info("Server:",f"Model loaded!")
         if(model != None):
             websocket.send(f"UNLOCK")
 
