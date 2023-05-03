@@ -3,11 +3,11 @@
         <article class="my-2 w-full overflow-y-auto px-4 pt-2 flex flex-col">
             <slot></slot>
         </article>
-        <form class="w-full p-2" @submit.prevent="">
+        <form class="w-full p-2" @submit.prevent="onSubmit">
             <sp-field-label for="message-box">Message</sp-field-label>
             <div class="flex flex-grow items-center gap-2">
                 <sp-textfield grows multiline resize="none" class="w-full max-h-[15rem] overflow-scroll"
-                    placeholder="Write a message..."></sp-textfield>
+                    placeholder="Write a message..." @keydown="onKeyUp" ref="inputRef"></sp-textfield>
                 <button type="submit"
                     class="flex aspect-square w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-zinc-100 transition-colors hover:bg-zinc-700 active:bg-zinc-900"
                     aria-label="Send Message" title="Send Message">
@@ -17,3 +17,31 @@
         </form>
     </div>
 </template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+import type { Textfield } from '@spectrum-web-components/textfield';
+
+const inputRef = ref<Textfield | null>(null);
+
+interface Emits {
+    (e: 'message', message: string): void,
+}
+
+const emits = defineEmits<Emits>();
+
+function onSubmit() {
+    if (!inputRef.value) return;
+    const value = inputRef.value.value.trim();
+    if (!value) return;
+    emits('message', value);
+    inputRef.value.value = '';
+}
+
+function onKeyUp(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        onSubmit();
+    }
+}
+</script>
