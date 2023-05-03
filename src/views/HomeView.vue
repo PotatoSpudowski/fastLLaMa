@@ -16,7 +16,7 @@ import { dummyFiles } from '@/model/dummy';
 import type { FileStructure } from '@/model/schema';
 import { useRouter } from 'vue-router';
 
-const isFilePickerShowing = ref(true);
+const isFilePickerShowing = ref(false);
 const router = useRouter();
 
 function onConfirm(file: FileStructure) {
