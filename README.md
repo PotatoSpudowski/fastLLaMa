@@ -157,7 +157,7 @@ res = model.generate(
     temp=0.8, #temperature (Optional)
     repeat_penalty=1.0, #repetition penalty (Optional)
     streaming_fn=stream_token, #streaming function
-    stop_word=["User:", "\n"] #stop generation when this word is encountered (Optional)
+    stop_words=["User:", "\n"] #stop generation when this word is encountered (Optional)
     )
 ```
 ### Loading model using Multithreads 
