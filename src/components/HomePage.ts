@@ -1,6 +1,5 @@
 import { html } from 'lit-html';
 import { FileStructure } from '../model/schema';
-import { FAST_LLAMA_WATERMARK } from '../lib/watermark';
 
 function onSelectModelClick() {
     const dialog = document.getElementById('file-dialog');
@@ -135,10 +134,6 @@ function FileDialog(filepath: string, files: FileStructure[]) {
             </div>
         </sp-dialog>
     `
-}
-
-function watermarkTemplate() {
-    return html` <pre aria-hidden="true" id="water" class="fastllama-watermark">${FAST_LLAMA_WATERMARK}</pre>`
 }
 
 export function HomePage(filepath: string, files: FileStructure[]) {
