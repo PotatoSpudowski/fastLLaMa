@@ -1,17 +1,36 @@
 import { modelMessageTemplate, systemMessageTemplate, userMessageTemplate } from './components/messages';
 import './index.css'
 import { render, html } from 'lit-html';
-import { Message, SystemMessage, dummyMessages } from './model/dummy';
+import { Message, SystemMessage, dummyFiles, dummyMessages } from './model/dummy';
 import { FAST_LLAMA_WATERMARK } from './lib/watermark';
 import { chatBoxTemplate } from './components/chatBox';
+import '@spectrum-web-components/theme/theme-darkest.js';
+import '@spectrum-web-components/theme/scale-medium.js';
+import '@spectrum-web-components/theme/sp-theme.js';
+import '@spectrum-web-components/theme/src/themes.js';
+import '@spectrum-web-components/sidenav/sp-sidenav.js';
+import '@spectrum-web-components/sidenav/sp-sidenav-heading.js';
+import '@spectrum-web-components/sidenav/sp-sidenav-item.js';
+import '@spectrum-web-components/button/sp-button.js';
+import '@spectrum-web-components/button/sp-clear-button.js';
+import '@spectrum-web-components/button/sp-close-button.js';
+import '@spectrum-web-components/button-group/sp-button-group.js';
+import '@spectrum-web-components/dialog/sp-dialog.js';
+import '@spectrum-web-components/textfield/sp-textfield.js';
+import '@spectrum-web-components/field-label/sp-field-label.js';
+import '@spectrum-web-components/search/sp-search.js';
+import '@spectrum-web-components/menu/sp-menu.js';
+import '@spectrum-web-components/menu/sp-menu-group.js';
+import '@spectrum-web-components/menu/sp-menu-item.js';
+import '@spectrum-web-components/menu/sp-menu-divider.js';
+import '@spectrum-web-components/icon/sp-icon.js';
+// import '@spectrum-web-components/table/elements.js';
+import { HomePage } from './components/HomePage';
+import { FileStructure } from './model/schema';
 
 type UserState = {
     currentScrollHeight: number
     scrollThreshold: number
-}
-
-function watermarkTemplate() {
-    return html` <pre aria-hidden="true" id="water" class="fastllama-watermark">${FAST_LLAMA_WATERMARK}</pre>`
 }
 
 function scrollToTheLastElement(container: HTMLElement, userState: UserState) {
@@ -34,7 +53,6 @@ function renderMessages(container: HTMLElement, messages: Message[], userState: 
         return systemMessageTemplate(systemMessage.kind, systemMessage.function_name, systemMessage.message);
     })
     const list = chatBoxTemplate(
-        watermarkTemplate(),
         html`
             <ul class="flex flex-col">
                 ${messageElements}
@@ -45,8 +63,7 @@ function renderMessages(container: HTMLElement, messages: Message[], userState: 
     scrollToTheLastElement(container, userState);
 }
 
-async function main() {
-
+async function chatPage() {
     const mainContainer = document.getElementById('main-body') as HTMLElement;
 
     const userState: UserState = {
@@ -64,6 +81,34 @@ async function main() {
         renderMessages(mainContainer, dummyMessages, userState);
         await new Promise((resolve) => setTimeout(resolve, 200));
     }
+}
+
+function renderHomePage() {
+    const mainContainer = document.getElementById('main-body') as HTMLElement;
+    render(HomePage("test/test/ste", dummyFiles), mainContainer);
+}
+
+async function main() {
+    const body = html`
+        <aside style="background-color: var(--spectrum-gray-75)">
+            <sp-sidenav defaultValue="Docs">
+                <sp-sidenav-item value="Docs" href="/components/SideNav">
+                    Docs
+                </sp-sidenav-item>
+            </sp-sidenav>
+        </aside>
+        <main id="main-body"></main>
+    `
+
+    const app = document.getElementById('app') as HTMLElement;
+    render(body, app);
+
+    renderHomePage();
+
+    document.addEventListener('file-select', (e: CustomEvent<FileStructure>) => {
+        render(body, app);
+        chatPage();
+    });
 }
 
 window.onload = main;

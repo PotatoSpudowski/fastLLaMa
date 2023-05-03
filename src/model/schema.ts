@@ -53,3 +53,16 @@ export const packetSchema = z.object({
     type: z.literal('load-model'),
     file_name: z.string(),
 }));
+
+
+export const fileSchema = z.object({
+    type: z.literal('file'),
+    name: z.string(),
+    path: z.string(),
+}).or(z.object({
+    type: z.literal('directory'),
+    name: z.string(),
+    path: z.string(),
+}));
+
+export type FileStructure = z.infer<typeof fileSchema>;

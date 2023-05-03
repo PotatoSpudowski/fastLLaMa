@@ -1,3 +1,5 @@
+import { FileStructure } from './schema';
+
 export type SystemMessage = {
     type: 'system',
     kind: 'info' | 'warning' | 'error',
@@ -118,4 +120,22 @@ export const dummyMessages: Message[] = [
         title: 'Alpaca',
         message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.'
     },
-]
+];
+
+export const dummyFiles: FileStructure[] = [
+    {
+        name: 'root',
+        type: 'directory',
+        path: 'root/root',
+    },
+    {
+        name: 'file1.txt',
+        type: 'file',
+        path: 'root/file1.txt',
+    },
+    {
+        name: 'file2.txt',
+        type: 'file',
+        path: 'root/file2.txt',
+    }
+];
