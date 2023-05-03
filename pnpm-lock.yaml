@@ -22,6 +22,9 @@ dependencies:
   '@spectrum-web-components/menu':
     specifier: ^0.16.17
     version: 0.16.17
+  '@spectrum-web-components/progress-circle':
+    specifier: ^0.7.9
+    version: 0.7.9
   '@spectrum-web-components/search':
     specifier: ^0.12.16
     version: 0.12.16
@@ -585,6 +588,12 @@ packages:
       '@spectrum-web-components/base': 0.7.5
       '@spectrum-web-components/shared': 0.15.7
       '@spectrum-web-components/theme': 0.15.0
+    dev: false
+
+  /@spectrum-web-components/progress-circle@0.7.9:
+    resolution: {integrity: sha512-o8KrmOTiTczZkOGagPQNyAc+BXLhfcBRLnbcJY29+VT6rLXtRVbzrurd4fG1uGDvZbNJJqPGDDwd6rLDiHI7jA==}
+    dependencies:
+      '@spectrum-web-components/base': 0.7.5
     dev: false
 
   /@spectrum-web-components/reactive-controllers@0.3.5:

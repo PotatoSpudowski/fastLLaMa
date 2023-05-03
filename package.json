@@ -31,6 +31,7 @@
     "@spectrum-web-components/icon": "^0.12.11",
     "@spectrum-web-components/icons-ui": "^0.9.12",
     "@spectrum-web-components/menu": "^0.16.17",
+    "@spectrum-web-components/progress-circle": "^0.7.9",
     "@spectrum-web-components/search": "^0.12.16",
     "@spectrum-web-components/sidenav": "^0.14.3",
     "@spectrum-web-components/styles": "^0.24.0",

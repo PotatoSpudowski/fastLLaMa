@@ -4,13 +4,23 @@ export type SystemMessage = {
     type: 'system',
     kind: 'info' | 'warning' | 'error',
     function_name: string,
-    message: string
+    message: string,
+}
+
+export type MessageStatusKind = 'loading' | 'progress' | 'success' | 'failure';
+
+export type MessageStatus = {
+    kind: Exclude<MessageStatusKind, 'progress'>,
+} | {
+    kind: 'progress',
+    progress: number,
 }
 
 export type Message = {
     type: 'user' | 'model',
     title: string,
-    message: string
+    message: string,
+    status: MessageStatus,
 } | SystemMessage
 
 export const dummyMessages: Message[] = [
@@ -113,12 +123,18 @@ export const dummyMessages: Message[] = [
     {
         type: 'user',
         title: 'John Doe',
-        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.'
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
     },
     {
         type: 'model',
         title: 'Alpaca',
-        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.'
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
     },
 ];
 

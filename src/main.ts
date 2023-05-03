@@ -23,6 +23,7 @@ import '@spectrum-web-components/menu/sp-menu-group.js';
 import '@spectrum-web-components/menu/sp-menu-item.js';
 import '@spectrum-web-components/menu/sp-menu-divider.js';
 import '@spectrum-web-components/icon/sp-icon.js';
+import '@spectrum-web-components/progress-circle/sp-progress-circle.js';
 // import '@spectrum-web-components/table/elements.js';
 import { HomePage } from './components/HomePage';
 import { FileStructure } from './model/schema';
@@ -46,8 +47,8 @@ function scrollToTheLastElement(container: HTMLElement, userState: UserState) {
 
 function renderMessages(container: HTMLElement, messages: Message[], userState: UserState) {
     const messageElements = messages.map((message) => {
-        if (message.type === 'user') return userMessageTemplate(message.title, message.message);
-        else if (message.type === 'model') return modelMessageTemplate(message.title, message.message);
+        if (message.type === 'user') return userMessageTemplate(message.title, message.message, message.status);
+        else if (message.type === 'model') return modelMessageTemplate(message.title, message.message, message.status);
         const systemMessage = message as SystemMessage;
         return systemMessageTemplate(systemMessage.kind, systemMessage.function_name, systemMessage.message);
     })
@@ -77,6 +78,13 @@ async function chatPage() {
     lastMessage.message = '';
     for (let i = 0; i < len; i += 10) {
         lastMessage.message += message.substring(i, i + 10);
+        if (lastMessage.type === 'model') {
+            if (lastMessage.message.length >= len) {
+                lastMessage.status = { kind: 'success' };
+            } else {
+                lastMessage.status = { kind: 'progress', progress: (i / len) * 100 };
+            }
+        }
         renderMessages(mainContainer, dummyMessages, userState);
         await new Promise((resolve) => setTimeout(resolve, 200));
     }
