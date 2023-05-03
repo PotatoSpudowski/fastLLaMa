@@ -2,7 +2,6 @@ import { modelMessageTemplate, systemMessageTemplate, userMessageTemplate } from
 import './index.css'
 import { render, html } from 'lit-html';
 import { Message, SystemMessage, dummyFiles, dummyMessages } from './model/dummy';
-import { FAST_LLAMA_WATERMARK } from './lib/watermark';
 import { chatBoxTemplate } from './components/chatBox';
 import '@spectrum-web-components/theme/theme-darkest.js';
 import '@spectrum-web-components/theme/scale-medium.js';
@@ -104,6 +103,7 @@ async function main() {
     render(body, app);
 
     renderHomePage();
+    // chatPage();
 
     document.addEventListener('file-select', (e: CustomEvent<FileStructure>) => {
         render(body, app);
