@@ -1,20 +1,18 @@
-@import "@spectrum-web-components/styles/scale-medium.css";
-@import "@spectrum-web-components/styles/typography.css";
-@import "@spectrum-web-components/styles/theme-darkest.css";
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "./base.css";
 
 @layer base {
-    html,
-    body {
-        height: 100%;
-        scroll-behavior: smooth;
+    html {
+        @apply bg-emerald-700;
     }
 
-    body {
-        overscroll-behavior: none;
+    html,
+    body,
+    #app {
+        @apply h-full w-full;
+    }
+
+    #app {
+        @apply bg-zinc-950 text-zinc-50;
     }
 
     sp-button {
@@ -24,18 +22,6 @@
 }
 
 @layer components {
-    #app {
-        @apply h-full w-full;
-        display: grid;
-        grid-template-columns: auto 1fr;
-    }
-
-    #main-body {
-        @apply px-5 pb-5 h-full overflow-hidden;
-        display: grid;
-        grid-template-rows: 1fr auto;
-    }
-
     .message-element {
         @apply flex flex-col bg-zinc-800 w-fit min-w-[10rem] max-w-[80%] px-4 py-2 rounded border border-zinc-700;
     }

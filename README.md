@@ -2,45 +2,45 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-`fastLLaMa` is an experimental high-performance framework designed to tackle the challenges associated with deploying large language models (LLMs) in production environments. 
+`fastLLaMa` is an experimental high-performance framework designed to tackle the challenges associated with deploying large language models (LLMs) in production environments.
 
 
 It offers a user-friendly Python interface to a C++ library, [llama.cpp](https://github.com/ggerganov/llama.cpp), enabling developers to create custom workflows, implement adaptable logging, and seamlessly switch contexts between sessions. This framework is geared towards enhancing the efficiency of operating LLMs at scale, with ongoing development focused on introducing features such as optimized cold boot times, Int4 support for NVIDIA GPUs, model artifact management, and multiple programming language support.
 
 ```
-                ___            __    _    _         __ __      
-                | | '___  ___ _| |_ | |  | |   ___ |  \  \ ___ 
+                ___            __    _    _         __ __
+                | | '___  ___ _| |_ | |  | |   ___ |  \  \ ___
                 | |-<_> |<_-<  | |  | |_ | |_ <_> ||     |<_> |
                 |_| <___|/__/  |_|  |___||___|<___||_|_|_|<___|
-                                                            
-                                                                                        
-                                                                           
-                                                       .+*+-.                
-                                                      -%#--                  
-                                                    :=***%*++=.              
-                                                   :+=+**####%+              
-                                                   ++=+*%#                   
-                                                  .*+++==-                   
-                  ::--:.                           .**++=::                   
-                 #%##*++=......                    =*+==-::                   
-                .@@@*@%*==-==-==---:::::------::==*+==--::                   
-                 %@@@@+--====+===---=---==+=======+++----:                   
-                 .%@@*++*##***+===-=====++++++*++*+====++.                   
-                 :@@%*##%@@%#*%#+==++++++=++***==-=+==+=-                    
-                  %@%%%%%@%#+=*%*##%%%@###**++++==--==++                     
-                  #@%%@%@@##**%@@@%#%%%%**++*++=====-=*-                     
-                  -@@@@@@@%*#%@@@@@@@%%%%#+*%#++++++=*+.                     
-                   +@@@@@%%*-#@@@@@@@@@@@%%@%**#*#+=-.                       
-                    #%%###%:  ..+#%@@@@%%@@@@%#+-                            
-                    :***#*-         ...  *@@@%*+:                            
-                     =***=               -@%##**.                            
-                    :#*++                -@#-:*=.                            
-                     =##-                .%*..##                             
-                      +*-                 *:  +-                             
-                      :+-                :+   =.                             
-                       =-.               *+   =-                             
-                        :-:-              =--  :::                           
-                                                                           
+
+
+
+                                                       .+*+-.
+                                                      -%#--
+                                                    :=***%*++=.
+                                                   :+=+**####%+
+                                                   ++=+*%#
+                                                  .*+++==-
+                  ::--:.                           .**++=::
+                 #%##*++=......                    =*+==-::
+                .@@@*@%*==-==-==---:::::------::==*+==--::
+                 %@@@@+--====+===---=---==+=======+++----:
+                 .%@@*++*##***+===-=====++++++*++*+====++.
+                 :@@%*##%@@%#*%#+==++++++=++***==-=+==+=-
+                  %@%%%%%@%#+=*%*##%%%@###**++++==--==++
+                  #@%%@%@@##**%@@@%#%%%%**++*++=====-=*-
+                  -@@@@@@@%*#%@@@@@@@%%%%#+*%#++++++=*+.
+                   +@@@@@%%*-#@@@@@@@@@@@%%@%**#*#+=-.
+                    #%%###%:  ..+#%@@@@%%@@@@%#+-
+                    :***#*-         ...  *@@@%*+:
+                     =***=               -@%##**.
+                    :#*++                -@#-:*=.
+                     =##-                .%*..##
+                      +*-                 *:  +-
+                      :+-                :+   =.
+                       =-.               *+   =-
+                        :-:-              =--  :::
+
 
 ```
 ---
@@ -62,9 +62,9 @@ It offers a user-friendly Python interface to a C++ library, [llama.cpp](https:/
 - [ ] Cold boot time optimization using multithreading.
     - [x] Improve loading using threads.
     - [ ] Support for `aio_read` for posix.
-    - [ ] Experiment with Linux `io_uring`. 
+    - [ ] Experiment with Linux `io_uring`.
 - [ ] Implement Multimodal models like MiniGPT-4
-    - [ ] Implement ViT and Q-Former 
+    - [ ] Implement ViT and Q-Former
     - [ ] TBD ...
 - [ ] Int4 support for NVIDIA GPUs.
 - [ ] Model artifact management support.
@@ -97,7 +97,7 @@ Download cmake-*.exe installer from [Download page](https://cmake.org/download/)
 3. Minimum C++ 17
 4. Python 3.x
 
-## Installation 
+## Installation
 
 To install `fastLLaMa` through pip use
 
@@ -112,7 +112,7 @@ pip install git+https://github.com/PotatoSpudowski/fastLLaMa.git@main
 To import fastLLaMa just run
 
 ```python
-from fastllama import Model 
+from fastllama import Model
 ```
 
 ### Initializing the Model
@@ -152,7 +152,7 @@ def stream_token(x: str) -> None:
     print(x, end='', flush=True)
 
 res = model.generate(
-    num_tokens=100, 
+    num_tokens=100,
     top_p=0.95, #top p sampling (Optional)
     temp=0.8, #temperature (Optional)
     repeat_penalty=1.0, #repetition penalty (Optional)
@@ -160,7 +160,7 @@ res = model.generate(
     stop_word=["User:", "\n"] #stop generation when this word is encountered (Optional)
     )
 ```
-### Loading model using Multithreads 
+### Loading model using Multithreads
 
 ```python
 model = Model(
@@ -225,7 +225,7 @@ To caculate the perplexity, use the `perplexity` method.
 
 with open("test.txt", "r") as f:
     data = f.read(8000)
-       
+
 total_perplexity = model.perplexity(data)
 print(f"Total Perplexity: {total_perplexity:.4f}")
 ```
@@ -260,11 +260,11 @@ class MyLogger(Logger):
         #Modify this to do whatever you want when you see info logs
         print(f"[Info]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
         pass
-    
+
     def log_err(self, func_name: str, message: str) -> None:
         #Modify this to do whatever you want when you see error logs
         print(f"[Error]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
-    
+
     def log_warn(self, func_name: str, message: str) -> None:
         #Modify this to do whatever you want when you see warning logs
         print(f"[Warn]: Func('{func_name}') {message}", flush=True, end='', file=self.file)
@@ -290,13 +290,13 @@ python3 scripts/convert-pth-to-ggml.py models/7B/ 1 0
 python ./examples/python/example.py
 ```
 
-### Running Alpaca-LoRA 
+### Running Alpaca-LoRA
 
 ```sh
 # Before running this command
 # You need to provide the HF model paths here
 python ./scripts/export-from-huggingface.py
-# Alternatively you can just download the ggml models from huggingface directly and run them! 
+# Alternatively you can just download the ggml models from huggingface directly and run them!
 
 python3 ./scripts/convert-pth-to-ggml.py models/ALPACA-LORA-7B 1 0
 
@@ -312,7 +312,7 @@ python ./examples/python/example-alpaca.py
 # https://huggingface.co/tloen/alpaca-lora-7b
 
 
-python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32 
+python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32
 # Change -t to fp16 to use fp16 weights
 # Inorder to use LoRA adapters without caching, pass the --no-cache flag
 #   - Only supported for fp32 adapter weights
@@ -320,8 +320,8 @@ python scripts/convert-lora-to-ggml.py models/ALPACA-7B-ADAPTER/ -t fp32
 python examples/python/example-lora-adapter.py
 
 # Make sure to set paths correctly for the base model and adapter inside the example
-# Commands: 
-# load_lora: Attaches the adapter to the base model 
+# Commands:
+# load_lora: Attaches the adapter to the base model
 # unload_lora: Deattaches the adapter (Deattach for fp16 is yet to be added!)
 # reset: Resets the model state
 ```

@@ -66,3 +66,29 @@ export const fileSchema = z.object({
 }));
 
 export type FileStructure = z.infer<typeof fileSchema>;
+
+
+export type SystemMessage = {
+    id: string,
+    type: 'system',
+    kind: 'info' | 'warning' | 'error',
+    function_name: string,
+    message: string,
+}
+
+export type MessageStatusKind = 'loading' | 'progress' | 'success' | 'failure';
+
+export type MessageStatus = {
+    kind: Exclude<MessageStatusKind, 'progress'>,
+} | {
+    kind: 'progress',
+    progress: number,
+}
+
+export type Message = {
+    id: string,
+    type: 'user' | 'model',
+    title: string,
+    message: string,
+    status: MessageStatus,
+} | SystemMessage
