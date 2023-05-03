@@ -212,9 +212,8 @@ namespace fastllama {
 
         auto const n_batch = m_model.n_batch;
 
-        get_logger().progress(ProgressTag::Ingest, 0, embd_input_size);
-
         for(auto i = 0ul; i < embd_input_size; i += static_cast<std::size_t>(n_batch)) {
+            get_logger().progress(ProgressTag::Ingest, i, embd_input_size);
             auto block = std::min(static_cast<std::size_t>(n_batch), embd_input_size - i);
 
             recycle_embed_if_exceeds_context();
@@ -230,7 +229,6 @@ namespace fastllama {
 
             std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_embd));
             std::copy_n(embd_input.begin() + static_cast<std::ptrdiff_t>(i), block, std::back_inserter(m_last_n_tokens));
-            get_logger().progress(ProgressTag::Ingest, block, embd_input_size);
         }
 
         get_logger().progress(ProgressTag::Ingest, embd_input_size, embd_input_size);
