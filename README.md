@@ -326,6 +326,31 @@ python examples/python/example-lora-adapter.py
 # reset: Resets the model state
 ```
 
+### Running the webUi
+
+```sh
+
+## start the server
+python examples/python/webui_srv.py
+
+
+## open the client in browser
+
+# Linux:
+browse ./examples/html/webui_example.html
+
+# Windows / WSL:
+powershell.exe -c "start $(powershell.exe -c 'Convert-Path ./examples/html/webui_example.html')"
+#powershell.exe -c "start [browser name] $(powershell.exe -c 'Convert-Path ./examples/html/webui_example.html')"
+
+# Macos (not tested):
+open ./index.html
+```
+At first, no model is loaded, select the desired model in the dropdown menu and click `Load Model`.
+
+Once the model is fully loaded, The `Ingest` button will unlock to notify the server is no longer busy. 
+Type the prompt in the textbox, and press `Ingest`. The model will then ingest the prompt and steam the generated tokens afterwards.
+
 ### Memory/Disk Requirements
 
 As the models are currently fully loaded into memory, you will need adequate disk space to save them
