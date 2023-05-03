@@ -5,7 +5,9 @@
             <span class="text-xs">{{ title }}</span>
             <TheChatMessageStatus :status="status" />
         </div>
-        <pre class="text-right message__content">{{ message.trim() }}</pre>
+        <output>
+            <pre class="text-right message__content">{{ message.trim() }}</pre>
+        </output>
     </li>
 </template>
 

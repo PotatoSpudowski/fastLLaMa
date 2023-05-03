@@ -4,7 +4,9 @@
             [<span class="flex-grow">{{ kind }}</span>]
         </span>
         <span class="text-xs font-semibold text-slate-400">&lt;{{ functionName }}&gt;</span>
-        <pre class="message__content font-mono">{{ message.trim() }}</pre>
+        <output>
+            <pre class="message__content font-mono">{{ message.trim() }}</pre>
+        </output>
     </li>
 </template>
 
