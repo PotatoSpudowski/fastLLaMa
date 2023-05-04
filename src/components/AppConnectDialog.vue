@@ -40,7 +40,7 @@ interface Emits {
     (e: 'update:show', value: boolean): void,
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 const emits = defineEmits<Emits>();
 
 const socketStore = useSocketStore();
