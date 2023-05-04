@@ -125,6 +125,87 @@ export const dummyMessages: Message[] = [
     },
     {
         id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
+        type: 'user',
+        title: 'John Doe',
+        message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
+        status: {
+            kind: 'success',
+        }
+    },
+    {
+        id: new Date().toISOString(),
         type: 'model',
         title: 'Alpaca',
         message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',
@@ -187,5 +268,12 @@ export const dummyCommands: Record<string, Token[]> = {
             name: 'n_thread',
             value: '',
         }
-    ]
+    ],
+    set: [
+        {
+            type: 'arg',
+            name: 'num_tokens',
+            value: '',
+        }
+    ],
 };

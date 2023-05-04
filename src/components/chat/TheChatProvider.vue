@@ -1,6 +1,7 @@
 <template>
     <div class="h-full w-full" style="display: grid; grid-template-rows: 1fr auto;">
-        <article class="my-2 w-full overflow-y-auto px-4 pt-2 flex flex-col">
+        <article class="w-full overflow-y-auto px-4 pt-2 flex flex-col last:mb-8" ref="messageContainerRef"
+            @scroll="onScroll">
             <slot></slot>
         </article>
         <form class="w-full p-2 relative" @submit.prevent="onSubmit">
@@ -15,7 +16,7 @@
                 </sp-menu>
             </sp-popover>
             <div class="flex flex-grow items-center gap-2">
-                <sp-textfield grows multiline class="w-full max-h-[15rem] min-w-full overflow-hidden resize-none"
+                <sp-textfield grows multiline class="w-full max-h-[15rem] min-w-[70%] overflow-hidden resize-none"
                     placeholder="Write a message..." @keydown="onKeyUp" ref="inputRef"
                     v-model.trim="inputValue"></sp-textfield>
                 <button type="submit"
@@ -155,5 +156,45 @@ function tokenToString(token: Token) {
 }
 
 // ------------------ Command Suggestions ------------------
+
+// ------------------ Message ------------------------------
+
+const messageContainerRef = ref<HTMLElement | null>(null);
+
+const userScrollState = {
+    isAtBottom: true,
+    threshold: 0.02,
+};
+
+function onScroll() {
+    requestAnimationFrame(() => {
+        if (!messageContainerRef.value) return;
+        const el = messageContainerRef.value;
+        const scrollHeight = el.scrollHeight;
+        const scrollTop = el.scrollTop;
+        const clientHeight = el.clientHeight;
+        const scrollBottom = scrollHeight - scrollTop - clientHeight;
+
+        if (scrollBottom <= scrollHeight * userScrollState.threshold) {
+            userScrollState.isAtBottom = true;
+        } else {
+            userScrollState.isAtBottom = false;
+        }
+    })
+}
+
+function scrollToLatestMessage(options?: Parameters<HTMLElement['scrollIntoView']>[0]) {
+    requestAnimationFrame(() => {
+        const el = messageContainerRef.value;
+        if (!el || !userScrollState.isAtBottom) return;
+        (el.lastElementChild as HTMLElement).scrollIntoView(options);
+    })
+}
+
+// ------------------ Message ------------------------------
+
+defineExpose({
+    scrollToLatestMessage,
+});
 
 </script>

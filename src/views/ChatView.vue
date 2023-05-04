@@ -1,14 +1,19 @@
 <template>
-    <TheChatProvider v-if="filepath">
-        <template v-for="message in messages" :key="message.id">
-            <TheChatSystemMessage v-if="message.type === 'system'" :message="message.message" :kind="message.kind"
-                :function-name="message.function_name" />
-            <TheChatUserMessage v-else-if="message.type === 'user'" :message="message.message" :title="message.title"
-                :status="message.status" />
-            <TheChatModelMessage v-else-if="message.type === 'model'" :message="message.message" :title="message.title"
-                :status="message.status" />
+    <AppMainLayout>
+        <template #aside>
+            <TheSideNavProvider />
         </template>
-    </TheChatProvider>
+        <TheChatProvider v-if="filepath" ref="chatProviderRef">
+            <template v-for="message in messages" :key="message.id">
+                <TheChatSystemMessage v-if="message.type === 'system'" :message="message.message" :kind="message.kind"
+                    :function-name="message.function_name" />
+                <TheChatUserMessage v-else-if="message.type === 'user'" :message="message.message" :title="message.title"
+                    :status="message.status" />
+                <TheChatModelMessage v-else-if="message.type === 'model'" :message="message.message" :title="message.title"
+                    :status="message.status" />
+            </template>
+        </TheChatProvider>
+    </AppMainLayout>
 </template>
 
 <script setup lang="ts">
@@ -17,15 +22,20 @@ import TheChatModelMessage from '@/components/chat/TheChatModelMessage.vue';
 import TheChatProvider from '@/components/chat/TheChatProvider.vue';
 import TheChatSystemMessage from '@/components/chat/TheChatSystemMessage.vue';
 import TheChatUserMessage from '@/components/chat/TheChatUserMessage.vue';
+import AppMainLayout from '@/layout/AppMainLayout.vue';
+import TheSideNavProvider from '@/components/side-nav/TheSideNavProvider.vue';
 import { dummyMessages } from '@/model/dummy';
 import { useRouter } from 'vue-router';
 
 const messages = ref(dummyMessages);
 const router = useRouter();
+const chatProviderRef = ref<InstanceType<typeof TheChatProvider> | null>(null);
 
 const filepath = computed(() => {
     const { query } = router.currentRoute.value;
-    return String(Array.isArray(query.path) ? query.path[0] : query.path);
+    const temp = Array.isArray(query.path) ? query.path[0] : query.path;
+    if (!temp) return null;
+    return String(temp);
 });
 
 onBeforeMount(() => {
@@ -53,6 +63,9 @@ onMounted(async () => {
                 progress: (i / len) * 100
             }
         }
+        chatProviderRef.value?.scrollToLatestMessage({
+            behavior: 'smooth', block: 'center', inline: 'center'
+        });
         await new Promise(resolve => setTimeout(resolve, 100 + Math.floor(Math.random() * 100)));
 
         i += step;

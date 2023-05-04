@@ -17,7 +17,7 @@
                 </sp-menu>
             </sp-accordion-item>
         </sp-accordion>
-        <sp-button-group class=" flex justify-center items-center py-2">
+        <sp-button-group v-if="showSaveHistoryButton" class="flex justify-center items-center py-2">
             <sp-button variant="primary" @click="history.push({ id: '1', title: 'test', date: Date.now() })">
                 Save
             </sp-button>
@@ -29,8 +29,10 @@
 import { computed, ref } from 'vue';
 import { dummyHistory } from '@/model/dummy';
 import type { SaveHistoryItem } from '@/model/schema';
+import { useRouter } from 'vue-router';
 
 const history = ref(dummyHistory)
+const router = useRouter();
 
 function formatDateWithPadding(date: Date) {
     const year = date.getFullYear();
@@ -50,5 +52,9 @@ const normalizedHistory = computed(() => {
     });
     return res;
 });
+
+const showSaveHistoryButton = computed(() => {
+    return router.currentRoute.value.name === 'chat';
+})
 
 </script>
