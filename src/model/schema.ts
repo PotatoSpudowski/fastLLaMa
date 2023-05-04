@@ -67,6 +67,14 @@ export const fileSchema = z.object({
 
 export type FileStructure = z.infer<typeof fileSchema>;
 
+export type SystemMessageProgress = {
+    id: string,
+    type: 'system',
+    kind: 'progress',
+    function_name: string,
+    message: string,
+    progress: number,
+}
 
 export type SystemMessage = {
     id: string,
@@ -74,7 +82,7 @@ export type SystemMessage = {
     kind: 'info' | 'warning' | 'error',
     function_name: string,
     message: string,
-}
+} | SystemMessageProgress
 
 export type MessageStatusKind = 'loading' | 'progress' | 'success' | 'failure';
 
@@ -85,13 +93,15 @@ export type MessageStatus = {
     progress: number,
 }
 
-export type Message = {
+export type ConversationMessage = {
     id: string,
     type: 'user' | 'model',
     title: string,
     message: string,
     status: MessageStatus,
-} | SystemMessage
+}
+
+export type Message = ConversationMessage | SystemMessage
 
 
 export type SaveHistoryItem = {

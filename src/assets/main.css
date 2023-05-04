@@ -55,7 +55,7 @@
     }
 
     .system-message-tag {
-        @apply text-xs font-bold uppercase min-w-[9ch] flex;
+        @apply text-xs font-bold uppercase min-w-[10ch] flex;
     }
 
     .system-message-tag[data-kind="info"] {
@@ -68,6 +68,10 @@
 
     .system-message-tag[data-kind="error"] {
         @apply text-rose-400;
+    }
+
+    .system-message-tag[data-kind="progress"] {
+        @apply text-sky-400;
     }
 
     .fastllama-watermark {

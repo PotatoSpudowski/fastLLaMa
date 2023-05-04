@@ -116,6 +116,14 @@ export const dummyMessages: Message[] = [
     },
     {
         id: new Date().toISOString(),
+        type: 'system',
+        kind: 'progress',
+        function_name: 'Model',
+        progress: 50,
+        message: 'loading model'
+    },
+    {
+        id: new Date().toISOString(),
         type: 'user',
         title: 'John Doe',
         message: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, voluptatum.',

@@ -5,12 +5,9 @@
         </template>
         <TheChatProvider v-if="filepath" ref="chatProviderRef">
             <template v-for="message in messages" :key="message.id">
-                <TheChatSystemMessage v-if="message.type === 'system'" :message="message.message" :kind="message.kind"
-                    :function-name="message.function_name" />
-                <TheChatUserMessage v-else-if="message.type === 'user'" :message="message.message" :title="message.title"
-                    :status="message.status" />
-                <TheChatModelMessage v-else-if="message.type === 'model'" :message="message.message" :title="message.title"
-                    :status="message.status" />
+                <TheChatSystemMessage v-if="message.type === 'system'" :message="message" />
+                <TheChatUserMessage v-else-if="message.type === 'user'" :message="message" />
+                <TheChatModelMessage v-else-if="message.type === 'model'" :message="message" />
             </template>
         </TheChatProvider>
     </AppMainLayout>
