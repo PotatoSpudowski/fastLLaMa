@@ -276,4 +276,15 @@ export const dummyCommands: Record<string, Token[]> = {
             value: '',
         }
     ],
+    socket: [
+        {
+            type: 'string',
+            value: 'disconnect'
+        },
+        {
+            type: 'arg',
+            name: 'connect',
+            value: 'ws://localhost:8080',
+        }
+    ],
 };
