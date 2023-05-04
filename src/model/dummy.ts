@@ -1,4 +1,5 @@
-import type { FileStructure, Message } from './schema';
+import type { Token } from '@/lib/parser';
+import type { FileStructure, Message, SaveHistoryItem } from './schema';
 
 export const dummyMessages: Message[] = [
     {
@@ -150,3 +151,41 @@ export const dummyFiles: FileStructure[] = [
         path: 'root/file2.txt',
     }
 ];
+
+
+export const dummyHistory: SaveHistoryItem[] = [
+    {
+        id: new Date().toISOString(),
+        title: 'John Doe 1',
+        date: Date.now()
+    },
+    {
+        id: new Date().toISOString(),
+        title: 'John Doe 2',
+        date: Date.now()
+    },
+    {
+        id: new Date().toISOString(),
+        title: 'John Doe 3',
+        date: Date.now() - 1000 * 60 * 60 * 24
+    },
+    {
+        id: new Date().toISOString(),
+        title: 'Sint id dolor anim sint nostrud magna deserunt ullamco sint ex ex commodo dolore labore. Cillum qui ea quis reprehenderit velit sunt laboris dolor reprehenderit. Mollit nisi dolor cupidatat officia Lorem adipisicing et deserunt enim ut qui fugiat amet occaecat.',
+        date: Date.now() - 1000 * 60 * 60 * 24 * 2
+    }
+];
+
+export const dummyCommands: Record<string, Token[]> = {
+    load: [
+        {
+            type: 'string',
+            value: 'lora'
+        },
+        {
+            type: 'arg',
+            name: 'n_thread',
+            value: '',
+        }
+    ]
+};

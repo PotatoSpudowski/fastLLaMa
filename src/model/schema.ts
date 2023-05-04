@@ -92,3 +92,10 @@ export type Message = {
     message: string,
     status: MessageStatus,
 } | SystemMessage
+
+
+export type SaveHistoryItem = {
+    id: string,
+    title: string,
+    date: number,
+}

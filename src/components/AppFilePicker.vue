@@ -32,7 +32,6 @@
 <script setup lang="ts">
 import type { FileStructure } from '@/model/schema';
 import { ref } from 'vue';
-import { Menu } from '@spectrum-web-components/menu';
 
 interface Props {
     show: boolean,
@@ -57,9 +56,8 @@ function onConfirm() {
 }
 
 function onItemSelect(e: Event) {
-    if (!(e.target instanceof Menu)) return;
-
-    const value = e.target.value as string;
+    const el = e.target as HTMLInputElement;
+    const value = el.value;
     const [path, type] = value.split(';');
     disableConfirmBtn.value = type === 'directory';
     selectedFile.value = props.files.find(file => file.path === path && file.type === type);

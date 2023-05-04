@@ -1,7 +1,7 @@
 <template>
     <AppMainLayout>
         <template #aside>
-            Test
+            <TheSideNavProvider />
         </template>
 
         <RouterView />
@@ -11,5 +11,6 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import AppMainLayout from './layout/AppMainLayout.vue';
+import TheSideNavProvider from './components/side-nav/TheSideNavProvider.vue';
 
 </script>
