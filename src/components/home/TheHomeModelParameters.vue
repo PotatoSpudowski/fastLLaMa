@@ -41,23 +41,23 @@
                         v-model.number="modelParams.n_batch"></sp-number-field>
                 </div>
 
-                <div class="flex-grow mt-5">
-                    <!-- use_mmap: z.boolean().optional(), -->
-                    <sp-checkbox :checked="modelParams.use_mmap"
-                        @change="onItemSelected('use_mmap', $event)">Mmap</sp-checkbox>
-                </div>
-
-                <div class="flex-grow mt-5">
-                    <!-- load_parallel: z.boolean().optional(), -->
-                    <sp-checkbox :checked="modelParams.load_parallel"
-                        @change="onItemSelected('load_parallel', $event)">Parallel load</sp-checkbox>
-                </div>
-
                 <div class="flex-grow">
                     <!-- n_load_parallel_blocks: z.number().optional(), -->
                     <sp-field-label for="model_init_n_load_parallel_blocks">Parallel load Batch Size</sp-field-label>
                     <sp-number-field name="model_init_n_load_parallel_blocks" id="model_init_n_load_parallel_blocks" min="0"
                         class="w-[8rem]" v-model.number="modelParams.n_load_parallel_blocks"></sp-number-field>
+                </div>
+
+                <div class="flex-grow mt-5 w-[8rem]">
+                    <!-- use_mmap: z.boolean().optional(), -->
+                    <sp-checkbox :checked="modelParams.use_mmap"
+                        @change="onItemSelected('use_mmap', $event)">Mmap</sp-checkbox>
+                </div>
+
+                <div class="flex-grow mt-5 w-[8rem]">
+                    <!-- load_parallel: z.boolean().optional(), -->
+                    <sp-checkbox :checked="modelParams.load_parallel"
+                        @change="onItemSelected('load_parallel', $event)">Parallel load</sp-checkbox>
                 </div>
 
             </div>
