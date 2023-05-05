@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-export const packetSchema = z.object({
-    id: z.string(),
-    type: z.literal('join'),
-}).or(z.object({
+export const modelParamsSchema = z.object({
     id: z.string(),
     type: z.literal('init-model'),
     model_path: z.string(),
@@ -16,8 +13,13 @@ export const packetSchema = z.object({
     use_mmap: z.boolean().optional(),
     use_mlock: z.boolean().optional(),
     load_parallel: z.boolean().optional(),
-    n_load_parallel_blocks: z.number().optional(),
-})).or(z.object({
+    n_load_parallel_blocks: z.number().optional()
+})
+
+export const packetSchema = z.object({
+    id: z.string(),
+    type: z.literal('join'),
+}).or(modelParamsSchema).or(z.object({
     id: z.string(),
     type: z.literal('fetch-all-models'),
     search_dirs: z.string().array().optional(),

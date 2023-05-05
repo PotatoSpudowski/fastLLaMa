@@ -5,7 +5,7 @@
             <sp-status-light variant="positive" v-if="isConnected">Connected</sp-status-light>
             <sp-status-light variant="negative" v-else>Disconnected</sp-status-light>
         </div>
-        <form>
+        <form onsubmit.prevent="">
             <div class="w-full">
                 <sp-field-label for="websocket-address">Websocket Address</sp-field-label>
                 <div class="flex items-center gap-2 justify-between">
