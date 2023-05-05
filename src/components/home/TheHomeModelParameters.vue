@@ -9,35 +9,39 @@
                 <div class="flex-grow">
                     <!-- n_threads: z.number().optional(), -->
                     <sp-field-label for="model_init_n_threads">Number of threads</sp-field-label>
-                    <sp-number-field name="model_init_n_threads" id="model_init_n_threads" min="0" class="w-[8rem]"
+                    <sp-number-field name="model_init_n_threads" id="model_init_n_threads" min="0"
+                        :max="Number.MAX_SAFE_INTEGER" class="w-[8rem]"
                         v-model.number="modelParams.n_threads"></sp-number-field>
                 </div>
 
                 <div class="flex-grow">
                     <!-- n_ctx: z.number().optional(), -->
                     <sp-field-label for="model_init_n_ctx">Context Size</sp-field-label>
-                    <sp-number-field name="model_init_n_ctx" id="model_init_n_ctx" min="0" class="w-[8rem]"
-                        v-model.number="modelParams.n_ctx"></sp-number-field>
+                    <sp-number-field name="model_init_n_ctx" id="model_init_n_ctx" min="0" :max="Number.MAX_SAFE_INTEGER"
+                        class="w-[8rem]" v-model.number="modelParams.n_ctx"></sp-number-field>
                 </div>
 
                 <div class="flex-grow">
                     <!-- last_n_size: z.number().optional(), -->
                     <sp-field-label for="model_init_last_n_size">Token history size</sp-field-label>
-                    <sp-number-field name="model_init_last_n_size" id="model_init_last_n_size" min="0" class="w-[8rem]"
+                    <sp-number-field name="model_init_last_n_size" id="model_init_last_n_size" min="0"
+                        :max="Number.MAX_SAFE_INTEGER" class="w-[8rem]"
                         v-model.number="modelParams.last_n_size"></sp-number-field>
                 </div>
 
                 <div class="flex-grow">
                     <!-- tokens_to_keep: z.number().optional(), -->
                     <sp-field-label for="model_init_tokens_to_keep">Token to keep</sp-field-label>
-                    <sp-number-field name="model_init_tokens_to_keep" id="model_init_tokens_to_keep" min="0"
-                        class="w-[8rem]" v-model.number="modelParams.tokens_to_keep"></sp-number-field>
+                    <sp-number-field name="model_init_tokens_to_keep" id="model_init_tokens_to_keep"
+                        :max="Number.MAX_SAFE_INTEGER" min="0" class="w-[8rem]"
+                        v-model.number="modelParams.tokens_to_keep"></sp-number-field>
                 </div>
 
                 <div class="flex-grow">
                     <!-- n_batch: z.number().optional(), -->
                     <sp-field-label for="model_init_n_batch">Batch Size</sp-field-label>
-                    <sp-number-field name="model_init_n_batch" id="model_init_n_batch" min="0" class="w-[8rem]"
+                    <sp-number-field name="model_init_n_batch" id="model_init_n_batch" min="0"
+                        :max="Number.MAX_SAFE_INTEGER" class="w-[8rem]"
                         v-model.number="modelParams.n_batch"></sp-number-field>
                 </div>
 
@@ -45,7 +49,8 @@
                     <!-- n_load_parallel_blocks: z.number().optional(), -->
                     <sp-field-label for="model_init_n_load_parallel_blocks">Parallel load Batch Size</sp-field-label>
                     <sp-number-field name="model_init_n_load_parallel_blocks" id="model_init_n_load_parallel_blocks" min="0"
-                        class="w-[8rem]" v-model.number="modelParams.n_load_parallel_blocks"></sp-number-field>
+                        :max="Number.MAX_SAFE_INTEGER" class="w-[8rem]"
+                        v-model.number="modelParams.n_load_parallel_blocks"></sp-number-field>
                 </div>
 
                 <div class="flex-grow mt-5 w-[8rem]">
@@ -64,8 +69,8 @@
             <div class="w-full">
                 <!-- seed: z.number().optional(), -->
                 <sp-field-label for="model_init_seed">Seed</sp-field-label>
-                <sp-number-field name="model_init_seed" id="model_init_seed" min="0" class="w-full"
-                    v-model.number="modelParams.seed"></sp-number-field>
+                <sp-number-field name="model_init_seed" id="model_init_seed" min="0" :max="Number.MAX_SAFE_INTEGER"
+                    class="w-full" v-model.number="modelParams.seed"></sp-number-field>
             </div>
 
             <sp-button-group class="min-w-fit mt-8">
