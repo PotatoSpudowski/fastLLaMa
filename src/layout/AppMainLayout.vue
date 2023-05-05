@@ -1,11 +1,12 @@
 <template>
     <sp-theme theme="spectrum" color="darkest" scale="medium" class="h-full">
-        <div class="w-full h-full" style="display: grid;"
-            :style="{ 'grid-template-columns': isWebsocketConnected ? '15rem 1fr' : '1fr' }">
-            <aside v-if="$slots.aside && isWebsocketConnected" class="bg-zinc-900 h-full overflow-hidden">
+        <div class="w-full h-full" style="display: flex;">
+            <aside v-if="$slots.aside" class="bg-zinc-900 h-full overflow-hidden"
+                :style="{ 'flex-basis': isWebsocketConnected ? '15rem' : '0' }"
+                style="transition: flex-basis 150ms ease-in-out;">
                 <slot name="aside"></slot>
             </aside>
-            <main class="h-full overflow-hidden">
+            <main class="h-full overflow-hidden flex-grow">
                 <slot></slot>
             </main>
         </div>
