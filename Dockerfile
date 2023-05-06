@@ -11,6 +11,6 @@ WORKDIR /app
 #Change this to your own model
 COPY models/ models/
 #Change this to your own example
-COPY examples/python/* ./
+COPY src/* ./
 
 CMD ["python3", "example.py"]

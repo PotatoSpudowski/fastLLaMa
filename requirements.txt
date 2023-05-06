@@ -1,0 +1,4 @@
+git+https://github.com/PotatoSpudowski/fastLLaMa.git@main
+fastapi==0.95.1
+uvicorn==0.22.0
+websockets==11.0.2
