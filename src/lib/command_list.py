@@ -1,7 +1,7 @@
 from typing import List
 from command import *
 
-SUPPORED_COMMANDS: List[Command] = [
+SUPPORTED_COMMANDS: List[Command] = [
     Command('set', [
         CommandArg('max_gen_token_length', CommandArgType.INT, 100),
         CommandArg('top_k', CommandArgType.FLOAT),
