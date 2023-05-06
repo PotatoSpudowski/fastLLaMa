@@ -84,5 +84,21 @@ class TestCommand(unittest.TestCase):
         self.assertTrue(cmd.args['test4'].as_boolean())
         self.assertFalse(cmd.args['test4'].is_none())
 
+    def test_normalized_value(self):
+        int_arg = CommandArg('test', CommandArgType.INT, '12')
+        self.assertEqual(int_arg.as_normalized_value(), 12)
+
+        float_arg = CommandArg('test', CommandArgType.FLOAT, '12.0')
+        self.assertEqual(float_arg.as_normalized_value(), 12.0)
+
+        boolean_arg = CommandArg('test', CommandArgType.BOOLEAN, '')
+        self.assertEqual(boolean_arg.as_normalized_value(), False)
+
+        invalid_int_arg = CommandArg('test', CommandArgType.INT, 'test')
+        self.assertIsNone(invalid_int_arg.as_normalized_value())
+
+        invalid_float_arg = CommandArg('test', CommandArgType.FLOAT, 'test')
+        self.assertIsNone(invalid_float_arg.as_normalized_value())
+
 if __name__ == '__main__':
     unittest.main()

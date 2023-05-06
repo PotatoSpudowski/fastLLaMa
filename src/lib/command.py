@@ -70,6 +70,20 @@ class CommandArg:
     
     def is_none(self):
         return self.value is None
+    
+    def as_normalized_value(self):
+        try:
+            if self.is_string():
+                return self.as_string()
+            if self.is_int():
+                return self.as_int()
+            if self.is_float():
+                return self.as_float()
+            if self.is_boolean():
+                return self.as_boolean()
+        except:
+            return None
+        return None
 
 class Command:
     def __init__(self, name: str, args: list[CommandArg]):
