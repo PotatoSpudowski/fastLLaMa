@@ -108,8 +108,10 @@ watchDebounced(inputValue, () => {
     cursorPosition.value = textEl.selectionStart ?? 0;
 
     const value = inputValue.value;
+    console.log({ value })
     if (!value.startsWith('/')) {
         showSuggestions.value = false;
+        commandSuggestions.value = [];
         return;
     }
     const command = parseCommand(value);
