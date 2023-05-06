@@ -7,7 +7,7 @@ CURRENT_FILE_PATH = Path(os.path.dirname(os.path.realpath(__file__)))
 
 sys.path.append(os.path.join(CURRENT_FILE_PATH, '..', 'src'))
 
-from lib.command import Command, CommandArgType, CommandArg
+from utils.command import Command, CommandArgType, CommandArg
 
 class TestCommand(unittest.TestCase):
     

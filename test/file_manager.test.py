@@ -7,7 +7,7 @@ CURRENT_FILE_PATH = Path(os.path.dirname(os.path.realpath(__file__)))
 
 sys.path.append(os.path.join(CURRENT_FILE_PATH, '..', 'src'))
 
-from lib.file_manager import FileManager, FileStructure, FileKind, workspace_path
+from utils.file_manager import FileManager, FileStructure, FileKind, workspace_path
 
 class TestFileManager(unittest.TestCase):
     def test_workspace(self):
