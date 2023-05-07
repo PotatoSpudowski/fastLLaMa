@@ -52,11 +52,11 @@ function onSubmit() {
     const command = parseCommand(value);
     if (!command) {
         emits('message', value);
-        inputRef.value.value = '';
     } else {
         emits('command', command);
         console.log(command);
     }
+    inputValue.value = '';
 }
 
 function onKeyUp(e: KeyboardEvent) {

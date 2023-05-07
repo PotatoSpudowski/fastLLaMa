@@ -25,7 +25,6 @@ import { useRouter } from 'vue-router';
 import type { ConversationMessage, Message, WebSocketMessage } from '@/model/schema';
 import useSocketStore from '@/stores/socketStore';
 import { v4 as uuidv4 } from '@lukeed/uuid';
-import { notifyError } from '@/lib/notification';
 
 const messages = ref<Message[]>([]);
 const router = useRouter();
@@ -64,6 +63,7 @@ function updateMessage(message: Message) {
     }
     const index = searchMessageFromEnd(message.id);
     messages.value[index] = message;
+    chatProviderRef.value?.scrollToLatestMessage();
 }
 
 // ----------------- Model Params -----------------
@@ -89,7 +89,7 @@ function onWebsocketMessage(message: WebSocketMessage) {
             const mess = messages.value[temp];
             if (mess.type !== 'user-message') return;
             mess.status = {
-                kind: message.status,
+                kind: 'loading',
             };
             mess.id = message.id;
             messagesKey.add(message.id);
@@ -134,7 +134,7 @@ function onUserMessage(message: string) {
             kind: 'loading',
         },
     };
-    addMessage(temp_message);
+    updateMessage(temp_message);
     websocketStore.message(temp_message);
 }
 
