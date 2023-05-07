@@ -1,6 +1,6 @@
 <template>
     <div class="flex flex-col items-center justify-center">
-        <img src="img/image.png" class="h-[30rem] aspect-[46/50]" />
+        <img src="img/image.png" class="h-[30rem] aspect-[1.66/1]" />
         <sp-button-group class="min-w-fit my-2">
             <sp-button static="white" @click="emits('select-model')" v-if="isConnectedToWebsocket">Select Modal</sp-button>
             <sp-button static="white" @click="emits('connect-websocket')" v-else>Connect</sp-button>
