@@ -73,7 +73,7 @@ class FastllamaWebsocket:
         self.message_manager = MessageManager()
         self.supported_versions = ["1.0"]
         self.file_manager = FileManager()
-        self.model_name = 'LLaMa Model'
+        self.model_name = 'fastLLaMa 🦙'
         self.model: Optional[Model] = None
         self.current_gen_message: Optional[ModelMessage] = None
         self.prompt_prefix = "\n\n### Instruction:\n\n"
