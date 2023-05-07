@@ -7,7 +7,10 @@ SUPPORTED_COMMANDS: List[Command] = [
         CommandArg('top_k', CommandArgType.FLOAT),
         CommandArg('top_p', CommandArgType.FLOAT),
         CommandArg('temp', CommandArgType.FLOAT),
-        CommandArg('repeat_penalty', CommandArgType.FLOAT)]),
+        CommandArg('repeat_penalty', CommandArgType.FLOAT),
+        CommandArg('p_prefix', CommandArgType.STRING),
+        CommandArg('p_suffix', CommandArgType.STRING),
+    ]),
     Command('reset', []),
     Command('attach', [
         CommandArg('lora', CommandArgType.BOOLEAN, False),
