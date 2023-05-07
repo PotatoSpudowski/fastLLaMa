@@ -8,8 +8,8 @@
             <TheHomeWelcomeScreen :style="styleData" v-if="!isFilePickerShowing && !showConnectionDialog"
                 @select-model="isFilePickerShowing = true" v-motion-slide-visible-left
                 @connect-websocket="showConnectionDialog = true" />
-            <AppFilePicker :style="styleData" v-model:show="isFilePickerShowing" :files="dummyFiles" filepath="/"
-                v-motion-slide-visible-right @confirm="onConfirm"></AppFilePicker>
+            <AppFilePicker :style="styleData" v-model:show="isFilePickerShowing" v-motion-slide-visible-right
+                @confirm="onConfirm"></AppFilePicker>
             <AppConnectDialog v-model:show="showConnectionDialog" v-motion-slide-visible-right :style="styleData" />
             <TheHomeModelParameters v-model:show="showModelParameters" @confirm="onModelParameterInitialized">
             </TheHomeModelParameters>

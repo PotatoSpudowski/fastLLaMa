@@ -3,7 +3,7 @@
         <template #aside>
             <TheSideNavProvider />
         </template>
-        <TheChatProvider v-if="filepath" ref="chatProviderRef">
+        <TheChatProvider v-if="filepath" ref="chatProviderRef" @message="onUserMessage">
             <template v-for="message in messages" :key="message.id">
                 <TheChatSystemMessage v-if="message.type === 'system-message'" :message="message" />
                 <TheChatUserMessage v-else-if="message.type === 'user-message'" :message="message" />
@@ -21,11 +21,11 @@ import TheChatSystemMessage from '@/components/chat/TheChatSystemMessage.vue';
 import TheChatUserMessage from '@/components/chat/TheChatUserMessage.vue';
 import AppMainLayout from '@/layout/AppMainLayout.vue';
 import TheSideNavProvider from '@/components/side-nav/TheSideNavProvider.vue';
-import { dummyMessages } from '@/model/dummy';
 import { useRouter } from 'vue-router';
-import type { ConversationMessage, Message, SystemMessageProgress, WebSocketMessage } from '@/model/schema';
-import { pause } from '@/lib/utils';
+import type { ConversationMessage, Message, WebSocketMessage } from '@/model/schema';
 import useSocketStore from '@/stores/socketStore';
+import { v4 as uuidv4 } from '@lukeed/uuid';
+import { notifyError } from '@/lib/notification';
 
 const messages = ref<Message[]>([]);
 const router = useRouter();
@@ -77,10 +77,6 @@ const modelParams = computed(() => {
     return JSON.parse(String(temp));
 });
 
-function onError(message: string) {
-    // TODO: Show error message
-}
-
 function onWebsocketMessage(message: WebSocketMessage) {
     switch (message.type) {
         case 'model-message': case 'system-message': case 'user-message': {
@@ -96,6 +92,7 @@ function onWebsocketMessage(message: WebSocketMessage) {
                 kind: message.status,
             };
             mess.id = message.id;
+            messagesKey.add(message.id);
             break;
         }
         default: return;
@@ -123,65 +120,24 @@ onMounted(() => {
 
 // ----------------- Model Params -----------------
 
-// ----------------- Testing -----------------
+// ----------------- User Message -----------------
 
-async function simulateProgress(callback: (progress: number) => void) {
-    for (let i = 0; i < 100; i += 10) {
-        callback(i);
-        await pause(100 + Math.floor(Math.random() * 200))
-    }
-    callback(100);
+function onUserMessage(message: string) {
+    const id = uuidv4();
+    const temp_message: ConversationMessage = {
+        type: 'user-message',
+        message,
+        webui_id: id,
+        id,
+        title: 'user',
+        status: {
+            kind: 'loading',
+        },
+    };
+    addMessage(temp_message);
+    websocketStore.message(temp_message);
 }
 
-async function simulateMessage() {
-    for (let i = 0; i < dummyMessages.length; ++i) {
-        const message = dummyMessages[i];
-        if (message.type === 'system-message' && message.kind === 'progress') {
-            const progressMessage = message;
-            progressMessage.progress = 0;
-            messages.value.push(progressMessage);
-            const lastPos = messages.value.length - 1;
-            await simulateProgress(progress => {
-                (messages.value[lastPos] as SystemMessageProgress).progress = progress;
-            });
-            continue;
-        }
-        if (message.type === 'model-message') {
-            const orgMessageData = structuredClone(message.message);
-            const messageLen = orgMessageData.length;
-            message.message = '';
-            message.status = {
-                kind: 'progress',
-                progress: 0,
-            }
-            messages.value.push(message);
-            const lastPos = messages.value.length - 1;
-
-            let step = 10;
-            for (let j = 0; j < messageLen; j += step) {
-                step = Math.floor(Math.random() * 10 + 10);
-                (messages.value[lastPos] as ConversationMessage).message += orgMessageData.substring(j, j + step);
-                const progress = Math.floor(j / messageLen * 100);
-                (messages.value[lastPos] as ConversationMessage).status = {
-                    kind: 'progress',
-                    progress,
-                }
-                await pause(100 + Math.floor(Math.random() * 100))
-            }
-            (messages.value[lastPos] as ConversationMessage).status = {
-                kind: 'success'
-            }
-        } else {
-            messages.value.push(message);
-        }
-        await pause(100 + Math.floor(Math.random() * 100))
-    }
-}
-
-onMounted(async () => {
-    simulateMessage();
-})
-
-// ----------------- Testing -----------------
+// ----------------- User Message -----------------
 
 </script>

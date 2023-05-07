@@ -82,7 +82,7 @@ async function initHandshake() {
         initAckPromise.reject = reject;
         socketStore.message({
             type: 'init',
-            version: '1'
+            version: '1.0'
         });
         setTimeout(() => {
             reject('websocket did not respond in time');

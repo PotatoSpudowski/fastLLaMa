@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const modelParamsSchema = z.object({
-    id: z.string(),
     type: z.literal('init-model'),
     model_path: z.string(),
     n_threads: z.number().optional(),
@@ -17,7 +16,7 @@ export const modelParamsSchema = z.object({
 });
 
 export const fileSchema = z.object({
-    type: z.enum(['file', 'directory']),
+    kind: z.enum(['file', 'directory']),
     name: z.string(),
     path: z.string(),
 });
@@ -27,7 +26,8 @@ export const commandAckSchema = z.object({
     command: z.string(),
     args: z.object({
         name: z.string(),
-        value: z.string().or(z.number()).or(z.boolean()).optional(),
+        type: z.enum(['string', 'float', 'int', 'boolean']),
+        value: z.string().or(z.number()).or(z.boolean()).optional().nullable(),
     }).array()
 });
 
@@ -51,7 +51,10 @@ export const initAckSchema = z.object({
     currentPath: z.string(),
     files: fileSchema.array(),
     saveHistory: saveHistorySchema.array(),
-    commands: commandAckSchema
+    commands: z.object({
+        name: z.string(),
+        args: commandAckSchema.shape.args
+    }).array()
 });
 
 export const closeSchema = z.object({
@@ -141,13 +144,18 @@ export const messageAckSchema = z.object({
 export const fileManagerSchema = z.object({
     type: z.literal('file-manager'),
     path: z.string(),
-    kind: z.enum(['go-back', 'open-directory'])
+    kind: z.enum(['go-back', 'open-dir'])
 });
 
 export const fileManagerAckSchema = z.object({
     type: z.literal('file-manager-ack'),
     currentPath: z.string(),
     files: fileSchema.array(),
+});
+
+export const errorSchema = z.object({
+    type: z.literal('error'),
+    message: z.string(),
 });
 
 export type FileStructure = z.infer<typeof fileSchema>;
@@ -165,6 +173,8 @@ export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 export type Message = ConversationMessage | SystemMessage
 
 export type SaveHistoryItem = z.infer<typeof saveHistorySchema>;
+
+export type InitAck = z.infer<typeof initAckSchema>;
 
 export const webSocketMessageSchema = z.union([
     initSchema,
@@ -185,5 +195,6 @@ export const webSocketMessageSchema = z.union([
     fileManagerSchema,
     fileManagerAckSchema,
     conversationMessageSchema,
+    errorSchema
 ]);
 export type WebSocketMessage = z.infer<typeof webSocketMessageSchema>;

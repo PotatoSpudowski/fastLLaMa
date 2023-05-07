@@ -28,7 +28,7 @@ const chatMessage = computed(() => {
 
 const progress = computed(() => {
     const { message } = props;
-    return message.kind === 'progress' ? message.progress : undefined;
+    return message.kind === 'progress' ? Math.round(message.progress) : undefined;
 });
 
 </script>

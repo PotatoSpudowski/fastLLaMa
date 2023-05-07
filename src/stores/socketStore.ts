@@ -1,5 +1,6 @@
 import { webSocketMessageSchema, type WebSocketMessage } from '@/model/schema';
 import { defineStore } from 'pinia';
+import useAppStore from './appStore';
 
 export type SocketCallback = (this: WebSocket, data: WebSocketMessage) => void;
 
@@ -16,7 +17,7 @@ type SocketStoreState = {
 const useSocketStore = defineStore('useSocketStore', {
     state: (): SocketStoreState => ({
         socket: null,
-        address: 'ws://localhost:8080',
+        address: 'ws://localhost:8000/ws',
         isConnected: false,
         isConnecting: false,
         errorMessage: null,
@@ -51,8 +52,10 @@ const useSocketStore = defineStore('useSocketStore', {
             const callbacks = this._callbacks;
             this.socket!.onmessage = function (event) {
                 try {
-                    const data: WebSocketMessage = webSocketMessageSchema.parse(JSON.parse(event.data));
+                    const json = JSON.parse(event.data);
+                    const data: WebSocketMessage = webSocketMessageSchema.parse(json);
                     const self = this;
+                    useAppStore()._handleWebsocketMessage(data);
                     callbacks.forEach((callback) => {
                         callback.call(self, data);
                     });
