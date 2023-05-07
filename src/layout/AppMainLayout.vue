@@ -10,6 +10,7 @@
                 <slot></slot>
             </main>
         </div>
+        <div role="region" id="alert-container" class="fixed z-10 top-0 left-1/2 -translate-x-1/2"></div>
     </sp-theme>
 </template>
 

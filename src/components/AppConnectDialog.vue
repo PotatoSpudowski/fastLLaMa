@@ -20,16 +20,21 @@
             </div>
 
             <sp-button-group class="min-w-fit mt-2">
-                <sp-button static="white" :disabled="isConnecting" v-if="!isConnected" @click="connect">Connect</sp-button>
+                <sp-button static="white" :disabled="isConnecting" v-if="!isConnected"
+                    @click="onConnect">Connect</sp-button>
                 <sp-button variant="negative" :disabled="isConnecting" v-else @click="disconnect">Disconnect</sp-button>
             </sp-button-group>
         </form>
+        <AppLoading v-model="showLoading" message="Connecting to websocket..."></AppLoading>
     </sp-dialog>
 </template>
 
 <script setup lang="ts">
+import type { WebSocketMessage } from '@/model/schema';
 import useSocketStore from '@/stores/socketStore';
 import { storeToRefs } from 'pinia';
+import { ref } from 'vue';
+import AppLoading from './AppLoading.vue';
 
 
 interface Props {
@@ -46,9 +51,66 @@ const emits = defineEmits<Emits>();
 const socketStore = useSocketStore();
 const { isConnecting, isConnected, errorMessage, hasError, address } = storeToRefs(socketStore);
 const { connect, disconnect } = useSocketStore();
+const showLoading = ref(false);
 
 function onClose() {
     emits('update:show', false);
 }
+
+
+// ----------------- Websocket -----------------
+
+const initAckPromise = {
+    resolve: (_value: boolean) => { void _value; },
+    reject: (_reason?: any) => { void _reason; },
+    timeout: 5000, // 5 seconds
+};
+
+
+function onWebsocketMessage(message: WebSocketMessage) {
+    if (message.type === 'init-ack') {
+        initAckPromise.resolve(true);
+        socketStore.off(onWebsocketMessage);
+    }
+}
+
+async function initHandshake() {
+    if (!socketStore.socket) return false;
+    socketStore.on(onWebsocketMessage);
+    return new Promise<boolean>((resolve, reject) => {
+        initAckPromise.resolve = resolve;
+        initAckPromise.reject = reject;
+        socketStore.message({
+            type: 'init',
+            version: '1'
+        });
+        setTimeout(() => {
+            reject('websocket did not respond in time');
+        }, initAckPromise.timeout);
+    });
+}
+
+async function onConnect() {
+    showLoading.value = true;
+    connect(async (err) => {
+        if (err) return;
+        try {
+            if (!await initHandshake()) {
+                disconnect();
+                hasError.value = true;
+                errorMessage.value = 'Websocket does not follow fastLLaMa protocol';
+            }
+        } catch {
+            disconnect();
+            hasError.value = true;
+            errorMessage.value = 'Websocket does not respond in time, or does not support fastLLaMa protocol';
+        } finally {
+            showLoading.value = false;
+        }
+    });
+
+}
+
+// ----------------- Websocket -----------------
 
 </script>

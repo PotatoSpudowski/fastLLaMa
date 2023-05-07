@@ -85,4 +85,26 @@
     .slide-leave {
         @apply transform opacity-0 translate-x-full;
     }
+
+    .fade-animation {
+        animation: fade-in 150ms ease, slide-in 150ms ease, fade-out 150ms ease var(--on-screen-duration, 3s);
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+    }
+
+    @keyframes fade-out {
+        to {
+            opacity: 0;
+        }
+    }
+
+    @keyframes slide-in {
+        from {
+            transform: translateY(0, 10px);
+        }
+    }
 }

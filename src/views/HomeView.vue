@@ -61,22 +61,25 @@ useEventListener(document, 'keyup', (e) => {
 const showModelParameters = ref(false);
 const modelFile = ref<FileStructure | null>(null);
 
-function onModelParameterInitialized(args: Omit<z.infer<typeof modelParamsSchema>, 'id' | 'model_path' | 'type'>) {
+async function onModelParameterInitialized(args: Omit<z.infer<typeof modelParamsSchema>, 'id' | 'model_path' | 'type'>) {
     if (!modelFile.value) return;
     showModelParameters.value = false;
+    const model_params = JSON.stringify({
+        n_threads: args.n_threads,
+        n_ctx: args.n_ctx,
+        last_n_size: args.last_n_size,
+        seed: args.seed,
+        tokens_to_keep: args.tokens_to_keep,
+        n_batch: args.n_batch,
+        use_mmap: args.use_mmap,
+        use_mlock: args.use_mlock,
+        load_parallel: args.load_parallel,
+        n_load_parallel_blocks: args.n_load_parallel_blocks,
+    });
     router.push({
         name: 'chat', query: {
+            model_params,
             path: modelFile.value.path,
-            n_threads: String(args.n_threads),
-            n_ctx: String(args.n_ctx),
-            last_n_size: String(args.last_n_size),
-            seed: String(args.seed),
-            tokens_to_keep: String(args.tokens_to_keep),
-            n_batch: String(args.n_batch),
-            use_mmap: String(args.use_mmap),
-            use_mlock: String(args.use_mlock),
-            load_parallel: String(args.load_parallel),
-            n_load_parallel_blocks: String(args.n_load_parallel_blocks),
         }
     });
 }

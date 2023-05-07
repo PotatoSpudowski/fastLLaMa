@@ -14,100 +14,176 @@ export const modelParamsSchema = z.object({
     use_mlock: z.boolean().optional(),
     load_parallel: z.boolean().optional(),
     n_load_parallel_blocks: z.number().optional()
-})
-
-export const packetSchema = z.object({
-    id: z.string(),
-    type: z.literal('join'),
-}).or(modelParamsSchema).or(z.object({
-    id: z.string(),
-    type: z.literal('fetch-all-models'),
-    search_dirs: z.string().array().optional(),
-})).or(z.object({
-    id: z.string(),
-    type: z.literal('ingest-message'),
-    message: z.string(),
-    is_system_prompt: z.boolean().optional(),
-})).or(z.object({
-    id: z.string(),
-    type: z.literal('generate-message'),
-    num_of_tokens: z.number().optional(),
-    temperature: z.number().optional(),
-    top_p: z.number().optional(),
-    top_k: z.number().optional(),
-    repetition_penalty: z.number().optional(),
-    stop_words: z.string().array().optional(),
-})).or(z.object({
-    id: z.string(),
-    seq: z.number(),
-    type: z.literal('generate-response'),
-    message: z.string().optional(),
-})).or(z.object({
-    id: z.string(),
-    type: z.literal('error'),
-    message: z.string(),
-})).or(z.object({
-    id: z.string(),
-    type: z.literal('save-model'),
-    file_name: z.string(),
-})).or(z.object({
-    id: z.string(),
-    type: z.literal('load-model'),
-    file_name: z.string(),
-}));
-
+});
 
 export const fileSchema = z.object({
-    type: z.literal('file'),
+    type: z.enum(['file', 'directory']),
     name: z.string(),
     path: z.string(),
-}).or(z.object({
-    type: z.literal('directory'),
-    name: z.string(),
-    path: z.string(),
+});
+
+export const commandAckSchema = z.object({
+    type: z.literal('command-ack'),
+    command: z.string(),
+    args: z.object({
+        name: z.string(),
+        value: z.string().or(z.number()).or(z.boolean()).optional(),
+    }).array()
+});
+
+export const commandSchema = z.object({
+    type: z.literal('command'),
+});
+
+export const initSchema = z.object({
+    type: z.literal('init'),
+    version: z.string(),
+});
+
+export const saveHistorySchema = z.object({
+    id: z.string().or(z.number()),
+    title: z.string(),
+    date: z.number(),
+});
+
+export const initAckSchema = z.object({
+    type: z.literal('init-ack'),
+    currentPath: z.string(),
+    files: fileSchema.array(),
+    saveHistory: saveHistorySchema.array(),
+    commands: commandAckSchema
+});
+
+export const closeSchema = z.object({
+    type: z.literal('close'),
+});
+
+export const sessionLoadSchema = z.object({
+    type: z.literal('session-load'),
+    id: z.string().or(z.number()),
+});
+
+export const sessionLoadAckSchema = z.object({
+    type: z.literal('session-load-ack'),
+    status: z.enum(['success', 'failure']),
+});
+
+export const sessionSaveSchema = z.object({
+    type: z.literal('session-save'),
+});
+
+export const sessionSaveAckSchema = z.object({
+    type: z.literal('session-save-ack'),
+    status: z.enum(['success', 'failure']),
+    id: z.string().or(z.number()),
+});
+
+export const sessionDeleteSchema = z.object({
+    type: z.literal('session-delete'),
+    id: z.string().or(z.number()),
+});
+
+export const sessionDeleteAckSchema = z.object({
+    type: z.literal('session-delete-ack'),
+    status: z.enum(['success', 'failure']),
+});
+
+export const sessionListSchema = z.object({
+    type: z.literal('session-list'),
+});
+
+export const sessionListAckSchema = z.object({
+    type: z.literal('session-list-ack'),
+    sessions: saveHistorySchema.array(),
+});
+
+const systemMessageBaseSchema = z.object({
+    id: z.string(),
+    type: z.literal('system-message'),
+    message: z.string(),
+    function_name: z.string(),
+});
+
+const systemMessageWithoutProgressSchema = systemMessageBaseSchema.merge(z.object({
+    kind: z.enum(['info', 'warning', 'error']),
 }));
+
+export const systemMessageProgressSchema = systemMessageBaseSchema.merge(z.object({
+    kind: z.literal('progress'),
+    progress: z.number(),
+}))
+
+export const systemMessageSchema = systemMessageWithoutProgressSchema.or(systemMessageProgressSchema);
+
+export const conversationMessageStatus = z.object({
+    kind: z.enum(['loading', 'success', 'failure']),
+}).or(z.object({
+    kind: z.literal('progress'),
+    progress: z.number(),
+}));
+
+export const conversationMessageSchema = z.object({
+    id: z.string(),
+    type: z.enum(['user-message', 'model-message']),
+    webui_id: z.string().optional(), // temp id generated for user messages before they are sent to the server and assigned an id
+    title: z.string(),
+    message: z.string(),
+    status: conversationMessageStatus,
+})
+
+export const messageAckSchema = z.object({
+    type: z.literal('message-ack'),
+    id: z.string(),
+    webui_id: z.string(), // temp id generated for user messages before they are sent to the server and assigned an id
+    status: z.enum(['success', 'failure']),
+});
+
+export const fileManagerSchema = z.object({
+    type: z.literal('file-manager'),
+    path: z.string(),
+    kind: z.enum(['go-back', 'open-directory'])
+});
+
+export const fileManagerAckSchema = z.object({
+    type: z.literal('file-manager-ack'),
+    currentPath: z.string(),
+    files: fileSchema.array(),
+});
 
 export type FileStructure = z.infer<typeof fileSchema>;
 
-export type SystemMessageProgress = {
-    id: string,
-    type: 'system',
-    kind: 'progress',
-    function_name: string,
-    message: string,
-    progress: number,
-}
+export type SystemMessageProgress = z.infer<typeof systemMessageProgressSchema>;
 
-export type SystemMessage = {
-    id: string,
-    type: 'system',
-    kind: 'info' | 'warning' | 'error',
-    function_name: string,
-    message: string,
-} | SystemMessageProgress
+export type SystemMessage = z.infer<typeof systemMessageSchema>;
 
-export type MessageStatusKind = 'loading' | 'progress' | 'success' | 'failure';
+export type MessageStatusKind = z.infer<typeof conversationMessageStatus>['kind'];
 
-export type MessageStatus = {
-    kind: Exclude<MessageStatusKind, 'progress'>,
-} | {
-    kind: 'progress',
-    progress: number,
-}
+export type MessageStatus = z.infer<typeof conversationMessageStatus>;
 
-export type ConversationMessage = {
-    id: string,
-    type: 'user' | 'model',
-    title: string,
-    message: string,
-    status: MessageStatus,
-}
+export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 
 export type Message = ConversationMessage | SystemMessage
 
+export type SaveHistoryItem = z.infer<typeof saveHistorySchema>;
 
-export type SaveHistoryItem = {
-    id: string,
-    title: string,
-    date: number,
-}
+export const webSocketMessageSchema = z.union([
+    initSchema,
+    initAckSchema,
+    closeSchema,
+    sessionLoadSchema,
+    sessionLoadAckSchema,
+    sessionSaveSchema,
+    sessionSaveAckSchema,
+    sessionDeleteSchema,
+    sessionDeleteAckSchema,
+    sessionListSchema,
+    sessionListAckSchema,
+    commandSchema,
+    commandAckSchema,
+    systemMessageSchema,
+    messageAckSchema,
+    fileManagerSchema,
+    fileManagerAckSchema,
+    conversationMessageSchema,
+]);
+export type WebSocketMessage = z.infer<typeof webSocketMessageSchema>;

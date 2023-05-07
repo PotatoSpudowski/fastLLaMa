@@ -1,6 +1,7 @@
+import { webSocketMessageSchema, type WebSocketMessage } from '@/model/schema';
 import { defineStore } from 'pinia';
 
-export type SocketCallback<T = any> = (this: WebSocket, data: T) => void;
+export type SocketCallback = (this: WebSocket, data: WebSocketMessage) => void;
 
 type SocketStoreState = {
     socket: WebSocket | null;
@@ -23,7 +24,7 @@ const useSocketStore = defineStore('useSocketStore', {
         _callbacks: [],
     }),
     actions: {
-        connect() {
+        connect(callback?: (err?: any) => void) {
             this.isConnecting = true;
             this.errorMessage = null;
             this.hasError = false;
@@ -31,6 +32,7 @@ const useSocketStore = defineStore('useSocketStore', {
             this.socket.onopen = () => {
                 this.isConnected = true;
                 this.isConnecting = false;
+                callback?.();
             };
             this.socket.onclose = (e) => {
                 this.isConnected = false;
@@ -44,18 +46,23 @@ const useSocketStore = defineStore('useSocketStore', {
                 this.isConnecting = false;
                 this.hasError = true;
                 this.errorMessage = 'Error occurred while connecting to the WebSocket server.';
+                callback?.(this.errorMessage);
             }
             const callbacks = this._callbacks;
             this.socket!.onmessage = function (event) {
-                const data = JSON.parse(event.data);
-                const self = this;
-                callbacks.forEach((callback) => {
-                    callback.apply(self, data);
-                });
+                try {
+                    const data: WebSocketMessage = webSocketMessageSchema.parse(JSON.parse(event.data));
+                    const self = this;
+                    callbacks.forEach((callback) => {
+                        callback.call(self, data);
+                    });
+                } catch (e) {
+                    console.error(e);
+                }
             };
         },
 
-        on<T>(callback: SocketCallback<T>) {
+        on(callback: SocketCallback) {
             this._callbacks.push(callback);
         },
         off(callback: SocketCallback) {
@@ -70,7 +77,11 @@ const useSocketStore = defineStore('useSocketStore', {
             this.isConnecting = false;
             this.errorMessage = null;
             this.hasError = false;
-        }
+        },
+        message(message: WebSocketMessage) {
+            if (!this.socket) return;
+            this.socket.send(JSON.stringify(message));
+        },
     }
 });
 
