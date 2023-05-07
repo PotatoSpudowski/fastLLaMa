@@ -93,7 +93,10 @@ async function initHandshake() {
 async function onConnect() {
     showLoading.value = true;
     connect(async (err) => {
-        if (err) return;
+        if (err) {
+            showLoading.value = false;
+            return;
+        }
         try {
             if (!await initHandshake()) {
                 disconnect();
