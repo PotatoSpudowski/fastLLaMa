@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, MutableMapping, Optional, Union, cast
+from typing import Any, Dict, List, MutableMapping, Optional, Tuple, Union, cast
 import uuid
 
 
@@ -10,22 +10,22 @@ class MessageKind(Enum):
 
     @staticmethod
     def from_string(kind: str) -> 'MessageKind':
-        if kind == 'user':
+        if kind == 'user-message':
             return MessageKind.USER
-        elif kind == 'system':
+        elif kind == 'system-message':
             return MessageKind.SYSTEM
-        elif kind == 'model':
+        elif kind == 'model-message':
             return MessageKind.MODEL
         else:
             raise ValueError('Invalid message kind')
         
     def to_string(self) -> str:
         if self == MessageKind.USER:
-            return 'user'
+            return 'user-message'
         elif self == MessageKind.SYSTEM:
-            return 'system'
+            return 'system-message'
         elif self == MessageKind.MODEL:
-            return 'model'
+            return 'model-message'
         else:
             raise ValueError('Invalid message kind')
 
@@ -92,8 +92,8 @@ class ConversationMessageStatus(Enum):
             raise ValueError('Invalid conversation message status')
 
 class Message:
-    def __init__(self, kind: MessageKind, id = uuid.uuid4()) -> None:
-        self.id = str(id)
+    def __init__(self, kind: MessageKind, id: Optional[str] = None) -> None:
+        self.id = str(uuid.uuid4()) if id is None else id
         self.message_type = kind
 
     def as_system_message(self) -> 'SystemMessage':
@@ -121,12 +121,12 @@ class Message:
         }
 
 class SystemMessage(Message):
-    def __init__(self, kind: SystemMessageKind, function: str, message: str):
+    def __init__(self, kind: SystemMessageKind, function: str, message: str, progress: float = 0.0):
         super().__init__(MessageKind.SYSTEM)
         self.kind = kind
         self.function = function
         self.message = message
-        self.progress = 0.0
+        self.progress = progress
 
     def is_info(self) -> bool:
         return self.kind == SystemMessageKind.INFO
@@ -148,7 +148,7 @@ class SystemMessage(Message):
             'id': self.id,
             'type': self.message_type.to_string(),
             'kind': self.kind.to_string(),
-            'function': self.function,
+            'function_name': self.function,
             'message': self.message,
         }
         if self.is_progress():
@@ -188,7 +188,7 @@ class UserMessage(Message):
             'status': {},
         }
         status: MutableMapping[str, Union[str, float]] = {
-            'type': self.status.to_string(),
+            'kind': self.status.to_string(),
         }
 
         if self.is_progress():
@@ -197,6 +197,50 @@ class UserMessage(Message):
         temp['status'] = status
         return temp
 
+    @staticmethod
+    def is_valid(json: dict) -> Tuple[bool, str]:
+        if 'id' not in json:
+            return (False, "Message 'id' is missing")
+        if 'type' not in json:
+            return (False, "Message 'type' is missing")
+        if 'title' not in json:
+            return (False, "Message 'title' is missing")
+        if 'message' not in json:
+            return (False, "Message 'message' is missing")
+        if 'status' not in json:
+            return (False, "Message 'status' is missing")
+        if 'kind' not in json['status']:
+            return (False, "Message 'status.kind' is missing")
+        if json['type'] != MessageKind.USER.to_string() and json['type'] != MessageKind.SYSTEM.to_string():
+            return (False, "Message 'type' is invalid")
+        
+        if type(json['id']) != str:
+            return (False, "Message 'id' must be a string")
+        
+        if type(json['title']) != str:
+            return (False, "Message 'title' must be a string")
+        
+        if type(json['message']) != str:
+            return (False, "Message 'message' must be a string")
+        
+        if type(json['status']) != dict:
+            return (False, "Message 'status' must be a json object")
+        
+        if type(json['status']['kind']) != str:
+            return (False, "Message 'status.kind' must be a string")
+        
+        if json['status']['kind'] != ConversationMessageStatus.LOADING.to_string() and json['status']['kind'] != ConversationMessageStatus.PROGRESS.to_string() and json['status']['kind'] != ConversationMessageStatus.SUCCESS.to_string() and json['status']['kind'] != ConversationMessageStatus.FAILURE.to_string():
+            return (False, "Message 'status.kind' must be a valid status")
+        
+        if json['status']['kind'] == ConversationMessageStatus.PROGRESS.to_string() and 'progress' not in json['status']:
+            return (False, "Message 'status.progress' is missing")
+        
+        if json['status']['kind'] == ConversationMessageStatus.PROGRESS.to_string() and (type(json['status']['progress']) != float or type(json['status']['progress']) != int):
+            return (False, "Message 'status.progress' must be a float or an int")
+        
+        return (True, '')
+            
+        
 class ModelMessage(UserMessage):
     def __init__(self, title: str, message: str, status: ConversationMessageStatus = ConversationMessageStatus.SUCCESS):
         super().__init__(title, message, status)
@@ -250,3 +294,4 @@ class MessageManager:
         return {
             'messages': [message.to_json() for message in self.messages]
         }
+    

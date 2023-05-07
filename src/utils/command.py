@@ -8,6 +8,21 @@ class CommandArgType(Enum):
     INT = 3
     FLOAT = 4
 
+    @staticmethod
+    def from_string(value: str):
+        if value == 'boolean':
+            return CommandArgType.BOOLEAN
+        if value == 'string':
+            return CommandArgType.STRING
+        if value == 'int':
+            return CommandArgType.INT
+        if value == 'float':
+            return CommandArgType.FLOAT
+        return None
+    
+    def to_json(self):
+        return self.name.lower()
+
 class CommandArg:
     def __init__(self, name: str, type: CommandArgType, value: Union[str, int, float, bool, None]=None):
         self.name = name
@@ -31,7 +46,7 @@ class CommandArg:
     def to_json(self):
         return {
             'name': self.name,
-            'type': self.type,
+            'type': self.type.to_json(),
             'value': self.value,
         }
     
@@ -91,7 +106,7 @@ class Command:
         self.args = { item.get_name() : item for item in args }
 
     def __str__(self):
-        return f"{self.name} ({len(self.args)} {self.args.join(' ')})"
+        return f"{self.name} ({len(self.args)}) {' '.join([str(arg) for (_, arg) in self.args.items()])}"
     
     def __repr__(self):
         return str(self)
@@ -99,7 +114,7 @@ class Command:
     def to_json(self):
         return {
             'name': self.name,
-            'args': [arg.to_json() for arg in self.args]
+            'args': [arg.to_json() for (_, arg) in self.args.items()]
         }
     
     def get_name(self):

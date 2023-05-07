@@ -1,5 +1,5 @@
 from typing import List
-from command import *
+from .command import *
 
 SUPPORTED_COMMANDS: List[Command] = [
     Command('set', [
