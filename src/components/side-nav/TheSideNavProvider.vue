@@ -6,7 +6,7 @@
                     <sp-menu-item v-for="history in histories" :key="history.id" class="group">
                         <div class="w-full justify-between" style="display: grid; grid-template-columns: 1fr auto;">
                             <sp-menu-item-label class="whitespace-nowrap overflow-x-hidden text-ellipsis"
-                                @dblclick="() => onLoad(history.id)">
+                                @dblclick="() => onLoad(history)">
                                 {{ history.title }}
                             </sp-menu-item-label>
                             <button title="Delete" aria-label="Delete history item" tabindex="1"
@@ -74,11 +74,40 @@ function onDelete(id: string) {
     });
 }
 
-function onLoad(id: string) {
+const readQuery = (key: string) => {
+    const query = router.currentRoute.value.query;
+    if (query[key]) {
+        const val = query[key];
+        return (Array.isArray(val) ? val[0] : val) as string;
+    }
+    return null;
+}
+
+async function onLoad(saveItem: SaveHistoryItem) {
+    if (router.currentRoute.value.name === 'chat') {
+        const filepath = readQuery('path');
+        if (filepath === saveItem.model_path) {
+            console.log(filepath, saveItem.model_path);
+            useSocketStore().message({
+                type: 'session-load',
+                id: saveItem.id,
+            });
+            return;
+        }
+    }
+    const routeResult = await router.push({
+        name: 'chat',
+        query: {
+            path: saveItem.model_path,
+            model_params: JSON.stringify(saveItem.model_args),
+        },
+    });
+    if (routeResult) return;
+
     useSocketStore().message({
         type: 'session-load',
-        id,
-    });
+        id: saveItem.id,
+    })
 }
 
 </script>

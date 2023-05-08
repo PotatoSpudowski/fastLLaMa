@@ -98,6 +98,13 @@ function onWebsocketMessage(message: WebSocketMessage) {
             messagesKey.add(message.id);
             break;
         }
+        case 'reset-messages': {
+            const newMessages = message.messages;
+            messagesKey.clear();
+            messages.value = [];
+            newMessages.forEach(updateMessage);
+            break;
+        }
         default: return;
     }
 }

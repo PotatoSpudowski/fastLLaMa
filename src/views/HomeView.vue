@@ -22,7 +22,6 @@ import { ref } from 'vue';
 import AppFilePicker from '@/components/AppFilePicker.vue';
 import TheHomeProvider from '@/components/home/TheHomeProvider.vue';
 import TheHomeWelcomeScreen from '@/components/home/TheHomeWelcomeScreen.vue';
-import { dummyFiles } from '@/model/dummy';
 import type { FileStructure, modelParamsSchema } from '@/model/schema';
 import AppMainLayout from '@/layout/AppMainLayout.vue';
 import TheSideNavProvider from '@/components/side-nav/TheSideNavProvider.vue';

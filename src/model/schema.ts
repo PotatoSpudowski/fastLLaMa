@@ -15,6 +15,10 @@ export const modelParamsSchema = z.object({
     n_load_parallel_blocks: z.number().optional()
 });
 
+export const modelInitCompleteSchema = z.object({
+    type: z.literal('model-init-complete'),
+});
+
 export const fileSchema = z.object({
     kind: z.enum(['file', 'directory']),
     name: z.string(),
@@ -50,6 +54,8 @@ export const saveHistorySchema = z.object({
     id: z.string(),
     title: z.string(),
     date: z.number(),
+    model_path: z.string(),
+    model_args: modelParamsSchema.omit({ type: true, model_path: true }),
 });
 
 export const initAckSchema = z.object({
@@ -148,6 +154,11 @@ export const notificationSchema = z.object({
     message: z.string(),
 });
 
+export const resetMessageSchema = z.object({
+    type: z.literal('reset-messages'),
+    messages: conversationMessageSchema.or(systemMessageSchema).array(),
+});
+
 export type FileStructure = z.infer<typeof fileSchema>;
 
 export type SystemMessageProgress = z.infer<typeof systemMessageProgressSchema>;
@@ -185,6 +196,8 @@ export const webSocketMessageSchema = z.union([
     fileManagerSchema,
     fileManagerAckSchema,
     conversationMessageSchema,
-    notificationSchema
+    notificationSchema,
+    modelInitCompleteSchema,
+    resetMessageSchema
 ]);
 export type WebSocketMessage = z.infer<typeof webSocketMessageSchema>;
