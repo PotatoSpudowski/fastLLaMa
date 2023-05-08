@@ -4,7 +4,6 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import '@spectrum-web-components/bundle/elements.js';
-import 'ionicons/dist/ionicons.js';
 
 import { MotionPlugin } from '@vueuse/motion'
 
@@ -24,6 +23,6 @@ app.use(createPinia())
 app.use(router)
 
 // Motion does not work properly with chrome for some reason
-app.use(MotionPlugin)
+// app.use(MotionPlugin)
 
 app.mount('#app')
