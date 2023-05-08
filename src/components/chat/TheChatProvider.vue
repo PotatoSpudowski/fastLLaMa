@@ -66,11 +66,11 @@ function onKeyUp(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         onSubmit();
-    } else if (e.key === 'ArrowUp') {
+    } else if ((e.key === 'ArrowUp') && e.shiftKey) {
         e.preventDefault();
         const temp = userInputsHistory.getPreviousHistory();
         inputValue.value = temp ?? '';
-    } else if (e.key === 'ArrowDown') {
+    } else if ((e.key === 'ArrowDown') && e.shiftKey) {
         e.preventDefault();
 
         const temp = userInputsHistory.getNextHistory();
