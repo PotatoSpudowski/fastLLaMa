@@ -6,7 +6,7 @@
             <span class="text-xs">{{ message.title }}</span>
         </div>
         <output>
-            <pre class="text-right message__content">{{ message.message.trim() }}</pre>
+            <pre class="text-left message__content">{{ message.message.trim() }}</pre>
         </output>
     </li>
 </template>
