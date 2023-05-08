@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import '@spectrum-web-components/bundle/elements.js';
 
 import { MotionPlugin } from '@vueuse/motion'
 
