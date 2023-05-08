@@ -94,7 +94,7 @@ watchEffect(async (cleanUp) => {
 
         if (!textEl) return;
         textEl.style.maxHeight = '15rem';
-        textEl.style.overflow = 'scroll';
+        textEl.style.overflow = 'auto';
         clearInterval(timerId);
     }, 200);
     cleanUp(() => {
