@@ -11,8 +11,9 @@ from .file_manager import *
 from .command_list import *
 import asyncio
 import os
-from typing import Optional, cast, Dict, List
+from typing import Optional, cast, Dict, List, Union
 from pathlib import Path
+import traceback
 
 MODEL_SAVE_PATH = Path(workspace_path()) / 'saves'
 
@@ -54,14 +55,13 @@ class FastllamaWebsocketLogger(Logger):
     def progress(self, tag: ProgressTag, done_size: int, total_size: int) -> None:
         if (tag != ProgressTag.Init):
             return
-        if tag not in self.progress_task:
-            with self.mutex:
-                if tag not in self.progress_task:
-                    self.progress_task[tag] = self.socket.message_manager.make_system_message(
-                        kind=SystemMessageKind.PROGRESS,
-                        message=f"loading {tag}",
-                        function=f"{tag}"
-                    )
+        with self.mutex:
+            if tag not in self.progress_task:
+                self.progress_task[tag] = self.socket.message_manager.make_system_message(
+                    kind=SystemMessageKind.PROGRESS,
+                    message=f"loading {tag}",
+                    function=f"{tag}"
+                )
         sys_message = self.progress_task[tag]
         sys_message.set_progress((done_size/total_size) * 100)
         asyncio.run_coroutine_threadsafe(self.socket.send_system_message(sys_message), cast(asyncio.AbstractEventLoop, self.socket.high_priority_loop))
@@ -69,27 +69,37 @@ class FastllamaWebsocketLogger(Logger):
             del self.progress_task[tag]
 
 class ModelSession:
-    def __init__(self, model_path: str, title: Optional[str] = None) -> None:
+    def __init__(self, model_path: str, model_args: dict, title: Optional[str] = None) -> None:
         self.id = uuid.uuid4().hex
         self.mode_path = model_path
         self.date = int(datetime.now().timestamp() * 1000)
-        self.filename = f'{self.id}.bin'
+        self.filename = self.id
         self.title = f'Session-${self.date}' if title is None else title
+        self.model_args = model_args
 
     def to_json(self) -> dict:
         return {
             'id': self.id,
             'title': self.title,
             'model_path': self.mode_path,
+            'model_args': self.model_args,
             'date': self.date,
-            'filename': self.filename,
+            'filename': self.filename
         }
     def is_session_valid(self):
-        filepath = MODEL_SAVE_PATH / self.filename
-        return filepath.exists() and filepath.is_file() and os.path.exists(self.mode_path) and os.path.isfile(self.mode_path)
+        filepath = self.get_save_bin_path()
+        return (
+                filepath.exists()               and
+                filepath.is_file()              and
+                os.path.exists(self.mode_path)  and
+                os.path.isfile(self.mode_path)
+            )
     
-    def get_save_path(self) -> Path:
-        return MODEL_SAVE_PATH / self.filename
+    def get_save_bin_path(self) -> Path:
+        return MODEL_SAVE_PATH / f'{self.filename}.bin'
+    
+    def get_save_messages_path(self) -> Path:
+        return MODEL_SAVE_PATH / f'{self.filename}_messages.json'
 
 class FastllamaWebsocket:
     def __init__(self, websocket: WebSocket):
@@ -117,6 +127,7 @@ class FastllamaWebsocket:
             "stop_words" : ["###"],
         }
         self.session_config: List[ModelSession] = []
+        self.model_args: dict = {}
 
     def __run_high_priority_loop(self) -> None:
         self.high_priority_loop = asyncio.new_event_loop()
@@ -238,6 +249,7 @@ class FastllamaWebsocket:
             })
         except Exception as e:
             # print(e)
+            traceback.print_exc()
             await self.notify_error(str(e))
             return
         
@@ -266,6 +278,8 @@ class FastllamaWebsocket:
             use_mlock = ws_message.get('use_mlock', False)
             n_load_parallel_blocks = ws_message.get('n_load_parallel_blocks', 1)
 
+            self.model_args = ws_message;
+
             self.model_path = ws_message['model_path']
             self.model = Model(
                 path=self.model_path,
@@ -281,7 +295,11 @@ class FastllamaWebsocket:
                 n_load_parallel_blocks=n_load_parallel_blocks,
                 logger=FastllamaWebsocketLogger(self)
             )
+            await self.__send_message({
+                'type': 'model-init-complete'
+            })
         except Exception as e:
+            traceback.print_exc()
             await self.notify_error(str(e))
             return
     def __stream_token_callback(self, message: str):
@@ -369,7 +387,7 @@ class FastllamaWebsocket:
                 temp = json.load(f)
                 for s in temp:
                     print(s)
-                    session = ModelSession(model_path=s['model_path'])
+                    session = ModelSession(model_path=s['model_path'], model_args=s['model_args'], title=s['title'])
                     session.id = s['id']
                     session.date=s['date']
                     session.filename=s['filename']
@@ -386,6 +404,19 @@ class FastllamaWebsocket:
         with open(path, 'w') as f:
             json.dump([m.to_json() for m in self.session_config], f)
 
+    def __write_model_messages(self, session: ModelSession) -> None:
+        if not session.get_save_messages_path().parent.exists():
+            session.get_save_messages_path().parent.mkdir()
+
+        with open(session.get_save_messages_path(), 'w') as f:
+            json.dump(self.message_manager.to_json()['messages'], f)
+
+    def __read_model_messages(self, session: ModelSession) -> None:
+        if session.get_save_messages_path().exists():
+            with open(session.get_save_messages_path(), 'r') as f:
+                temp_messages = MessageManager.from_json(json.load(f))
+                self.message_manager.replace_non_system_messages(temp_messages.messages) 
+                
     async def __send_session_list(self) -> None:
         await self.__send_message({
             'type': 'session-list-ack',
@@ -400,18 +431,20 @@ class FastllamaWebsocket:
 
             message_text: Optional[str] = self.message_manager.get_save_title(size=40)
             
-            session = ModelSession(model_path=self.model_path, title=message_text)
+            session = ModelSession(model_path=self.model_path, model_args=self.model_args, title=message_text)
             if not MODEL_SAVE_PATH.exists():
                 MODEL_SAVE_PATH.mkdir()
 
-            if self.model.save_state(str(session.get_save_path())) == True:
+            if self.model.save_state(str(session.get_save_bin_path())) == True:
                 self.session_config.append(session)
                 self.__write_session_config()
+                self.__write_model_messages(session)
                 
                 await self.__send_session_list()
             else:
                 await self.notify_error("Failed to save session")
         except Exception as e:
+            traceback.print_exc()
             await self.notify_error(str(e))
             return
         
@@ -432,15 +465,19 @@ class FastllamaWebsocket:
             if index == -1:
                 await self.notify_error("Session not found")
                 return
-            path = self.session_config[index].get_save_path()
-            if path.exists():
-                path.unlink()
+            bin_path = self.session_config[index].get_save_bin_path()
+            message_path = self.session_config[index].get_save_messages_path()
+            if bin_path.exists():
+                bin_path.unlink()
+            
+            if message_path.exists():
+                message_path.unlink()
             
             self.session_config.remove(self.session_config[index])
             self.__write_session_config()
             await self.__send_session_list()
         except Exception as e:
-            print(e)
+            traceback.print_exc()
             await self.notify_error(str(e))
             return
         
@@ -475,11 +512,18 @@ class FastllamaWebsocket:
                 await self.notify_error("Model session is not compatible with current model")
                 return
             
-            if not self.model.load_state(str(session.get_save_path())):
+            if not self.model.load_state(str(session.get_save_bin_path())):
                 await self.notify_error("Failed to load session")
                 return
+            
+            self.__read_model_messages(session)
+            
+            await self.__send_message({
+                'type': 'reset-messages',
+                'messages': self.message_manager.to_json()['messages']
+            })
         except Exception as e:
-            print(e)
+            traceback.print_exc()
             await self.notify_error(str(e))
             return
 

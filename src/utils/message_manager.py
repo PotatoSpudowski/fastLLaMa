@@ -154,6 +154,16 @@ class SystemMessage(Message):
         if self.is_progress():
             temp['progress'] = self.progress
         return temp
+    
+    @staticmethod
+    def from_json(json: dict) -> 'SystemMessage':
+        kind = SystemMessageKind.from_string(json['kind'])
+        function = json['function_name']
+        message = json['message']
+        if kind == SystemMessageKind.PROGRESS:
+            return SystemMessage(kind, function, message, json['progress'])
+        else:
+            return SystemMessage(kind, function, message)
 
 
 class UserMessage(Message):
@@ -196,6 +206,17 @@ class UserMessage(Message):
 
         temp['status'] = status
         return temp
+    
+    @staticmethod
+    def from_json(json: dict) -> 'UserMessage':
+        if not UserMessage.is_valid(json):
+            raise ValueError('Invalid user message')
+        temp = UserMessage(json['title'], json['message'], ConversationMessageStatus.from_string(json['status']['kind']))
+        temp.id = json['id']
+        if temp.is_progress():
+            temp.progress = json['status']['progress']
+        return temp
+        
 
     @staticmethod
     def is_valid(json: dict) -> Tuple[bool, str]:
@@ -246,6 +267,16 @@ class ModelMessage(UserMessage):
         super().__init__(title, message, status)
         self.message_type = MessageKind.MODEL
         self.message = message
+
+    @staticmethod
+    def from_json(json: dict) -> 'ModelMessage':
+        if not ModelMessage.is_valid(json):
+            raise ValueError('Invalid model message')
+        temp = ModelMessage(json['title'], json['message'], ConversationMessageStatus.from_string(json['status']['kind']))
+        temp.id = json['id']
+        if temp.is_progress():
+            temp.progress = json['status']['progress']
+        return temp
 
 class MessageManager:
     def __init__(self) -> None:
@@ -309,3 +340,28 @@ class MessageManager:
             'messages': [message.to_json() for message in self.messages]
         }
     
+    @staticmethod
+    def from_json(json: List[dict]) -> 'MessageManager':
+        manager = MessageManager()
+        for message in json:
+            if message['type'] == MessageKind.SYSTEM.to_string():
+                manager.add_message(SystemMessage.from_json(message))
+            elif message['type'] == MessageKind.USER.to_string():
+                manager.add_message(UserMessage.from_json(message))
+            elif message['type'] == MessageKind.MODEL.to_string():
+                manager.add_message(ModelMessage.from_json(message))
+        return manager
+    
+    def replace_non_system_messages(self, messages: List[Message]) -> None:
+        temp_res: List[Message] = []
+        for message in self.messages:
+            if message is None:
+                continue
+            if message.is_system_message():
+                temp_res.append(message)
+        for message in messages:
+            if message is None:
+                continue
+            if not message.is_system_message():
+                temp_res.append(message)
+        self.messages = temp_res
