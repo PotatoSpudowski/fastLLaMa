@@ -60,6 +60,7 @@ const useSocketStore = defineStore('useSocketStore', {
                         callback.call(self, data);
                     });
                 } catch (e) {
+                    console.log(event.data);
                     console.error(e);
                 }
             };

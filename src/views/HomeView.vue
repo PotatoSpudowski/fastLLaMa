@@ -36,7 +36,6 @@ const isFilePickerShowing = ref(false);
 const router = useRouter();
 
 function onConfirm(file: FileStructure) {
-    console.log(file);
     modelFile.value = file;
     showModelParameters.value = true;
 }

@@ -3,7 +3,7 @@
         <template #aside>
             <TheSideNavProvider />
         </template>
-        <TheChatProvider v-if="filepath" ref="chatProviderRef" @message="onUserMessage">
+        <TheChatProvider v-if="filepath" ref="chatProviderRef" @message="onUserMessage" @command="onUserCommand">
             <template v-for="message in messages" :key="message.id">
                 <TheChatSystemMessage v-if="message.type === 'system-message'" :message="message" />
                 <TheChatUserMessage v-else-if="message.type === 'user-message'" :message="message" />
@@ -22,9 +22,11 @@ import TheChatUserMessage from '@/components/chat/TheChatUserMessage.vue';
 import AppMainLayout from '@/layout/AppMainLayout.vue';
 import TheSideNavProvider from '@/components/side-nav/TheSideNavProvider.vue';
 import { useRouter } from 'vue-router';
-import type { ConversationMessage, Message, WebSocketMessage } from '@/model/schema';
+import type { Command, ConversationMessage, Message, WebSocketMessage } from '@/model/schema';
 import useSocketStore from '@/stores/socketStore';
 import { v4 as uuidv4 } from '@lukeed/uuid';
+import type { Token } from '@/lib/parser';
+import useAppStore from '@/stores/appStore';
 
 const messages = ref<Message[]>([]);
 const router = useRouter();
@@ -47,6 +49,7 @@ function addMessage(message: Message) {
     if (messagesKey.has(message.id)) return;
     messagesKey.add(message.id);
     messages.value.push(message);
+    chatProviderRef.value?.scrollToLatestMessage();
 }
 
 function searchMessageFromEnd(id: string) {
@@ -139,5 +142,64 @@ function onUserMessage(message: string) {
 }
 
 // ----------------- User Message -----------------
+
+
+// ----------------- User Command -----------------
+
+function normalizeCommandValue(value: string | undefined | null, type: Command['args'][0]['type']) {
+    switch (type) {
+        case 'float': {
+            if (value == null) return 0;
+            const num = parseFloat(value);
+            return Number.isNaN(num) ? 0 : num;
+        }
+        case 'int': {
+            if (value == null) return 0;
+            const num = parseInt(value);
+            return Number.isNaN(num) ? 0 : num;
+        }
+        case 'string': return String(value ?? '');
+        case 'boolean': return value == null || value === 'true';
+        default: return value;
+    }
+}
+
+function normalizeCommand(token: Token[]) {
+    if (token[0].type !== 'cmd') return undefined;
+    const cmd_name = token[0].value;
+    const cmdArgs = [] as Command['args'];
+    const { commands } = useAppStore();
+    const cmd = commands.find((cmd) => cmd.name === cmd_name);
+    if (!cmd) return undefined;
+    for (let i = 1; i < token.length; ++i) {
+        const arg = token[i];
+        if (arg.type === 'cmd') return undefined;
+        const argName = arg.type === 'arg' ? arg.name : arg.value;
+        const argWitness = cmd.args.find((arg) => arg.name === argName);
+        if (!argWitness) continue;
+        cmdArgs.push({
+            name: argName,
+            value: normalizeCommandValue(arg.value, argWitness.type),
+            type: argWitness.type,
+        });
+    }
+    return {
+        name: cmd_name,
+        args: cmdArgs,
+    };
+}
+
+function onUserCommand(command: Token[]) {
+    const cmd = normalizeCommand(command);
+    if (!cmd) return;
+
+    websocketStore.message({
+        type: 'invoke-command',
+        command: cmd.name,
+        args: cmd.args,
+    })
+}
+
+// ----------------- User Command -----------------
 
 </script>

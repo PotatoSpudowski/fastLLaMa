@@ -21,8 +21,8 @@ export const fileSchema = z.object({
     path: z.string(),
 });
 
-export const commandAckSchema = z.object({
-    type: z.literal('command-ack'),
+export const supportedCommandAckSchema = z.object({
+    type: z.literal('supported-command-ack'),
     command: z.string(),
     args: z.object({
         name: z.string(),
@@ -31,8 +31,14 @@ export const commandAckSchema = z.object({
     }).array()
 });
 
-export const commandSchema = z.object({
-    type: z.literal('command'),
+export const supportedCommandSchema = z.object({
+    type: z.literal('supported-command'),
+});
+
+export const invokeCommandSchema = z.object({
+    type: z.literal('invoke-command'),
+    command: z.string(),
+    args: supportedCommandAckSchema.shape.args
 });
 
 export const initSchema = z.object({
@@ -41,7 +47,7 @@ export const initSchema = z.object({
 });
 
 export const saveHistorySchema = z.object({
-    id: z.string().or(z.number()),
+    id: z.string(),
     title: z.string(),
     date: z.number(),
 });
@@ -53,7 +59,7 @@ export const initAckSchema = z.object({
     saveHistory: saveHistorySchema.array(),
     commands: z.object({
         name: z.string(),
-        args: commandAckSchema.shape.args
+        args: supportedCommandAckSchema.shape.args
     }).array()
 });
 
@@ -66,29 +72,13 @@ export const sessionLoadSchema = z.object({
     id: z.string().or(z.number()),
 });
 
-export const sessionLoadAckSchema = z.object({
-    type: z.literal('session-load-ack'),
-    status: z.enum(['success', 'failure']),
-});
-
 export const sessionSaveSchema = z.object({
     type: z.literal('session-save'),
-});
-
-export const sessionSaveAckSchema = z.object({
-    type: z.literal('session-save-ack'),
-    status: z.enum(['success', 'failure']),
-    id: z.string().or(z.number()),
 });
 
 export const sessionDeleteSchema = z.object({
     type: z.literal('session-delete'),
     id: z.string().or(z.number()),
-});
-
-export const sessionDeleteAckSchema = z.object({
-    type: z.literal('session-delete-ack'),
-    status: z.enum(['success', 'failure']),
 });
 
 export const sessionListSchema = z.object({
@@ -153,8 +143,8 @@ export const fileManagerAckSchema = z.object({
     files: fileSchema.array(),
 });
 
-export const errorSchema = z.object({
-    type: z.literal('error'),
+export const notificationSchema = z.object({
+    type: z.enum(['error-notification', 'success-notification', 'warning-notification', 'info-notification']),
     message: z.string(),
 });
 
@@ -176,25 +166,25 @@ export type SaveHistoryItem = z.infer<typeof saveHistorySchema>;
 
 export type InitAck = z.infer<typeof initAckSchema>;
 
+export type Command = Omit<z.infer<typeof supportedCommandAckSchema>, 'type'>;
+
 export const webSocketMessageSchema = z.union([
     initSchema,
     initAckSchema,
     closeSchema,
     sessionLoadSchema,
-    sessionLoadAckSchema,
     sessionSaveSchema,
-    sessionSaveAckSchema,
     sessionDeleteSchema,
-    sessionDeleteAckSchema,
     sessionListSchema,
     sessionListAckSchema,
-    commandSchema,
-    commandAckSchema,
+    supportedCommandSchema,
+    supportedCommandAckSchema,
+    invokeCommandSchema,
     systemMessageSchema,
     messageAckSchema,
     fileManagerSchema,
     fileManagerAckSchema,
     conversationMessageSchema,
-    errorSchema
+    notificationSchema
 ]);
 export type WebSocketMessage = z.infer<typeof webSocketMessageSchema>;

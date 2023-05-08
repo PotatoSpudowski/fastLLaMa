@@ -32,8 +32,10 @@
 <script setup lang="ts">
 import { parseCommand, type Token } from '@/lib/parser';
 import { computed, nextTick, ref, watchEffect } from 'vue';
-import { dummyCommands } from '@/model/dummy';
 import { watchDebounced } from '@vueuse/core';
+import { storeToRefs } from 'pinia';
+import useAppStore from '@/stores/appStore';
+import { InputHistory } from '@/lib/inputHistory';
 
 interface Emits {
     (e: 'message', message: string): void,
@@ -44,6 +46,7 @@ const emits = defineEmits<Emits>();
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const inputValue = ref('');
+const userInputsHistory = new InputHistory();
 
 function onSubmit() {
     if (!inputRef.value) return;
@@ -54,8 +57,8 @@ function onSubmit() {
         emits('message', value);
     } else {
         emits('command', command);
-        console.log(command);
     }
+    userInputsHistory.addHistory(value);
     inputValue.value = '';
 }
 
@@ -63,6 +66,15 @@ function onKeyUp(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         onSubmit();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const temp = userInputsHistory.getPreviousHistory();
+        inputValue.value = temp ?? '';
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+
+        const temp = userInputsHistory.getNextHistory();
+        inputValue.value = temp ?? '';
     }
 }
 
@@ -94,7 +106,7 @@ watchEffect(async (cleanUp) => {
 // ------------------ Command Suggestions ------------------
 const cursorPosition = ref(0);
 const commandSuggestions = ref<Token[]>([]);
-const possibleCommands = dummyCommands;
+const { commands: possibleCommands } = storeToRefs(useAppStore());
 const showSuggestions = ref(false);
 const inputFontSize = computed(() => {
     if (!inputRef.value) return 0;
@@ -127,26 +139,39 @@ watchDebounced(inputValue, () => {
 
 const nextPossibleSuggestions = computed(() => {
     if (!showSuggestions.value) return [];
-    if (commandSuggestions.value.length === 0) return Object.keys(possibleCommands).map((key) => {
+    if (commandSuggestions.value.length === 0) return possibleCommands.value.map((cmd) => {
         return {
             type: 'cmd',
-            value: key,
+            value: cmd.name,
         } as Token;
     });
 
-    const command = possibleCommands[commandSuggestions.value[0].value];
+    const command = possibleCommands.value.find((cmd) => cmd.name === commandSuggestions.value[0].value);
     if (!command) return [];
 
     const unusedCommands: Token[] = [];
 
-    for (let i = 0; i < command.length; ++i) {
-        const el = command[i];
-        const argName = el.type === 'arg' ? el.name : el.value;
+    for (let i = 0; i < command.args.length; ++i) {
+        const el = command.args[i];
+        const argName = el.name;
         const cmdExists = commandSuggestions.value.some((cmd) => {
             if (cmd.type === 'arg') return cmd.name === argName;
             return cmd.value === argName;
         });
-        if (!cmdExists) unusedCommands.push(el);
+        if (!cmdExists) {
+            if (el.type === 'boolean') {
+                unusedCommands.push({
+                    type: 'string',
+                    value: argName
+                });
+            } else {
+                unusedCommands.push({
+                    type: 'arg',
+                    name: argName,
+                    value: ''
+                });
+            }
+        }
     }
     return unusedCommands;
 });

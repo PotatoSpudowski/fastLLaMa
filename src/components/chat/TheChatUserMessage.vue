@@ -1,9 +1,9 @@
 <template>
     <li class="message-element message-element-right message-element-user my-2">
         <div class="flex items-center gap-1 message__user-title">
+            <TheChatMessageStatus :status="message.status" />
             <ion-icon name="person"></ion-icon>
             <span class="text-xs">{{ message.title }}</span>
-            <TheChatMessageStatus :status="message.status" />
         </div>
         <output>
             <pre class="text-right message__content">{{ message.message.trim() }}</pre>

@@ -15,7 +15,6 @@ const router = useRouter();
 
 const errorMessage = computed(() => {
     const { params } = router.currentRoute.value;
-    console.log(params);
     return params.message;
 });
 </script>
