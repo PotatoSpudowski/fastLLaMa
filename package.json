@@ -37,6 +37,7 @@
         "@spectrum-web-components/bundle": "^0.30.0",
         "@vueuse/core": "^10.1.2",
         "@vueuse/motion": "2.0.0-beta.12",
+        "ionicons": "^7.1.0",
         "lit-html": "^2.7.3",
         "pinia": "^2.0.32",
         "vue": "^3.2.47",

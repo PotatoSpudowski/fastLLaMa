@@ -13,6 +13,9 @@ dependencies:
   '@vueuse/motion':
     specifier: 2.0.0-beta.12
     version: 2.0.0-beta.12(vue@3.2.47)
+  ionicons:
+    specifier: ^7.1.0
+    version: 7.1.0
   lit-html:
     specifier: ^2.7.3
     version: 2.7.3
@@ -1136,6 +1139,12 @@ packages:
     resolution: {integrity: sha512-SNUQ5nFOf6eNmuu+Z2V2DgB7j2uHjiS0PVAgyjvW2ad6S0HdwhBJHmlmKS2lB7tXAV+qI84oaznIk1W+EaM1TQ==}
     dependencies:
       '@spectrum-web-components/base': 0.30.0
+    dev: false
+
+  /@stencil/core@2.22.3:
+    resolution: {integrity: sha512-kmVA0M/HojwsfkeHsifvHVIYe4l5tin7J5+DLgtl8h6WWfiMClND5K3ifCXXI2ETDNKiEk21p6jql3Fx9o2rng==}
+    engines: {node: '>=12.10.0', npm: '>=6.0.0'}
+    hasBin: true
     dev: false
 
   /@swc/helpers@0.4.14:
@@ -2533,6 +2542,12 @@ packages:
       has: 1.0.3
       side-channel: 1.0.4
     dev: true
+
+  /ionicons@7.1.0:
+    resolution: {integrity: sha512-iE4GuEdEHARJpp0sWL7WJZCzNCf5VxpNRhAjW0fLnZPnNL5qZOJUcfup2Z2Ty7Jk8Q5hacrHfGEB1lCwOdXqGg==}
+    dependencies:
+      '@stencil/core': 2.22.3
+    dev: false
 
   /is-array-buffer@3.0.2:
     resolution: {integrity: sha512-y+FyyR/w8vfIRq4eQcM1EYgSTnmHXPqaF+IgzgraytCFq5Xh8lllDVmAZolPJiZttZLeFSINPYMaEJ7/vWUa1w==}

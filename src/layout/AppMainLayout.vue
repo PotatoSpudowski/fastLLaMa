@@ -18,6 +18,6 @@
 import useSocketStore from '@/stores/socketStore';
 import { storeToRefs } from 'pinia';
 
-
 const { isConnected: isWebsocketConnected } = storeToRefs(useSocketStore())
+
 </script>
