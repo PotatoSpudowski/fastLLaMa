@@ -274,8 +274,22 @@ class MessageManager:
     def get_messages(self) -> List[Message]:
         return self.messages
     
-    def get_last_message(self) -> Message:
-        return self.messages[-1]
+    def get_last_message(self) -> Optional[Message]:
+        if len(self.messages) > 0:
+            return self.messages[-1]
+        return None
+    
+    def get_first_message(self) -> Optional[Message]:
+        if len(self.messages) > 0:
+            return self.messages[0]
+        return None
+    
+    def get_save_title(self, size=20) -> Optional[str]:
+        for message in self.messages:
+            if message.message_type == MessageKind.USER:
+                temp = cast(UserMessage, message)
+                return temp.message[0: min(size, len(temp.message))]
+        return None
     
     def get_message(self, id: str) -> Optional[Message]:
         for message in self.messages:

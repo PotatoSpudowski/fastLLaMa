@@ -13,7 +13,7 @@ SUPPORTED_COMMANDS: List[Command] = [
     ]),
     Command('reset', []),
     Command('attach', [
-        CommandArg('lora', CommandArgType.BOOLEAN, False),
+        CommandArg('lora', CommandArgType.STRING, None),
     ]),
     Command('detach', [
         CommandArg('lora', CommandArgType.BOOLEAN, False),

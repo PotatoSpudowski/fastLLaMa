@@ -99,6 +99,26 @@ class CommandArg:
         except:
             return None
         return None
+    
+    @staticmethod
+    def from_json(arg: dict) -> 'CommandArg':
+        if type(arg) != dict:
+            raise ValueError("All arguments must be objects")
+        
+        if 'name' not in arg:
+            raise ValueError("'name' is required")
+        
+        if type(arg['name']) != str:
+            raise ValueError("'name' must be a string")
+        
+        if 'value' not in arg:
+            raise ValueError("'value' is required")
+        
+        if 'type' not in arg:
+            raise ValueError("'type' is required")
+        
+        cmd_type = CommandArgType.from_string(arg['type'])
+        return CommandArg(name=arg['name'], value=arg['value'], type=cmd_type)
 
 class Command:
     def __init__(self, name: str, args: list[CommandArg]):
