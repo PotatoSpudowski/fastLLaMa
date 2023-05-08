@@ -266,7 +266,9 @@ class FastllamaWebsocket:
             if not os.path.isfile(ws_message['model_path']):
                 await self.notify_error(f"Model file '{ws_message['model_path']}' does not exist")
                 return
-            
+            self.message_manager = MessageManager()
+            self.current_gen_message = None
+                        
             n_threads = ws_message.get('n_threads', 4)
             n_ctx = ws_message.get('n_ctx', 512)
             last_n_size = ws_message.get('last_n_size', 64)
